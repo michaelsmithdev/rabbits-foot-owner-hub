@@ -1,9 +1,26 @@
 export type InvoiceStatus =
   | 'draft'
   | 'sent'
+  | 'partial'
   | 'paid'
   | 'overdue'
   | 'void'
+
+export type PaymentMethod =
+  | 'cash'
+  | 'check'
+  | 'card'
+  | 'online'
+
+export type InvoicePayment = {
+  id: string
+  date: string
+  amount: number
+  method: PaymentMethod
+  referenceNumber: string
+  notes: string
+  createdAt: string
+}
 
 export type InvoiceLineItem = {
   id: string
@@ -38,6 +55,7 @@ export type Invoice = {
 
   notes: string
   status: InvoiceStatus
+  payments: InvoicePayment[]
 
   createdAt: string
   updatedAt: string

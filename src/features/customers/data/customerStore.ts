@@ -1,4 +1,5 @@
 import type { Customer } from '../types/Customer'
+import { queueCollectionSync } from '../../cloud/syncQueue'
 
 const STORAGE_KEY = 'rabbits-foot-customers'
 
@@ -84,6 +85,7 @@ export function loadCustomers(): Customer[] {
 export function saveCustomers(customers: Customer[]): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(customers))
+    queueCollectionSync('customer', customers)
   } catch (error) {
     console.error('Customer data could not be saved.', error)
   }

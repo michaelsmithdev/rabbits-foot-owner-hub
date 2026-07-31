@@ -33,6 +33,7 @@ import '../styles/Estimates.css'
 
 type EstimatesProps = {
   initialCustomerId: string | null
+  openBuilderOnMount?: boolean
 }
 
 type ServiceOption = {
@@ -293,6 +294,7 @@ function getMatchingOption(
 
 function Estimates({
   initialCustomerId,
+  openBuilderOnMount = false,
 }: EstimatesProps) {
   const [
     activeDocumentTab,
@@ -308,7 +310,7 @@ function Estimates({
   >(() => loadEstimates())
 
   const [isBuilderOpen, setIsBuilderOpen] =
-    useState(Boolean(initialCustomerId))
+    useState(openBuilderOnMount)
 
   const [
     editingEstimateId,
@@ -328,7 +330,15 @@ function Estimates({
   ] = useState('')
 
   const [serviceAddress, setServiceAddress] =
-    useState('')
+    useState(() => {
+      const initialCustomer = customers.find(
+        (customer) => customer.id === initialCustomerId,
+      )
+
+      return initialCustomer
+        ? formatCustomerAddress(initialCustomer)
+        : ''
+    })
 
   const [description, setDescription] =
     useState('')
@@ -359,27 +369,6 @@ function Estimates({
   useEffect(() => {
     saveEstimates(estimates)
   }, [estimates])
-
-  useEffect(() => {
-    if (!initialCustomerId) {
-      return
-    }
-
-    const customer = customers.find(
-      (currentCustomer) =>
-        currentCustomer.id === initialCustomerId,
-    )
-
-    setEditingEstimateId(null)
-    setSelectedCustomerId(initialCustomerId)
-    setIsBuilderOpen(true)
-
-    if (customer) {
-      setServiceAddress(
-        formatCustomerAddress(customer),
-      )
-    }
-  }, [initialCustomerId, customers])
 
   useEffect(() => {
     if (!isBuilderOpen) {
@@ -947,6 +936,8 @@ function Estimates({
         'Payment is due within 14 days.',
 
       status: 'draft',
+
+      payments: [],
 
       createdAt: currentTimestamp,
 

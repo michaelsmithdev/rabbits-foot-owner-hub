@@ -1,66 +1,143 @@
-import { useState } from 'react'
-import Sidebar, {
+import { useEffect, useState } from 'react'
+import { Plus } from 'lucide-react'
+
+import Sidebar from './components/Sidebar/Sidebar'
+import {
+  navigationItems,
   type PageName,
-} from './components/Sidebar/Sidebar'
+} from './components/Sidebar/navigation'
 import Customers from './features/customers/pages/Customers'
-import Dashboard from './pages/Dashboard/Dashboard'
 import Estimates from './features/estimates/pages/Estimates'
+import CloudSyncStatus from './features/cloud/CloudSyncStatus'
+import { DATA_REFRESHED_EVENT } from './features/cloud/syncQueue'
+import ConnectionStatus from './features/pwa/components/ConnectionStatus'
+import Dashboard from './pages/Dashboard/Dashboard'
 import Inbox from './pages/Inbox/Inbox'
 import Settings from './pages/Settings/Settings'
 
-function App() {
-  const [activePage, setActivePage] =
-    useState<PageName>('home')
+type EstimateLaunch = {
+  requestId: number
+  customerId: string | null
+  openBuilder: boolean
+}
 
-  const [
-    selectedEstimateCustomerId,
-    setSelectedEstimateCustomerId,
-  ] = useState<string | null>(null)
+const validPages = new Set<PageName>(
+  navigationItems.map((item) => item.id),
+)
+
+function getPageFromHash(): PageName {
+  const requestedPage = window.location.hash.replace('#', '')
+
+  return validPages.has(requestedPage as PageName)
+    ? (requestedPage as PageName)
+    : 'home'
+}
+
+function App() {
+  const [activePage, setActivePage] = useState<PageName>(getPageFromHash)
+  const [estimateLaunch, setEstimateLaunch] = useState<EstimateLaunch>({
+    requestId: 0,
+    customerId: null,
+    openBuilder: false,
+  })
+  const [dataRevision, setDataRevision] = useState(0)
+
+  useEffect(() => {
+    function handleHashChange() {
+      setActivePage(getPageFromHash())
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [])
+
+  useEffect(() => {
+    const handleDataRefresh = () => {
+      setDataRevision((currentRevision) => currentRevision + 1)
+    }
+
+    window.addEventListener(DATA_REFRESHED_EVENT, handleDataRefresh)
+
+    return () =>
+      window.removeEventListener(DATA_REFRESHED_EVENT, handleDataRefresh)
+  }, [])
+
+  useEffect(() => {
+    const currentPage = navigationItems.find(
+      (item) => item.id === activePage,
+    )
+
+    document.title = currentPage
+      ? `${currentPage.label} | Rabbit's Foot Owner Hub`
+      : "Rabbit's Foot Owner Hub"
+  }, [activePage])
+
+  function navigateTo(page: PageName) {
+    setActivePage(page)
+
+    const nextHash = page === 'home' ? '' : `#${page}`
+
+    if (window.location.hash !== nextHash) {
+      window.location.hash = nextHash
+    }
+  }
 
   function openEstimateBuilder(customerId?: string) {
-    setSelectedEstimateCustomerId(customerId ?? null)
-    setActivePage('documents')
+    setEstimateLaunch((currentLaunch) => ({
+      requestId: currentLaunch.requestId + 1,
+      customerId: customerId ?? null,
+      openBuilder: true,
+    }))
+    navigateTo('documents')
   }
 
   function handlePageChange(page: PageName) {
-    if (page !== 'documents') {
-      setSelectedEstimateCustomerId(null)
+    if (page === 'documents') {
+      setEstimateLaunch((currentLaunch) => ({
+        requestId: currentLaunch.requestId + 1,
+        customerId: null,
+        openBuilder: false,
+      }))
     }
 
-    setActivePage(page)
+    navigateTo(page)
   }
 
   function renderCurrentPage() {
     switch (activePage) {
       case 'customers':
-        return (
-          <Customers
-            onStartEstimate={(customerId) =>
-              openEstimateBuilder(customerId)
-            }
-          />
-        )
+        return <Customers onStartEstimate={openEstimateBuilder} />
 
-           case 'documents':
+      case 'documents':
         return (
           <Estimates
-            initialCustomerId={
-              selectedEstimateCustomerId
-            }
+            initialCustomerId={estimateLaunch.customerId}
+            key={estimateLaunch.requestId}
+            openBuilderOnMount={estimateLaunch.openBuilder}
           />
         )
 
       case 'inbox':
-        return <Inbox />
+        return <Inbox onOpenDocuments={() => handlePageChange('documents')} />
 
       case 'settings':
         return <Settings />
 
       case 'home':
       default:
-        return <Dashboard />
+        return (
+          <Dashboard
+            onOpenCustomers={() => handlePageChange('customers')}
+            onOpenDocuments={() => handlePageChange('documents')}
+          />
+        )
     }
   }
+
+  const currentPageLabel =
+    navigationItems.find((item) => item.id === activePage)?.label ??
+    'Dashboard'
 
   return (
     <div className="app-shell">
@@ -71,26 +148,30 @@ function App() {
 
       <main className="workspace">
         <header className="topbar">
-          <label className="search-box">
-            <span aria-hidden="true">⌕</span>
+          <div className="topbar-context">
+            <span>OWNER HUB</span>
+            <strong>{currentPageLabel}</strong>
+          </div>
 
-            <input
-              aria-label="Search"
-              placeholder="Search customers, estimates, invoices..."
-              type="search"
-            />
-          </label>
-
-          <button
-            className="new-estimate-button"
-            onClick={() => openEstimateBuilder()}
-            type="button"
-          >
-            + New estimate
-          </button>
+          <div className="topbar-actions">
+            <ConnectionStatus />
+            <CloudSyncStatus />
+            <button
+              aria-label="New estimate"
+              className="new-estimate-button"
+              onClick={() => openEstimateBuilder()}
+              type="button"
+            >
+              <Plus aria-hidden="true" size={19} strokeWidth={2.5} />
+              <span>New estimate</span>
+            </button>
+          </div>
         </header>
 
-        <section className="page-content">
+        <section
+          className="page-content"
+          key={activePage === 'documents' ? activePage : `${activePage}-${dataRevision}`}
+        >
           {renderCurrentPage()}
         </section>
       </main>

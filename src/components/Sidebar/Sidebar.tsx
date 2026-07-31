@@ -1,89 +1,103 @@
-export type PageName =
-  | 'home'
-  | 'customers'
-  | 'documents'
-  | 'inbox'
-  | 'settings'
+import { navigationItems, type PageName } from './navigation'
 
-type SidebarProps = {
+type NavigationProps = {
   activePage: PageName
   onPageChange: (page: PageName) => void
 }
 
-const navigationItems: Array<{
-  id: PageName
-  label: string
-}> = [
-  {
-    id: 'home',
-    label: 'Home',
-  },
-  {
-    id: 'customers',
-    label: 'Customers',
-  },
-  {
-    id: 'documents',
-    label: 'Estimates & invoices',
-  },
-  {
-    id: 'inbox',
-    label: 'Inbox',
-  },
-  {
-    id: 'settings',
-    label: 'Settings',
-  },
-]
+function Brand() {
+  return (
+    <div className="sidebar-brand">
+      <img
+        alt=""
+        aria-hidden="true"
+        className="brand-logo"
+        height="64"
+        src="/rabbits-foot-logo.png"
+        width="64"
+      />
+      <div>
+        <h1>RABBIT&apos;S FOOT</h1>
+        <p>OWNER HUB</p>
+      </div>
+    </div>
+  )
+}
 
 function Sidebar({
   activePage,
   onPageChange,
-}: SidebarProps) {
+}: NavigationProps) {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-brand">
-        <div className="brand-logo">RF</div>
+    <>
+      <aside className="sidebar">
+        <Brand />
 
-        <div>
-          <h1>RABBIT&apos;S FOOT</h1>
-          <h1>HANDYMAN</h1>
-          <h1>SERVICES</h1>
-          <p>OWNER HUB</p>
+        <nav
+          aria-label="Main navigation"
+          className="sidebar-navigation"
+        >
+          {navigationItems.map((item) => {
+            const Icon = item.icon
+
+            return (
+              <button
+                aria-current={
+                  activePage === item.id ? 'page' : undefined
+                }
+                className={
+                  activePage === item.id
+                    ? 'nav-button active'
+                    : 'nav-button'
+                }
+                key={item.id}
+                onClick={() => onPageChange(item.id)}
+                type="button"
+              >
+                <Icon aria-hidden="true" size={20} strokeWidth={2.2} />
+                <span>{item.label}</span>
+
+              </button>
+            )
+          })}
+        </nav>
+
+        <div className="sidebar-footer">
+          <strong>Field-ready workspace</strong>
+          <span>Offline access enabled</span>
         </div>
-      </div>
+      </aside>
 
       <nav
-        aria-label="Main navigation"
-        className="sidebar-navigation"
+        aria-label="Mobile navigation"
+        className="mobile-navigation"
       >
-        {navigationItems.map((item) => (
-          <button
-            className={
-              activePage === item.id
-                ? 'nav-button active'
-                : 'nav-button'
-            }
-            key={item.id}
-            onClick={() => onPageChange(item.id)}
-            type="button"
-          >
-            {item.label}
+        {navigationItems.map((item) => {
+          const Icon = item.icon
 
-            {item.id === 'inbox' && (
-              <span className="notification-badge">
-                1
+          return (
+            <button
+              aria-current={
+                activePage === item.id ? 'page' : undefined
+              }
+              className={
+                activePage === item.id
+                  ? 'mobile-nav-button active'
+                  : 'mobile-nav-button'
+              }
+              key={item.id}
+              onClick={() => onPageChange(item.id)}
+              type="button"
+            >
+              <span className="mobile-nav-icon">
+                <Icon aria-hidden="true" size={21} strokeWidth={2.2} />
               </span>
-            )}
-          </button>
-        ))}
+              <span>{item.shortLabel}</span>
+            </button>
+          )
+        })}
       </nav>
-
-      <div className="sidebar-footer">
-        <strong>Private &amp; local</strong>
-        <span>No subscription needed</span>
-      </div>
-    </aside>
+    </>
   )
 }
 

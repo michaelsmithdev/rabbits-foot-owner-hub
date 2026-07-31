@@ -1,0 +1,15 @@
+.settings-page { display: grid; gap: 26px; }
+.settings-page > header h1 { margin: 7px 0 0; font-size: clamp(2.5rem, 5vw, 4.4rem); line-height: .96; letter-spacing: -.06em; }
+.settings-page > header > p:last-child { margin: 14px 0 0; color: #6b7069; }
+.settings-message { border: 1px solid #d7e9b4; border-radius: 16px; background: #f2f8e7; color: #406300; padding: 14px 16px; font-weight: 800; }
+.settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.settings-card { display: grid; grid-template-columns: auto 1fr; align-items: start; gap: 16px; border: 1px solid #dfe2da; border-radius: 24px; background: #fff; padding: 24px; box-shadow: 0 14px 38px rgba(18, 24, 17, .05); }
+.settings-card-icon { width: 50px; height: 50px; display: grid; place-items: center; border-radius: 15px; background: #e8f6ca; color: #4e7500; }
+.settings-card h2 { margin: 7px 0 0; font-size: 1.35rem; letter-spacing: -.025em; }
+.settings-card > div > p:last-child { margin: 9px 0 0; color: #6c716b; line-height: 1.55; }
+.settings-secondary-button { grid-column: 2; width: fit-content; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid #d9ddd5; border-radius: 13px; background: #f6f7f4; color: #343934; padding: 0 14px; font: inherit; font-size: .82rem; font-weight: 850; cursor: pointer; }
+.settings-secondary-button:disabled { cursor: not-allowed; opacity: .5; }
+.settings-protection-note { grid-column: 1 / -1; display: flex; align-items: center; border-color: #263026; background: #131713; color: white; }
+.settings-protection-note p { margin: 0; color: rgba(255,255,255,.72); line-height: 1.6; }
+@media (max-width: 780px) { .settings-grid { grid-template-columns: 1fr; } .settings-protection-note { grid-column: auto; } }
+@media (max-width: 520px) { .settings-card { grid-template-columns: 1fr; padding: 20px; } .settings-secondary-button { grid-column: 1; width: 100%; justify-content: center; } }

@@ -1,4 +1,5 @@
 import type { Estimate } from '../types/Estimate'
+import { queueCollectionSync } from '../../cloud/syncQueue'
 
 const STORAGE_KEY = 'rabbits-foot-estimates'
 
@@ -68,6 +69,7 @@ export function saveEstimates(
       STORAGE_KEY,
       JSON.stringify(estimates),
     )
+    queueCollectionSync('estimate', estimates)
   } catch (error) {
     console.error(
       'Estimate data could not be saved.',

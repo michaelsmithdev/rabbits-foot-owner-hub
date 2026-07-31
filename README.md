@@ -1,75 +1,58 @@
-# React + TypeScript + Vite
+# Rabbit's Foot Owner Hub
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The private business workspace for Rabbit's Foot Handyman Services. The app is
+built with React, Vite, and TypeScript and is designed as an installable,
+mobile-first Progressive Web App.
 
-Currently, two official plugins are available:
+## Run locally
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm install
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open the address printed by Vite. For a production-style PWA test:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm run build
+npm run preview
 ```
+
+Use the browser's install control to add the Owner Hub to a phone, tablet, or
+desktop. After the first successful load, the application shell can open
+offline.
+
+## Quality checks
+
+```bash
+npm run lint
+npm run build
+npm audit --omit=dev
+```
+
+The approved Rabbit's Foot shield logo is stored at
+`public/rabbits-foot-logo.png`. Its committed PWA icon sizes are used for app
+installation, the mobile shell, and printable invoices.
+
+## Secure cloud setup
+
+The Owner Hub uses Supabase Auth, Postgres Row Level Security, Realtime, and a
+private Storage bucket. Local records remain available offline and are migrated
+into the authenticated business workspace on the first successful sync.
+
+1. Create a Supabase project and run
+   `supabase/migrations/202607310001_secure_owner_hub.sql` in its SQL editor.
+2. Copy `.env.example` to `.env.local`, add the project URL and publishable key,
+   then restart the app and choose **First-time setup** on the login screen.
+3. Add the server-only values from the website's `.env.example` to Vercel so
+   estimate requests are stored in the Owner Hub as well as emailed.
+
+Never place the Supabase service-role key in this Vite project or in a variable
+whose name begins with `VITE_` or `NEXT_PUBLIC_`.
+
+## Data protection and synchronization
+
+Customers, estimates, invoices, payments, and leads are cached on the device for
+field use. Authenticated changes are queued while offline, synchronized when the
+connection returns, and restricted to organization members by database policy.
+The Settings screen also provides a portable JSON backup.
