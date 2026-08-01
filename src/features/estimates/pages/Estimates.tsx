@@ -4,6 +4,8 @@ import {
   useState,
 } from 'react'
 
+import { Printer } from 'lucide-react'
+
 import Invoices from '../../invoices/pages/Invoices'
 
 import {
@@ -310,6 +312,11 @@ function Estimates({
   const [estimates, setEstimates] = useState<
     Estimate[]
   >(() => loadEstimates())
+
+  const [
+    printEstimateId,
+    setPrintEstimateId,
+  ] = useState<string | null>(null)
 
   const [isBuilderOpen, setIsBuilderOpen] =
     useState(openBuilderOnMount)
@@ -1059,12 +1066,7 @@ function Estimates({
     estimate: Estimate,
   ): number {
     const estimateSubtotal =
-      estimate.lineItems.reduce(
-        (total, item) =>
-          total +
-          item.quantity * item.unitPrice,
-        0,
-      )
+      calculateEstimateSubtotal(estimate)
 
     const estimateTax =
       estimateSubtotal *
@@ -1077,6 +1079,48 @@ function Estimates({
         estimate.discount,
     )
   }
+
+  function calculateEstimateSubtotal(
+    estimate: Estimate,
+  ): number {
+    return estimate.lineItems.reduce(
+      (total, item) =>
+        total +
+        item.quantity * item.unitPrice,
+      0,
+    )
+  }
+
+  function printEstimateDocument(
+    estimate: Estimate,
+  ): void {
+    setPrintEstimateId(estimate.id)
+
+    window.addEventListener(
+      'afterprint',
+      () => setPrintEstimateId(null),
+      { once: true },
+    )
+
+    window.setTimeout(() => {
+      window.requestAnimationFrame(() =>
+        window.print(),
+      )
+    }, 0)
+  }
+
+  const printEstimate = estimates.find(
+    (estimate) =>
+      estimate.id === printEstimateId,
+  )
+
+  const printCustomer = printEstimate
+    ? customers.find(
+        (customer) =>
+          customer.id ===
+          printEstimate.customerId,
+      )
+    : undefined
 
   if (activeDocumentTab === 'invoices') {
     return (
@@ -1302,6 +1346,22 @@ function Estimates({
                     type="button"
                   >
                     Duplicate
+                  </button>
+
+                  <button
+                    className="customer-secondary-action"
+                    onClick={() =>
+                      printEstimateDocument(
+                        estimate,
+                      )
+                    }
+                    type="button"
+                  >
+                    <Printer
+                      aria-hidden="true"
+                      size={16}
+                    />
+                    Print / PDF
                   </button>
 
                   <button
@@ -1801,6 +1861,208 @@ function Estimates({
             </p>
           </section>
         </div>
+      )}
+
+      {printEstimate && (
+        <article className="invoice-print-sheet">
+          <header className="invoice-print-header">
+            <img
+              alt={businessSettings.businessName}
+              src="/rabbits-foot-logo.png"
+            />
+
+            <div className="invoice-print-business">
+              <strong>
+                {businessSettings.businessName}
+              </strong>
+
+              {businessSettings.phone && (
+                <span>{businessSettings.phone}</span>
+              )}
+
+              {businessSettings.email && (
+                <span>{businessSettings.email}</span>
+              )}
+
+              {businessSettings.website && (
+                <span>{businessSettings.website}</span>
+              )}
+
+              {businessSettings.streetAddress && (
+                <span>
+                  {businessSettings.streetAddress}
+                </span>
+              )}
+
+              {(businessSettings.city ||
+                businessSettings.zipCode) && (
+                <span>
+                  {[
+                    businessSettings.city,
+                    businessSettings.state,
+                    businessSettings.zipCode,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <p>ESTIMATE</p>
+              <h1>
+                {printEstimate.estimateNumber}
+              </h1>
+              <span>
+                Issued{' '}
+                {formatDate(
+                  printEstimate.issueDate,
+                )}
+              </span>
+              <span>
+                Valid through{' '}
+                {formatDate(
+                  printEstimate.expirationDate,
+                )}
+              </span>
+            </div>
+          </header>
+
+          <section className="invoice-print-addresses">
+            <div>
+              <span>PREPARED FOR</span>
+              <strong>
+                {printCustomer
+                  ? `${printCustomer.firstName} ${printCustomer.lastName}`
+                  : 'Unknown customer'}
+              </strong>
+
+              {printCustomer && (
+                <p>
+                  {formatCustomerAddress(
+                    printCustomer,
+                  )}
+                </p>
+              )}
+
+              {printCustomer?.phone && (
+                <p>{printCustomer.phone}</p>
+              )}
+
+              {printCustomer?.email && (
+                <p>{printCustomer.email}</p>
+              )}
+            </div>
+
+            <div>
+              <span>SERVICE ADDRESS</span>
+              <strong>
+                {printEstimate.jobName}
+              </strong>
+              <p>{printEstimate.serviceAddress}</p>
+            </div>
+          </section>
+
+          {printEstimate.description && (
+            <section className="invoice-print-scope">
+              <span>SCOPE OF WORK</span>
+              <p>{printEstimate.description}</p>
+            </section>
+          )}
+
+          <table className="invoice-print-table">
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th>Qty</th>
+                <th>Unit price</th>
+                <th>Amount</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {printEstimate.lineItems.map(
+                (lineItem) => (
+                  <tr key={lineItem.id}>
+                    <td>
+                      {lineItem.description}
+                    </td>
+                    <td>{lineItem.quantity}</td>
+                    <td>
+                      {formatCurrency(
+                        lineItem.unitPrice,
+                      )}
+                    </td>
+                    <td>
+                      {formatCurrency(
+                        lineItem.quantity *
+                          lineItem.unitPrice,
+                      )}
+                    </td>
+                  </tr>
+                ),
+              )}
+            </tbody>
+          </table>
+
+          <section className="invoice-print-totals">
+            <div>
+              <span>Subtotal</span>
+              <strong>
+                {formatCurrency(
+                  calculateEstimateSubtotal(
+                    printEstimate,
+                  ),
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Tax</span>
+              <strong>
+                {formatCurrency(
+                  calculateEstimateSubtotal(
+                    printEstimate,
+                  ) *
+                    (printEstimate.taxRate /
+                      100),
+                )}
+              </strong>
+            </div>
+
+            <div>
+              <span>Discount</span>
+              <strong>
+                -
+                {formatCurrency(
+                  printEstimate.discount,
+                )}
+              </strong>
+            </div>
+
+            <div className="invoice-print-total">
+              <span>Estimate total</span>
+              <strong>
+                {formatCurrency(
+                  calculateEstimateTotal(
+                    printEstimate,
+                  ),
+                )}
+              </strong>
+            </div>
+          </section>
+
+          {printEstimate.notes && (
+            <footer className="invoice-print-notes">
+              <span>NOTES &amp; TERMS</span>
+              <p>{printEstimate.notes}</p>
+              <strong>
+                Thank you for choosing
+                Rabbit&apos;s Foot.
+              </strong>
+            </footer>
+          )}
+        </article>
       )}
     </>
   )

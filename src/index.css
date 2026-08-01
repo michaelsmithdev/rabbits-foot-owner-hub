@@ -1220,6 +1220,10 @@ textarea:focus-visible {
 
 .customer-primary-action,
 .customer-secondary-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   min-height: 44px;
   border-radius: 10px;
   font-weight: 900;

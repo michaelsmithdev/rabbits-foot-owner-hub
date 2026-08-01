@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Rabbit\'s Foot Owner Hub</string>
+    <string name="title_activity_main">Rabbit\'s Foot Owner Hub</string>
+    <string name="package_name">com.callrabbitsfoot.ownerhub</string>
+    <string name="custom_url_scheme">com.callrabbitsfoot.ownerhub</string>
+</resources>
