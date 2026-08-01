@@ -12,6 +12,7 @@ import {
   loadQueuedLeads,
 } from '../leads/data/leadStore'
 import type { Lead, LeadActivity, LeadStatus } from '../leads/types/Lead'
+import { synchronizePendingPhotos } from '../photos/data/photoStore'
 
 type DatabaseLead = {
   id: string
@@ -93,6 +94,8 @@ export async function synchronizeBusinessRecords(
   client: SupabaseClient,
   organizationId: string,
 ) {
+  await synchronizePendingPhotos(client, organizationId)
+
   const queuedChanges = loadSyncQueue()
 
   if (queuedChanges.length > 0) {

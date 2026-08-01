@@ -40,8 +40,8 @@ The Owner Hub uses Supabase Auth, Postgres Row Level Security, Realtime, and a
 private Storage bucket. Local records remain available offline and are migrated
 into the authenticated business workspace on the first successful sync.
 
-1. Create a Supabase project and run
-   `supabase/migrations/202607310001_secure_owner_hub.sql` in its SQL editor.
+1. Create a Supabase project and run every file in `supabase/migrations` in
+   filename order in its SQL editor.
 2. Copy `.env.example` to `.env.local`, add the project URL and publishable key,
    then restart the app and choose **First-time setup** on the login screen.
 3. Add the server-only values from the website's `.env.example` to Vercel so
@@ -52,7 +52,8 @@ whose name begins with `VITE_` or `NEXT_PUBLIC_`.
 
 ## Data protection and synchronization
 
-Customers, estimates, invoices, payments, and leads are cached on the device for
-field use. Authenticated changes are queued while offline, synchronized when the
-connection returns, and restricted to organization members by database policy.
-The Settings screen also provides a portable JSON backup.
+Customers, estimates, invoices, payments, leads, settings, and photo metadata
+are cached on the device for field use. New photos are retained in IndexedDB
+while offline, uploaded to a private Supabase Storage bucket when the connection
+returns, and restricted to organization members by database policy. The
+Settings screen also provides a portable JSON data backup.

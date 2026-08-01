@@ -1,4 +1,8 @@
 import type { Lead, LeadStatus } from '../types/Lead'
+import {
+  DATA_REFRESHED_EVENT,
+  SYNC_REQUESTED_EVENT,
+} from '../../cloud/syncQueue'
 
 const LEADS_STORAGE_KEY = 'rabbits-foot-leads'
 const LEAD_QUEUE_STORAGE_KEY = 'rabbits-foot-lead-sync-queue'
@@ -60,6 +64,7 @@ export function saveLeads(leads: Lead[]) {
   const queuedById = new Map(
     readJson<Lead[]>(LEAD_QUEUE_STORAGE_KEY, []).map((lead) => [lead.id, lead]),
   )
+  let hasQueuedChanges = false
 
   leads.forEach((lead) => {
     const fingerprint = JSON.stringify(lead)
@@ -67,18 +72,21 @@ export function saveLeads(leads: Lead[]) {
     if (metadata[lead.id]?.fingerprint === fingerprint) return
 
     queuedById.set(lead.id, lead)
+    hasQueuedChanges = true
     metadata[lead.id] = {
       fingerprint,
       updatedAt: lead.updatedAt,
     }
   })
 
+  if (!hasQueuedChanges) return
+
   localStorage.setItem(
     LEAD_QUEUE_STORAGE_KEY,
     JSON.stringify(Array.from(queuedById.values())),
   )
   localStorage.setItem(LEAD_METADATA_STORAGE_KEY, JSON.stringify(metadata))
-  window.dispatchEvent(new Event('ownerhub:sync-requested'))
+  window.dispatchEvent(new Event(SYNC_REQUESTED_EVENT))
 }
 
 export function loadQueuedLeads() {
@@ -110,9 +118,15 @@ export function applyRemoteLeads(leads: Lead[]) {
     }
   })
 
-  localStorage.setItem(
-    LEADS_STORAGE_KEY,
-    JSON.stringify(Array.from(leadsById.values())),
-  )
+  const nextLeads = Array.from(leadsById.values())
+  const serializedLeads = JSON.stringify(nextLeads)
+  const hasLeadChanges =
+    localStorage.getItem(LEADS_STORAGE_KEY) !== serializedLeads
+
+  localStorage.setItem(LEADS_STORAGE_KEY, serializedLeads)
   localStorage.setItem(LEAD_METADATA_STORAGE_KEY, JSON.stringify(metadata))
+
+  if (hasLeadChanges) {
+    window.dispatchEvent(new Event(DATA_REFRESHED_EVENT))
+  }
 }

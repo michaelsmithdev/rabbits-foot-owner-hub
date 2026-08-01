@@ -628,6 +628,17 @@
     flex-direction: column;
   }
 
+  .invoice-print-header .invoice-print-business {
+    align-items: flex-start;
+    flex: 1;
+    padding-top: 14px;
+  }
+
+  .invoice-print-business strong {
+    margin-bottom: 5px;
+    font-size: 15px;
+  }
+
   .invoice-print-header p,
   .invoice-print-addresses span,
   .invoice-print-scope span,

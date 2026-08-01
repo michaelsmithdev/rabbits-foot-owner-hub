@@ -13,6 +13,8 @@ import {
 
 import { loadCustomers } from '../../customers/data/customerStore'
 import type { Customer } from '../../customers/types/Customer'
+import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
+import type { BusinessSettings } from '../../settings/types/BusinessSettings'
 import {
   createInvoiceNumber,
   loadInvoices,
@@ -83,9 +85,9 @@ function getTodayDate() {
   return getDateInputValue(new Date())
 }
 
-function getDefaultDueDate() {
+function getDefaultDueDate(dueDays = 14) {
   const dueDate = new Date()
-  dueDate.setDate(dueDate.getDate() + 14)
+  dueDate.setDate(dueDate.getDate() + dueDays)
 
   return getDateInputValue(dueDate)
 }
@@ -99,18 +101,18 @@ function createEmptyLineItem(): InvoiceLineItem {
   }
 }
 
-function createEmptyDraft(): InvoiceDraft {
+function createEmptyDraft(settings: BusinessSettings): InvoiceDraft {
   return {
     customerId: '',
     jobName: '',
     serviceAddress: '',
     description: '',
     issueDate: getTodayDate(),
-    dueDate: getDefaultDueDate(),
+    dueDate: getDefaultDueDate(settings.invoiceDueDays),
     lineItems: [createEmptyLineItem()],
-    taxRate: 0,
+    taxRate: settings.defaultTaxRate,
     discount: 0,
-    notes: 'Payment is due within 14 days.',
+    notes: settings.invoiceTerms,
     status: 'draft',
   }
 }
@@ -151,9 +153,12 @@ function formatCustomerAddress(customer: Customer) {
 }
 
 function Invoices() {
+  const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const [customers] = useState<Customer[]>(() => loadCustomers())
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoices())
-  const [draft, setDraft] = useState<InvoiceDraft>(createEmptyDraft)
+  const [draft, setDraft] = useState<InvoiceDraft>(() =>
+    createEmptyDraft(businessSettings),
+  )
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(
     null,
   )
@@ -208,7 +213,7 @@ function Invoices() {
   )
 
   function resetBuilder() {
-    setDraft(createEmptyDraft())
+    setDraft(createEmptyDraft(businessSettings))
     setEditingInvoiceId(null)
     setFormError('')
   }
@@ -342,7 +347,8 @@ function Invoices() {
     const baseInvoice: Invoice = {
       id: existingInvoice?.id ?? createId(),
       invoiceNumber:
-        existingInvoice?.invoiceNumber ?? createInvoiceNumber(invoices),
+        existingInvoice?.invoiceNumber ??
+        createInvoiceNumber(invoices, businessSettings.invoicePrefix),
       customerId: draft.customerId,
       estimateId: existingInvoice?.estimateId ?? null,
       jobName: draft.jobName.trim(),
@@ -1072,9 +1078,29 @@ function Invoices() {
         <article className="invoice-print-sheet">
           <header className="invoice-print-header">
             <img
-              alt="Rabbit's Foot Handyman Services"
+              alt={businessSettings.businessName}
               src="/rabbits-foot-logo.png"
             />
+            <div className="invoice-print-business">
+              <strong>{businessSettings.businessName}</strong>
+              {businessSettings.phone && <span>{businessSettings.phone}</span>}
+              {businessSettings.email && <span>{businessSettings.email}</span>}
+              {businessSettings.website && <span>{businessSettings.website}</span>}
+              {businessSettings.streetAddress && (
+                <span>{businessSettings.streetAddress}</span>
+              )}
+              {(businessSettings.city || businessSettings.zipCode) && (
+                <span>
+                  {[
+                    businessSettings.city,
+                    businessSettings.state,
+                    businessSettings.zipCode,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                </span>
+              )}
+            </div>
             <div>
               <p>INVOICE</p>
               <h1>{printInvoice.invoiceNumber}</h1>

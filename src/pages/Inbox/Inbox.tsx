@@ -32,6 +32,8 @@ import type {
   LeadStatus,
 } from '../../features/leads/types/Lead'
 import { cloudClient } from '../../features/cloud/cloudClient'
+import { DATA_REFRESHED_EVENT } from '../../features/cloud/syncQueue'
+import { loadBusinessSettings } from '../../features/settings/data/businessSettingsStore'
 import './Inbox.css'
 
 type InboxFilter = 'inbox' | 'unread' | 'flagged' | 'archived' | 'all'
@@ -138,6 +140,18 @@ function Inbox({ onOpenDocuments }: InboxProps) {
   useEffect(() => {
     saveLeads(leads)
   }, [leads])
+
+  useEffect(() => {
+    const refreshLeads = () => {
+      setLeads(loadLeads())
+    }
+
+    window.addEventListener(DATA_REFRESHED_EVENT, refreshLeads)
+
+    return () => {
+      window.removeEventListener(DATA_REFRESHED_EVENT, refreshLeads)
+    }
+  }, [])
 
   const selectedLead = leads.find((lead) => lead.id === selectedLeadId) ?? null
   const unreadCount = leads.filter((lead) => lead.status === 'unread').length
@@ -275,13 +289,19 @@ function Inbox({ onOpenDocuments }: InboxProps) {
   function createEstimateFromLead(lead: Lead) {
     const customer = findOrCreateCustomer(lead)
     const estimates = loadEstimates()
+    const businessSettings = loadBusinessSettings()
     const now = new Date()
     const expirationDate = new Date(now)
-    expirationDate.setDate(expirationDate.getDate() + 30)
+    expirationDate.setDate(
+      expirationDate.getDate() + businessSettings.estimateValidDays,
+    )
 
     const estimate: Estimate = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      estimateNumber: createEstimateNumber(estimates),
+      estimateNumber: createEstimateNumber(
+        estimates,
+        businessSettings.estimatePrefix,
+      ),
       customerId: customer.id,
       jobName: lead.service,
       serviceAddress: lead.address,
@@ -296,9 +316,14 @@ function Inbox({ onOpenDocuments }: InboxProps) {
           unitPrice: 0,
         },
       ],
-      taxRate: 0,
+      taxRate: businessSettings.defaultTaxRate,
       discount: 0,
-      notes: `Created from website lead ${lead.id}. Add pricing before sending.`,
+      notes: [
+        businessSettings.estimateTerms,
+        `Created from website lead ${lead.id}. Add pricing before sending.`,
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
       status: 'draft',
       createdAt: now.toISOString(),
       updatedAt: now.toISOString(),

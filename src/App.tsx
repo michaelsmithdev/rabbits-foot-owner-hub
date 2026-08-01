@@ -13,6 +13,7 @@ import { DATA_REFRESHED_EVENT } from './features/cloud/syncQueue'
 import ConnectionStatus from './features/pwa/components/ConnectionStatus'
 import Dashboard from './pages/Dashboard/Dashboard'
 import Inbox from './pages/Inbox/Inbox'
+import Photos from './pages/Photos/Photos'
 import Settings from './pages/Settings/Settings'
 
 type EstimateLaunch = {
@@ -121,6 +122,9 @@ function App() {
       case 'inbox':
         return <Inbox onOpenDocuments={() => handlePageChange('documents')} />
 
+      case 'photos':
+        return <Photos />
+
       case 'settings':
         return <Settings />
 
@@ -170,7 +174,13 @@ function App() {
 
         <section
           className="page-content"
-          key={activePage === 'documents' ? activePage : `${activePage}-${dataRevision}`}
+          key={
+            activePage === 'documents' ||
+            activePage === 'inbox' ||
+            activePage === 'photos'
+              ? activePage
+              : `${activePage}-${dataRevision}`
+          }
         >
           {renderCurrentPage()}
         </section>

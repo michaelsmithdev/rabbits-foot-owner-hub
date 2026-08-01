@@ -80,10 +80,11 @@ export function saveEstimates(
 
 export function createEstimateNumber(
   estimates: Estimate[],
+  prefix = 'EST',
 ): string {
   const nextNumber = estimates.length + 1
 
-  return `EST-${String(nextNumber).padStart(
+  return `${prefix}-${String(nextNumber).padStart(
     4,
     '0',
   )}`

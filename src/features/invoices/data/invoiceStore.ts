@@ -135,11 +135,17 @@ export function saveInvoices(invoices: Invoice[]): void {
   }
 }
 
-export function createInvoiceNumber(invoices: Invoice[]): string {
+export function createInvoiceNumber(
+  invoices: Invoice[],
+  prefix = 'INV',
+): string {
   const currentYear = new Date().getFullYear()
   const invoiceNumbers = invoices
     .map((invoice) => {
-      const match = invoice.invoiceNumber.match(/^INV-(\d{4})-(\d+)$/)
+      const escapedPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const match = invoice.invoiceNumber.match(
+        new RegExp(`^${escapedPrefix}-(\\d{4})-(\\d+)$`),
+      )
 
       if (!match || Number(match[1]) !== currentYear) return null
 
@@ -150,5 +156,5 @@ export function createInvoiceNumber(invoices: Invoice[]): string {
   const nextSequence =
     invoiceNumbers.length > 0 ? Math.max(...invoiceNumbers) + 1 : 1
 
-  return `INV-${currentYear}-${String(nextSequence).padStart(4, '0')}`
+  return `${prefix}-${currentYear}-${String(nextSequence).padStart(4, '0')}`
 }

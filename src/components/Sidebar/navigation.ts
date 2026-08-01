@@ -1,5 +1,6 @@
 import {
   FileText,
+  Images,
   Inbox,
   LayoutDashboard,
   Settings,
@@ -12,6 +13,7 @@ export type PageName =
   | 'customers'
   | 'documents'
   | 'inbox'
+  | 'photos'
   | 'settings'
 
 type NavigationItem = {
@@ -45,6 +47,12 @@ export const navigationItems: NavigationItem[] = [
     label: 'Inbox',
     shortLabel: 'Inbox',
     icon: Inbox,
+  },
+  {
+    id: 'photos',
+    label: 'Photos',
+    shortLabel: 'Photos',
+    icon: Images,
   },
   {
     id: 'settings',

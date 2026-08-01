@@ -1,4 +1,9 @@
-export type CloudRecordType = 'customer' | 'estimate' | 'invoice'
+export type CloudRecordType =
+  | 'customer'
+  | 'estimate'
+  | 'invoice'
+  | 'settings'
+  | 'photo'
 
 export type CloudRecord = Record<string, unknown> & {
   id: string
@@ -31,6 +36,8 @@ const storageKeys: Record<CloudRecordType, string> = {
   customer: 'rabbits-foot-customers',
   estimate: 'rabbits-foot-estimates',
   invoice: 'rabbits-foot-invoices',
+  settings: 'rabbits-foot-business-settings',
+  photo: 'rabbits-foot-photos',
 }
 
 function getRecordKey(recordType: CloudRecordType, recordId: string) {
@@ -90,6 +97,7 @@ export function queueCollectionSync<T extends { id: string }>(
     ]),
   )
   const nextRecordIds = new Set(records.map((record) => record.id))
+  let hasQueuedChanges = false
 
   records.forEach((record) => {
     const recordKey = getRecordKey(recordType, record.id)
@@ -118,6 +126,7 @@ export function queueCollectionSync<T extends { id: string }>(
       fingerprint,
     }
     queuedByKey.set(recordKey, change)
+    hasQueuedChanges = true
   })
 
   Object.entries(metadata).forEach(([recordKey, recordMetadata]) => {
@@ -143,7 +152,10 @@ export function queueCollectionSync<T extends { id: string }>(
       fingerprint: '',
     }
     queuedByKey.set(recordKey, change)
+    hasQueuedChanges = true
   })
+
+  if (!hasQueuedChanges) return
 
   saveMetadata(metadata)
   localStorage.setItem(
@@ -199,8 +211,15 @@ export function applyRemoteRecords(
   }>,
 ) {
   const metadata = readJson<SyncMetadata>(METADATA_STORAGE_KEY, {})
+  let hasDataChanges = false
 
-  ;(['customer', 'estimate', 'invoice'] as CloudRecordType[]).forEach(
+  ;([
+    'customer',
+    'estimate',
+    'invoice',
+    'settings',
+    'photo',
+  ] as CloudRecordType[]).forEach(
     (recordType) => {
       const localRecords = readJson<CloudRecord[]>(storageKeys[recordType], [])
       const recordsById = new Map(
@@ -235,13 +254,18 @@ export function applyRemoteRecords(
           }
         })
 
-      localStorage.setItem(
-        storageKeys[recordType],
-        JSON.stringify(Array.from(recordsById.values())),
-      )
+      const serializedRecords = JSON.stringify(Array.from(recordsById.values()))
+
+      if (localStorage.getItem(storageKeys[recordType]) !== serializedRecords) {
+        localStorage.setItem(storageKeys[recordType], serializedRecords)
+        hasDataChanges = true
+      }
     },
   )
 
   saveMetadata(metadata)
-  window.dispatchEvent(new Event(DATA_REFRESHED_EVENT))
+
+  if (hasDataChanges) {
+    window.dispatchEvent(new Event(DATA_REFRESHED_EVENT))
+  }
 }

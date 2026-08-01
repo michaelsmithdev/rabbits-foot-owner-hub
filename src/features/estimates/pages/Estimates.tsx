@@ -17,6 +17,7 @@ import type { Invoice } from '../../invoices/types/Invoice'
 import { loadCustomers } from '../../customers/data/customerStore'
 
 import type { Customer } from '../../customers/types/Customer'
+import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 
 import {
   createEstimateNumber,
@@ -243,10 +244,10 @@ function getTodayDate(): string {
   return new Date().toISOString().split('T')[0]
 }
 
-function getExpirationDate(): string {
+function getExpirationDate(validDays = 30): string {
   const date = new Date()
 
-  date.setDate(date.getDate() + 30)
+  date.setDate(date.getDate() + validDays)
 
   return date.toISOString().split('T')[0]
 }
@@ -296,6 +297,7 @@ function Estimates({
   initialCustomerId,
   openBuilderOnMount = false,
 }: EstimatesProps) {
+  const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const [
     activeDocumentTab,
     setActiveDocumentTab,
@@ -347,19 +349,17 @@ function Estimates({
     useState(getTodayDate())
 
   const [expirationDate, setExpirationDate] =
-    useState(getExpirationDate())
+    useState(() => getExpirationDate(businessSettings.estimateValidDays))
 
   const [lineItems, setLineItems] = useState<
     EstimateLineItem[]
   >([createEmptyLineItem()])
 
-  const [taxRate, setTaxRate] = useState(0)
+  const [taxRate, setTaxRate] = useState(businessSettings.defaultTaxRate)
 
   const [discount, setDiscount] = useState(0)
 
-  const [notes, setNotes] = useState(
-    'Estimate valid for 30 days.',
-  )
+  const [notes, setNotes] = useState(businessSettings.estimateTerms)
 
   const [formError, setFormError] = useState('')
 
@@ -379,7 +379,6 @@ function Estimates({
       event: KeyboardEvent,
     ) {
       if (event.key === 'Escape') {
-        resetBuilder()
         setIsBuilderOpen(false)
       }
     }
@@ -475,11 +474,11 @@ function Estimates({
     setServiceAddress('')
     setDescription('')
     setIssueDate(getTodayDate())
-    setExpirationDate(getExpirationDate())
+    setExpirationDate(getExpirationDate(businessSettings.estimateValidDays))
     setLineItems([createEmptyLineItem()])
-    setTaxRate(0)
+    setTaxRate(businessSettings.defaultTaxRate)
     setDiscount(0)
-    setNotes('Estimate valid for 30 days.')
+    setNotes(businessSettings.estimateTerms)
     setFormError('')
     setSaveMessage('')
   }
@@ -537,7 +536,7 @@ function Estimates({
 
     setNotes(
       estimate.notes ||
-        'Estimate valid for 30 days.',
+        businessSettings.estimateTerms,
     )
 
     setFormError('')
@@ -819,8 +818,10 @@ function Estimates({
       const newEstimate: Estimate = {
         id: createId(),
 
-        estimateNumber:
-          createEstimateNumber(estimates),
+        estimateNumber: createEstimateNumber(
+          estimates,
+          businessSettings.estimatePrefix,
+        ),
 
         customerId: selectedCustomerId,
 
@@ -891,7 +892,7 @@ function Estimates({
     const dueDate = new Date(today)
 
     dueDate.setDate(
-      dueDate.getDate() + 14,
+      dueDate.getDate() + businessSettings.invoiceDueDays,
     )
 
     const currentTimestamp =
@@ -900,8 +901,10 @@ function Estimates({
     const newInvoice: Invoice = {
       id: createId(),
 
-      invoiceNumber:
-        createInvoiceNumber(existingInvoices),
+      invoiceNumber: createInvoiceNumber(
+        existingInvoices,
+        businessSettings.invoicePrefix,
+      ),
 
       customerId: estimate.customerId,
 
@@ -931,9 +934,9 @@ function Estimates({
 
       discount: estimate.discount,
 
-      notes:
-        estimate.notes ||
-        'Payment is due within 14 days.',
+      notes: [estimate.notes, businessSettings.invoiceTerms]
+        .filter(Boolean)
+        .join('\n\n'),
 
       status: 'draft',
 
@@ -969,8 +972,10 @@ function Estimates({
 
       id: createId(),
 
-      estimateNumber:
-        createEstimateNumber(estimates),
+      estimateNumber: createEstimateNumber(
+        estimates,
+        businessSettings.estimatePrefix,
+      ),
 
       jobName: `${estimate.jobName} Copy`,
 
