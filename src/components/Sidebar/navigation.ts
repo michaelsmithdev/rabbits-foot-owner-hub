@@ -1,9 +1,11 @@
 import {
   FileText,
+  FolderArchive,
   Images,
   Inbox,
   LayoutDashboard,
   Settings,
+  Sparkles,
   UsersRound,
   type LucideIcon,
 } from 'lucide-react'
@@ -12,6 +14,8 @@ export type PageName =
   | 'home'
   | 'customers'
   | 'documents'
+  | 'archive'
+  | 'pricing'
   | 'inbox'
   | 'photos'
   | 'settings'
@@ -41,6 +45,18 @@ export const navigationItems: NavigationItem[] = [
     label: 'Estimates & invoices',
     shortLabel: 'Documents',
     icon: FileText,
+  },
+  {
+    id: 'archive',
+    label: 'PDF archive',
+    shortLabel: 'PDFs',
+    icon: FolderArchive,
+  },
+  {
+    id: 'pricing',
+    label: 'Smart pricing',
+    shortLabel: 'Pricing',
+    icon: Sparkles,
   },
   {
     id: 'inbox',

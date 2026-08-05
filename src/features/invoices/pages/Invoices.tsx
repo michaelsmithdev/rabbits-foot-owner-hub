@@ -5,7 +5,6 @@ import {
   CircleDollarSign,
   FilePenLine,
   Plus,
-  Printer,
   ReceiptText,
   Trash2,
   X,
@@ -15,6 +14,8 @@ import { loadCustomers } from '../../customers/data/customerStore'
 import type { Customer } from '../../customers/types/Customer'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import type { BusinessSettings } from '../../settings/types/BusinessSettings'
+import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
+import PricingInsightPanel from '../../pricing/components/PricingInsightPanel'
 import {
   createInvoiceNumber,
   loadInvoices,
@@ -48,6 +49,10 @@ type InvoiceDraft = {
   taxRate: number
   discount: number
   notes: string
+  propertyType: 'residential' | 'commercial'
+  jobCategory: string
+  materialCost: number
+  taxReservePercent: number
   status: InvoiceStatus
 }
 
@@ -113,6 +118,10 @@ function createEmptyDraft(settings: BusinessSettings): InvoiceDraft {
     taxRate: settings.defaultTaxRate,
     discount: 0,
     notes: settings.invoiceTerms,
+    propertyType: 'residential',
+    jobCategory: 'General handyman',
+    materialCost: 0,
+    taxReservePercent: settings.defaultTaxReservePercent,
     status: 'draft',
   }
 }
@@ -174,7 +183,7 @@ function Invoices() {
   const [paymentReference, setPaymentReference] = useState('')
   const [paymentNotes, setPaymentNotes] = useState('')
   const [paymentError, setPaymentError] = useState('')
-  const [printInvoiceId, setPrintInvoiceId] = useState<string | null>(null)
+  const [printInvoiceId] = useState<string | null>(null)
 
   useEffect(() => {
     saveInvoices(invoices)
@@ -236,6 +245,10 @@ function Invoices() {
       taxRate: invoice.taxRate,
       discount: invoice.discount,
       notes: invoice.notes,
+      propertyType: invoice.propertyType ?? 'residential',
+      jobCategory: invoice.jobCategory ?? 'General handyman',
+      materialCost: invoice.materialCost ?? 0,
+      taxReservePercent: invoice.taxReservePercent ?? businessSettings.defaultTaxReservePercent,
       status: invoice.status,
     })
     setFormError('')
@@ -363,6 +376,10 @@ function Invoices() {
       taxRate: draft.taxRate,
       discount: draft.discount,
       notes: draft.notes.trim(),
+      propertyType: draft.propertyType,
+      jobCategory: draft.jobCategory.trim(),
+      materialCost: draft.materialCost,
+      taxReservePercent: draft.taxReservePercent,
       status: draft.status,
       payments: existingInvoice?.payments ?? [],
       createdAt: existingInvoice?.createdAt ?? timestamp,
@@ -507,18 +524,6 @@ function Invoices() {
     closePayment()
   }
 
-  function printInvoiceDocument(invoice: Invoice) {
-    setPrintInvoiceId(invoice.id)
-    window.addEventListener(
-      'afterprint',
-      () => setPrintInvoiceId(null),
-      { once: true },
-    )
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => window.print())
-    })
-  }
-
   const printCustomer = printInvoice
     ? customers.find((customer) => customer.id === printInvoice.customerId)
     : undefined
@@ -636,13 +641,7 @@ function Invoices() {
                       <FilePenLine aria-hidden="true" size={16} />
                       Edit
                     </button>
-                    <button
-                      onClick={() => printInvoiceDocument(invoice)}
-                      type="button"
-                    >
-                      <Printer aria-hidden="true" size={16} />
-                      Print / PDF
-                    </button>
+                    <DocumentPdfActions kind="invoice" document={invoice} customer={customer} />
                     {balance > 0 && invoice.status !== 'void' && (
                       <button
                         className="invoice-payment-button"
@@ -873,6 +872,10 @@ function Invoices() {
             </section>
 
             <div className="invoice-form-grid invoice-totals-fields">
+              <div className="invoice-form-full-width"><PricingInsightPanel category={draft.jobCategory} customerId={draft.customerId} description={`${draft.jobName} ${draft.description} ${draft.lineItems.map((item) => item.description).join(' ')}`} onUsePrice={(price) => setDraft((current) => ({ ...current, lineItems: current.lineItems.length ? current.lineItems.map((item, index) => index === 0 ? { ...item, unitPrice: price, quantity: 1 } : item) : [{ ...createEmptyLineItem(), description: current.jobName || 'Handyman service', unitPrice: price }] }))} propertyType={draft.propertyType} /></div>
+              <label><span>Job category</span><input onChange={(event) => updateDraft('jobCategory', event.target.value)} value={draft.jobCategory} /></label>
+              <label><span>Property type</span><select onChange={(event) => updateDraft('propertyType', event.target.value as 'residential' | 'commercial')} value={draft.propertyType}><option value="residential">Residential</option><option value="commercial">Commercial</option></select></label>
+              <label><span>Material cost $</span><input min="0" onChange={(event) => updateDraft('materialCost', Number(event.target.value))} step="0.01" type="number" value={draft.materialCost} /></label>
               <label>
                 <span>Tax rate %</span>
                 <input
@@ -907,6 +910,7 @@ function Invoices() {
                   value={draft.notes}
                 />
               </label>
+              <label className="invoice-form-full-width tax-reserve-control"><span>Tax reserve: {draft.taxReservePercent}%</span><input aria-label="Invoice tax reserve percentage" max="35" min="25" onChange={(event) => updateDraft('taxReservePercent', Number(event.target.value))} step="1" type="range" value={draft.taxReservePercent} /><small>Reserve {formatCurrency(draftTotal * draft.taxReservePercent / 100)} · Safe to spend {formatCurrency(draftTotal * (1 - draft.taxReservePercent / 100))}</small></label>
             </div>
 
             <div className="invoice-builder-footer">

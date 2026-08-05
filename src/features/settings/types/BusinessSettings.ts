@@ -9,6 +9,8 @@ export interface BusinessSettings {
   state: string
   zipCode: string
   defaultTaxRate: number
+  defaultTaxReservePercent: number
+  darkMode: boolean
   estimateValidDays: number
   invoiceDueDays: number
   estimatePrefix: string

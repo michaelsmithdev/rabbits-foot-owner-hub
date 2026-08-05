@@ -12,6 +12,7 @@ import { loadEstimates } from '../../features/estimates/data/estimateStore'
 import type { Estimate } from '../../features/estimates/types/Estimate'
 import { loadInvoices } from '../../features/invoices/data/invoiceStore'
 import type { Invoice } from '../../features/invoices/types/Invoice'
+import { loadBusinessSettings } from '../../features/settings/data/businessSettingsStore'
 
 type DashboardProps = {
   onOpenCustomers: () => void
@@ -52,6 +53,7 @@ function Dashboard({
   const customers = loadCustomers()
   const estimates = loadEstimates()
   const invoices = loadInvoices()
+  const settings = loadBusinessSettings()
   const customerNames = new Map(
     customers.map((customer) => [
       customer.id,
@@ -69,6 +71,11 @@ function Dashboard({
   const paidTotal = invoices
     .filter((invoice) => invoice.status === 'paid')
     .reduce((sum, invoice) => sum + getDocumentTotal(invoice), 0)
+
+  const monthKey = new Date().toISOString().slice(0, 7)
+  const monthlyRevenue = invoices.filter((invoice) => invoice.status === 'paid' && (invoice.paidAt ?? invoice.updatedAt).slice(0, 7) === monthKey).reduce((sum, invoice) => sum + getDocumentTotal(invoice), 0)
+  const approvedEstimateValue = estimates.filter((estimate) => estimate.status === 'approved').reduce((sum, estimate) => sum + getDocumentTotal(estimate), 0)
+  const taxReserve = monthlyRevenue * (settings.defaultTaxReservePercent / 100)
 
   const openEstimates = estimates.filter(
     (estimate) =>
@@ -131,6 +138,24 @@ function Dashboard({
       value: String(customers.length),
       description: 'Saved customer profiles',
       icon: UsersRound,
+    },
+    {
+      label: 'This month',
+      value: formatCurrency(monthlyRevenue),
+      description: 'Paid revenue',
+      icon: CheckCircle2,
+    },
+    {
+      label: 'Approved work',
+      value: formatCurrency(approvedEstimateValue),
+      description: 'Approved estimate value',
+      icon: FileText,
+    },
+    {
+      label: 'Tax reserve',
+      value: formatCurrency(taxReserve),
+      description: `${settings.defaultTaxReservePercent}% of monthly revenue`,
+      icon: CircleDollarSign,
     },
   ]
 

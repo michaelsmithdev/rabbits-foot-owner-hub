@@ -15,6 +15,9 @@ import Dashboard from './pages/Dashboard/Dashboard'
 import Inbox from './pages/Inbox/Inbox'
 import Photos from './pages/Photos/Photos'
 import Settings from './pages/Settings/Settings'
+import DocumentsArchive from './features/documents/pages/DocumentsArchive'
+import PriceHistory from './features/pricing/pages/PriceHistory'
+import { loadBusinessSettings } from './features/settings/data/businessSettingsStore'
 
 type EstimateLaunch = {
   requestId: number
@@ -74,6 +77,10 @@ function App() {
       : "Rabbit's Foot Owner Hub"
   }, [activePage])
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = loadBusinessSettings().darkMode ? 'dark' : 'light'
+  }, [activePage, dataRevision])
+
   function navigateTo(page: PageName) {
     setActivePage(page)
 
@@ -121,6 +128,12 @@ function App() {
 
       case 'inbox':
         return <Inbox onOpenDocuments={() => handlePageChange('documents')} />
+
+      case 'archive':
+        return <DocumentsArchive />
+
+      case 'pricing':
+        return <PriceHistory />
 
       case 'photos':
         return <Photos />

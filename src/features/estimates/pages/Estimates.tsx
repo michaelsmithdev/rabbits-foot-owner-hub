@@ -4,9 +4,9 @@ import {
   useState,
 } from 'react'
 
-import { Printer } from 'lucide-react'
-
 import Invoices from '../../invoices/pages/Invoices'
+import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
+import PricingInsightPanel from '../../pricing/components/PricingInsightPanel'
 
 import {
   createInvoiceNumber,
@@ -315,7 +315,6 @@ function Estimates({
 
   const [
     printEstimateId,
-    setPrintEstimateId,
   ] = useState<string | null>(null)
 
   const [isBuilderOpen, setIsBuilderOpen] =
@@ -367,6 +366,10 @@ function Estimates({
   const [discount, setDiscount] = useState(0)
 
   const [notes, setNotes] = useState(businessSettings.estimateTerms)
+  const [propertyType, setPropertyType] = useState<'residential' | 'commercial'>('residential')
+  const [jobCategory, setJobCategory] = useState('General handyman')
+  const [materialCost, setMaterialCost] = useState(0)
+  const [taxReservePercent, setTaxReservePercent] = useState(businessSettings.defaultTaxReservePercent)
 
   const [formError, setFormError] = useState('')
 
@@ -486,6 +489,10 @@ function Estimates({
     setTaxRate(businessSettings.defaultTaxRate)
     setDiscount(0)
     setNotes(businessSettings.estimateTerms)
+    setPropertyType('residential')
+    setJobCategory('General handyman')
+    setMaterialCost(0)
+    setTaxReservePercent(businessSettings.defaultTaxReservePercent)
     setFormError('')
     setSaveMessage('')
   }
@@ -545,6 +552,10 @@ function Estimates({
       estimate.notes ||
         businessSettings.estimateTerms,
     )
+    setPropertyType(estimate.propertyType ?? 'residential')
+    setJobCategory(estimate.jobCategory ?? 'General handyman')
+    setMaterialCost(estimate.materialCost ?? 0)
+    setTaxReservePercent(estimate.taxReservePercent ?? businessSettings.defaultTaxReservePercent)
 
     setFormError('')
     setSaveMessage('')
@@ -807,6 +818,10 @@ function Estimates({
         taxRate,
         discount,
         notes: notes.trim(),
+        propertyType,
+        jobCategory: jobCategory.trim(),
+        materialCost,
+        taxReservePercent,
         updatedAt: currentTimestamp,
       }
 
@@ -850,6 +865,14 @@ function Estimates({
         discount,
 
         notes: notes.trim(),
+
+        propertyType,
+
+        jobCategory: jobCategory.trim(),
+
+        materialCost,
+
+        taxReservePercent,
 
         status: 'draft',
 
@@ -944,6 +967,18 @@ function Estimates({
       notes: [estimate.notes, businessSettings.invoiceTerms]
         .filter(Boolean)
         .join('\n\n'),
+
+      propertyType: estimate.propertyType ?? 'residential',
+
+      jobCategory: estimate.jobCategory ?? 'General handyman',
+
+      materialCost: estimate.materialCost ?? 0,
+
+      taxReservePercent: estimate.taxReservePercent ?? businessSettings.defaultTaxReservePercent,
+
+      completionDate: estimate.completionDate,
+
+      photoIds: estimate.photoIds ? [...estimate.photoIds] : [],
 
       status: 'draft',
 
@@ -1089,24 +1124,6 @@ function Estimates({
         item.quantity * item.unitPrice,
       0,
     )
-  }
-
-  function printEstimateDocument(
-    estimate: Estimate,
-  ): void {
-    setPrintEstimateId(estimate.id)
-
-    window.addEventListener(
-      'afterprint',
-      () => setPrintEstimateId(null),
-      { once: true },
-    )
-
-    window.setTimeout(() => {
-      window.requestAnimationFrame(() =>
-        window.print(),
-      )
-    }, 0)
   }
 
   const printEstimate = estimates.find(
@@ -1348,21 +1365,7 @@ function Estimates({
                     Duplicate
                   </button>
 
-                  <button
-                    className="customer-secondary-action"
-                    onClick={() =>
-                      printEstimateDocument(
-                        estimate,
-                      )
-                    }
-                    type="button"
-                  >
-                    <Printer
-                      aria-hidden="true"
-                      size={16}
-                    />
-                    Print / PDF
-                  </button>
+                  <DocumentPdfActions kind="estimate" document={estimate} customer={customers.find((item) => item.id === estimate.customerId)} />
 
                   <button
                     className="customer-secondary-action"
@@ -1778,6 +1781,16 @@ function Estimates({
                     <span>$</span>
                   </div>
                 </label>
+
+                <label><span>Job category</span><input onChange={(event) => setJobCategory(event.target.value)} value={jobCategory} /></label>
+
+                <label><span>Property type</span><select onChange={(event) => setPropertyType(event.target.value as 'residential' | 'commercial')} value={propertyType}><option value="residential">Residential</option><option value="commercial">Commercial</option></select></label>
+
+                <label><span>Material cost</span><div className="estimate-number-suffix"><input min="0" onChange={(event) => setMaterialCost(Number(event.target.value))} step="0.01" type="number" value={materialCost} /><span>$</span></div></label>
+
+                <label className="tax-reserve-control"><span>Tax reserve: {taxReservePercent}%</span><input aria-label="Estimate tax reserve percentage" max="35" min="25" onChange={(event) => setTaxReservePercent(Number(event.target.value))} step="1" type="range" value={taxReservePercent} /><small>Reserve {formatCurrency(grandTotal * taxReservePercent / 100)} · Safe to spend {formatCurrency(grandTotal * (1 - taxReservePercent / 100))}</small></label>
+
+                <PricingInsightPanel category={jobCategory} customerId={selectedCustomerId} description={`${jobName} ${description} ${lineItems.map((item) => item.description).join(' ')}`} onUsePrice={(price) => setLineItems((items) => items.length ? items.map((item, index) => index === 0 ? { ...item, unitPrice: price, quantity: 1 } : item) : [{ ...createEmptyLineItem(), description: jobName || 'Handyman service', unitPrice: price }])} propertyType={propertyType} />
 
                 <div className="estimate-summary-row">
                   <span>Subtotal</span>

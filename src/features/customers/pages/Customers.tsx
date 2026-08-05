@@ -9,6 +9,9 @@ import {
   saveCustomers,
 } from '../data/customerStore'
 import type { Customer } from '../types/Customer'
+import { loadEstimates } from '../../estimates/data/estimateStore'
+import { loadInvoices } from '../../invoices/data/invoiceStore'
+import { loadPhotos } from '../../photos/data/photoStore'
 
 type CustomersProps = {
   onStartEstimate: (customerId: string) => void
@@ -68,6 +71,21 @@ function Customers({
       ) ?? null
     )
   }, [customers, selectedCustomerId])
+
+  const customerActivity = useMemo(() => {
+    if (!selectedCustomerId) return { estimates: [], invoices: [], photos: [], timeline: [], billed: 0 }
+    const estimates = loadEstimates().filter((item) => item.customerId === selectedCustomerId)
+    const invoices = loadInvoices().filter((item) => item.customerId === selectedCustomerId)
+    const photos = loadPhotos().filter((item) => item.customerId === selectedCustomerId)
+    const billed = invoices.reduce((sum, invoice) => { const subtotal = invoice.lineItems.reduce((lineSum, line) => lineSum + line.quantity * line.unitPrice, 0); return sum + Math.max(0, subtotal * (1 + invoice.taxRate / 100) - invoice.discount) }, 0)
+    const timeline = [
+      ...estimates.map((item) => ({ id: `estimate-${item.id}`, date: item.updatedAt, type: 'Estimate', title: `${item.estimateNumber} · ${item.jobName}`, detail: item.status })),
+      ...invoices.map((item) => ({ id: `invoice-${item.id}`, date: item.updatedAt, type: 'Invoice', title: `${item.invoiceNumber} · ${item.jobName}`, detail: item.status })),
+      ...invoices.flatMap((invoice) => invoice.payments.map((payment) => ({ id: `payment-${payment.id}`, date: payment.createdAt, type: 'Payment', title: `$${payment.amount.toFixed(2)} received`, detail: `${payment.method} · ${invoice.invoiceNumber}` }))),
+      ...photos.map((item) => ({ id: `photo-${item.id}`, date: item.capturedAt, type: 'Photo', title: `${item.category} · ${item.jobName || 'Project photo'}`, detail: item.caption || item.fileName })),
+    ].sort((a, b) => b.date.localeCompare(a.date))
+    return { estimates, invoices, photos, timeline, billed }
+  }, [selectedCustomerId])
 
   const filteredCustomers = useMemo(() => {
     const normalizedSearch = searchTerm
@@ -361,17 +379,17 @@ function Customers({
 
             <div className="customer-card-stats">
               <div>
-                <strong>0</strong>
+                <strong>{customerActivity.estimates.length}</strong>
                 <span>estimates</span>
               </div>
 
               <div>
-                <strong>0</strong>
+                <strong>{customerActivity.invoices.length}</strong>
                 <span>invoices</span>
               </div>
 
               <div>
-                <strong>$0.00</strong>
+                <strong>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(customerActivity.billed)}</strong>
                 <span>billed</span>
               </div>
             </div>
@@ -397,33 +415,14 @@ function Customers({
           <article className="customer-card">
             <div className="customer-card-header">
               <div className="customer-card-name">
-                <h2>Recent documents</h2>
+                <h2>Customer timeline</h2>
                 <p>
-                  Estimates and invoices will
-                  appear here
+                  Estimates, invoices, payments, and photos
                 </p>
               </div>
             </div>
 
-            <div className="customers-empty-state">
-              <h2>No documents yet</h2>
-
-              <p>
-                Create the first estimate for
-                this customer to begin their
-                document history.
-              </p>
-
-              <button
-                className="button-dark"
-                onClick={() =>
-                  startEstimate(selectedCustomer)
-                }
-                type="button"
-              >
-                Create estimate
-              </button>
-            </div>
+            {customerActivity.timeline.length ? <div className="customer-timeline">{customerActivity.timeline.map((item) => <div className="timeline-row" key={item.id}><span className="status-pill">{item.type}</span><div><strong>{item.title}</strong><p>{item.detail}</p><small>{new Date(item.date).toLocaleString()}</small></div></div>)}</div> : <div className="customers-empty-state"><h2>No activity yet</h2><p>Create the first estimate for this customer to begin their history.</p><button className="button-dark" onClick={() => startEstimate(selectedCustomer)} type="button">Create estimate</button></div>}
           </article>
         </div>
 

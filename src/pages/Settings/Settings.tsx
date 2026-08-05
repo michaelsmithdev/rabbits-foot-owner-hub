@@ -77,6 +77,8 @@ function Settings() {
     if (
       settings.defaultTaxRate < 0 ||
       settings.defaultTaxRate > 100 ||
+      settings.defaultTaxReservePercent < 25 ||
+      settings.defaultTaxReservePercent > 35 ||
       settings.estimateValidDays < 1 ||
       settings.invoiceDueDays < 1
     ) {
@@ -257,6 +259,10 @@ function Settings() {
               </div>
             </label>
             <label className="settings-field">
+              <span>Default tax reserve</span>
+              <span className="settings-number-field"><input aria-label="Default tax reserve percentage" max="35" min="25" onChange={(event) => updateSetting('defaultTaxReservePercent', Number(event.target.value))} step="1" type="range" value={settings.defaultTaxReservePercent} /><b>{settings.defaultTaxReservePercent}% reserve</b></span>
+            </label>
+            <label className="settings-field">
               <span>Estimate valid for</span>
               <div className="settings-number-field">
                 <input
@@ -335,6 +341,10 @@ function Settings() {
               onChange={(event) => updateSetting('emailNotifications', event.target.checked)}
               type="checkbox"
             />
+          </label>
+          <label className="settings-toggle-row">
+            <div><strong>Dark mode</strong><span>Use a low-glare theme throughout the Owner Hub.</span></div>
+            <input checked={settings.darkMode} onChange={(event) => updateSetting('darkMode', event.target.checked)} type="checkbox" />
           </label>
           <label className="settings-toggle-row">
             <div>

@@ -54,6 +54,12 @@ export type Invoice = {
   discount: number
 
   notes: string
+  propertyType?: 'residential' | 'commercial'
+  jobCategory?: string
+  materialCost?: number
+  taxReservePercent?: number
+  completionDate?: string
+  photoIds?: string[]
   status: InvoiceStatus
   payments: InvoicePayment[]
 

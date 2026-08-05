@@ -14,6 +14,8 @@ export const defaultBusinessSettings: BusinessSettings = {
   state: 'IN',
   zipCode: '',
   defaultTaxRate: 0,
+  defaultTaxReservePercent: 30,
+  darkMode: false,
   estimateValidDays: 30,
   invoiceDueDays: 14,
   estimatePrefix: 'EST',
@@ -65,7 +67,17 @@ export function loadBusinessSettings(): BusinessSettings {
       : parsedSettings
 
     return isBusinessSettings(settingsRecord)
-      ? settingsRecord
+      ? {
+          ...settingsRecord,
+          defaultTaxReservePercent:
+            typeof settingsRecord.defaultTaxReservePercent === 'number'
+              ? settingsRecord.defaultTaxReservePercent
+              : 30,
+          darkMode:
+            typeof settingsRecord.darkMode === 'boolean'
+              ? settingsRecord.darkMode
+              : false,
+        }
       : { ...defaultBusinessSettings }
   } catch {
     return { ...defaultBusinessSettings }
