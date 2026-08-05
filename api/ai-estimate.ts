@@ -14,8 +14,10 @@ import {
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
 
-const MAX_BODY_BYTES = 100_000
+const MAX_BODY_BYTES = 4_000_000
 const MAX_REQUESTS_PER_MINUTE = 12
+const MAX_PHOTOS = 10
+const MAX_PHOTO_DATA_URL_LENGTH = 320_000
 const rateLimits = new Map<string, { count: number; resetAt: number }>()
 
 const ESTIMATOR_INSTRUCTIONS = `
@@ -36,6 +38,12 @@ reasonable contractor assumptions for ordinary unknowns such as exact measuremen
 brand or finish, minor access conditions, fastening details, and normal disposal.
 State those assumptions clearly in contractorNotes and lower confidence when needed.
 Do not make the customer answer routine questions before receiving an estimate.
+
+Use attached job photos as visual evidence for visible damage, materials, access,
+finish, and scope. Do not invent measurements or claim to see concealed plumbing,
+wiring, structure, moisture, or code conditions. Record photo-based observations and
+anything requiring onsite verification in contractorNotes. Project facts supplied in
+text take priority when an image is ambiguous.
 
 Return at most two short follow-up questions, and only when an answer could materially
 change the bid, code or safety requirements, or whether the work is feasible. Rank the
@@ -180,6 +188,26 @@ function parseHistory(value: unknown): EstimateHistoryItem[] {
   })
 }
 
+function parsePhotos(value: unknown): AiEstimateRequest['photos'] {
+  if (!Array.isArray(value)) return []
+
+  return value.slice(0, MAX_PHOTOS).flatMap((item) => {
+    if (!item || typeof item !== 'object') return []
+    const photo = item as { fileName?: unknown; dataUrl?: unknown }
+    const fileName = cleanText(photo.fileName, 120) || 'job-photo.jpg'
+    const dataUrl = typeof photo.dataUrl === 'string' ? photo.dataUrl.trim() : ''
+
+    if (
+      !/^data:image\/(?:jpeg|png|webp);base64,[a-zA-Z0-9+/=]+$/.test(dataUrl) ||
+      dataUrl.length > MAX_PHOTO_DATA_URL_LENGTH
+    ) {
+      return []
+    }
+
+    return [{ fileName, dataUrl }]
+  })
+}
+
 function parseRequest(value: unknown): AiEstimateRequest | null {
   if (!value || typeof value !== 'object') return null
   const request = value as Partial<AiEstimateRequest>
@@ -206,6 +234,7 @@ function parseRequest(value: unknown): AiEstimateRequest | null {
     propertyType: request.propertyType === 'commercial' ? 'commercial' : 'residential',
     jobCategory: cleanText(request.jobCategory, 120) || 'General handyman',
     history: parseHistory(request.history),
+    photos: parsePhotos(request.photos),
   }
 }
 
@@ -399,21 +428,37 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const modelResponse = await openai.responses.create({
       model,
       instructions: ESTIMATOR_INSTRUCTIONS,
-      input: JSON.stringify({
-        business: {
-          name: "Rabbit's Foot Handyman Services",
-          type: 'Residential and Commercial Handyman',
-          goal: 'Generate accurate, fair, and profitable estimates.',
+      input: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'input_text',
+              text: JSON.stringify({
+                business: {
+                  name: "Rabbit's Foot Handyman Services",
+                  type: 'Residential and Commercial Handyman',
+                  goal: 'Generate accurate, fair, and profitable estimates.',
+                },
+                requestedJob: parsedRequest.jobDescription,
+                followUpAnswers: parsedRequest.answers,
+                context: {
+                  customerCity: parsedRequest.customerCity,
+                  propertyType: parsedRequest.propertyType,
+                  jobCategory: parsedRequest.jobCategory,
+                  attachedPhotoCount: parsedRequest.photos.length,
+                },
+                similarCompletedJobs: parsedRequest.history,
+              }),
+            },
+            ...parsedRequest.photos.map((photo) => ({
+              type: 'input_image' as const,
+              image_url: photo.dataUrl,
+              detail: 'auto' as const,
+            })),
+          ],
         },
-        requestedJob: parsedRequest.jobDescription,
-        followUpAnswers: parsedRequest.answers,
-        context: {
-          customerCity: parsedRequest.customerCity,
-          propertyType: parsedRequest.propertyType,
-          jobCategory: parsedRequest.jobCategory,
-        },
-        similarCompletedJobs: parsedRequest.history,
-      }),
+      ],
       reasoning: { effort: 'medium' },
       text: {
         verbosity: 'medium',

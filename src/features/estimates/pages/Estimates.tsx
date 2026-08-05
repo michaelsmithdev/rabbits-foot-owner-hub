@@ -830,6 +830,12 @@ function Estimates({
         jobCategory: jobCategory.trim(),
         materialCost,
         taxReservePercent,
+        photoIds: Array.from(
+          new Set([
+            ...(existingEstimate.photoIds ?? []),
+            ...(aiGeneration?.photoIds ?? []),
+          ]),
+        ),
         aiEstimate: aiGeneration ?? undefined,
         updatedAt: currentTimestamp,
       }
@@ -882,6 +888,8 @@ function Estimates({
         materialCost,
 
         taxReservePercent,
+
+        photoIds: aiGeneration?.photoIds ? [...aiGeneration.photoIds] : [],
 
         aiEstimate: aiGeneration ?? undefined,
 

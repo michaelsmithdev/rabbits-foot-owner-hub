@@ -1,7 +1,13 @@
-import { LoaderCircle, RefreshCw, Sparkles } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { Camera, Images, LoaderCircle, RefreshCw, Sparkles, X } from 'lucide-react'
+import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 
 import type { Customer } from '../../customers/types/Customer'
+import { queuePhotoFiles } from '../../photos/data/photoStore'
+import {
+  MAX_AI_ESTIMATE_PHOTOS,
+  prepareEstimatePhoto,
+  type PreparedEstimatePhoto,
+} from './estimatePhotos'
 import { useAiEstimateAssistant } from './useAiEstimateAssistant'
 import type {
   AiEstimateGeneration,
@@ -45,10 +51,17 @@ export default function AiEstimateAssistant({
     initialGeneration?.jobDescription ?? '',
   )
   const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [photos, setPhotos] = useState<PreparedEstimatePhoto[]>([])
+  const [photoError, setPhotoError] = useState('')
+  const [isPreparingPhotos, setIsPreparingPhotos] = useState(false)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const { error, generate, generation, isLoading, setGeneration } =
     useAiEstimateAssistant(initialGeneration)
   const result = generation?.draft ?? null
-  const canGenerate = Boolean(customerId && jobDescription.trim().length >= 10)
+  const canGenerate = Boolean(
+    customerId && jobDescription.trim().length >= 10 && !isPreparingPhotos,
+  )
   const answeredQuestions = useMemo(
     () =>
       Object.fromEntries(
@@ -57,8 +70,90 @@ export default function AiEstimateAssistant({
     [answers],
   )
 
+  async function selectPhotos(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = Array.from(event.target.files ?? [])
+    event.target.value = ''
+    if (selectedFiles.length === 0) return
+
+    const availableSlots = MAX_AI_ESTIMATE_PHOTOS - photos.length
+    if (availableSlots <= 0) {
+      setPhotoError(`You can attach up to ${MAX_AI_ESTIMATE_PHOTOS} photos.`)
+      return
+    }
+
+    const acceptedFiles = selectedFiles.slice(0, availableSlots)
+    setPhotoError(
+      selectedFiles.length > availableSlots
+        ? `Only the first ${availableSlots} selected photo${availableSlots === 1 ? '' : 's'} were added.`
+        : '',
+    )
+    setIsPreparingPhotos(true)
+
+    try {
+      const preparedPhotos = await Promise.all(
+        acceptedFiles.map((file) => prepareEstimatePhoto(file)),
+      )
+      setPhotos((current) => [...current, ...preparedPhotos])
+    } catch (selectionError) {
+      setPhotoError(
+        selectionError instanceof Error
+          ? selectionError.message
+          : 'The selected photos could not be prepared.',
+      )
+    } finally {
+      setIsPreparingPhotos(false)
+    }
+  }
+
+  function removePhoto(photoId: string) {
+    setPhotos((current) => current.filter((photo) => photo.id !== photoId))
+    setPhotoError('')
+  }
+
+  async function storeSelectedPhotos(): Promise<PreparedEstimatePhoto[]> {
+    const unstoredPhotos = photos.filter((photo) => !photo.photoId)
+    if (unstoredPhotos.length === 0) return photos
+
+    const storedPhotos = await queuePhotoFiles(
+      unstoredPhotos.map((photo) => photo.file),
+      {
+        customerId: customerId || null,
+        jobName: jobCategory.trim() || jobDescription.trim().slice(0, 100),
+        category: 'before',
+        caption: 'AI estimate reference photo',
+        capturedAt: new Date().toISOString(),
+      },
+    )
+    let storedIndex = 0
+    const nextPhotos = photos.map((photo) => {
+      if (photo.photoId) return photo
+      const nextPhoto = {
+        ...photo,
+        photoId: storedPhotos[storedIndex]?.id,
+      }
+      storedIndex += 1
+      return nextPhoto
+    })
+
+    setPhotos(nextPhotos)
+    return nextPhotos
+  }
+
   async function handleGenerate() {
     if (!canGenerate || !customer) return
+
+    let estimatePhotos: PreparedEstimatePhoto[]
+    setPhotoError('')
+    try {
+      estimatePhotos = await storeSelectedPhotos()
+    } catch (storageError) {
+      setPhotoError(
+        storageError instanceof Error
+          ? storageError.message
+          : 'The photos could not be saved.',
+      )
+      return
+    }
 
     const nextGeneration = await generate({
       jobDescription,
@@ -67,11 +162,22 @@ export default function AiEstimateAssistant({
       customerCity: customer.city,
       propertyType,
       jobCategory,
+      photos: estimatePhotos.map((photo) => ({
+        fileName: photo.file.name,
+        dataUrl: photo.dataUrl,
+      })),
     })
 
     if (nextGeneration) {
       setAnswers({})
-      onGenerated(nextGeneration)
+      const generationWithPhotos = {
+        ...nextGeneration,
+        photoIds: estimatePhotos.flatMap((photo) =>
+          photo.photoId ? [photo.photoId] : [],
+        ),
+      }
+      setGeneration(generationWithPhotos)
+      onGenerated(generationWithPhotos)
     }
   }
 
@@ -109,6 +215,91 @@ export default function AiEstimateAssistant({
           value={jobDescription}
         />
       </label>
+
+      <div className="ai-estimate-photos">
+        <div className="ai-estimate-photos-header">
+          <div>
+            <span>Job photos</span>
+            <small>
+              Add up to {MAX_AI_ESTIMATE_PHOTOS} photos so the AI can assess visible conditions.
+            </small>
+          </div>
+          <strong>{photos.length}/{MAX_AI_ESTIMATE_PHOTOS}</strong>
+        </div>
+
+        <input
+          accept="image/jpeg,image/png,image/webp"
+          aria-label="Choose estimate photos"
+          className="ai-photo-file-input"
+          disabled={isLoading || isPreparingPhotos || photos.length >= MAX_AI_ESTIMATE_PHOTOS}
+          multiple
+          onChange={selectPhotos}
+          ref={galleryInputRef}
+          type="file"
+        />
+        <input
+          accept="image/jpeg,image/png,image/webp"
+          aria-label="Take an estimate photo"
+          capture="environment"
+          className="ai-photo-file-input"
+          disabled={isLoading || isPreparingPhotos || photos.length >= MAX_AI_ESTIMATE_PHOTOS}
+          onChange={selectPhotos}
+          ref={cameraInputRef}
+          type="file"
+        />
+
+        <div className="ai-photo-actions">
+          <button
+            disabled={isLoading || isPreparingPhotos || photos.length >= MAX_AI_ESTIMATE_PHOTOS}
+            onClick={() => galleryInputRef.current?.click()}
+            type="button"
+          >
+            <Images aria-hidden="true" size={18} />
+            Choose photos
+          </button>
+          <button
+            disabled={isLoading || isPreparingPhotos || photos.length >= MAX_AI_ESTIMATE_PHOTOS}
+            onClick={() => cameraInputRef.current?.click()}
+            type="button"
+          >
+            <Camera aria-hidden="true" size={18} />
+            Take photo
+          </button>
+        </div>
+
+        {isPreparingPhotos && (
+          <p className="ai-photo-status" role="status">
+            <LoaderCircle aria-hidden="true" className="ai-estimate-spinner" size={17} />
+            Preparing photos securely…
+          </p>
+        )}
+
+        {photos.length > 0 && (
+          <div className="ai-photo-preview-grid">
+            {photos.map((photo, index) => (
+              <div className="ai-photo-preview" key={photo.id}>
+                <img alt={`Selected job photo ${index + 1}`} src={photo.dataUrl} />
+                <button
+                  aria-label={`Remove photo ${index + 1}`}
+                  disabled={isLoading || isPreparingPhotos}
+                  onClick={() => removePhoto(photo.id)}
+                  type="button"
+                >
+                  <X aria-hidden="true" size={16} />
+                </button>
+                <span>{index + 1}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {photoError && (
+          <p className="ai-photo-error" role="alert">{photoError}</p>
+        )}
+        <p className="ai-photo-guidance">
+          Photos help identify visible conditions. Verify measurements and concealed work onsite.
+        </p>
+      </div>
 
       {!customerId && (
         <p className="ai-estimate-guidance">Select a customer before generating an estimate.</p>

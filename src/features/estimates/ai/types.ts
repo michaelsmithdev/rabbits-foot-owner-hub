@@ -6,6 +6,11 @@ export type AiEstimateLineItem = {
   total: number
 }
 
+export type AiEstimatePhotoInput = {
+  fileName: string
+  dataUrl: string
+}
+
 export type AiEstimateResult = {
   jobTitle: string
   summary: string
@@ -28,6 +33,7 @@ export type AiEstimateGeneration = {
   generatedAt: string
   model: string
   historyUsed: number
+  photoIds?: string[]
   draft: AiEstimateResult
 }
 
@@ -54,6 +60,7 @@ export type AiEstimateRequest = {
   propertyType: 'residential' | 'commercial'
   jobCategory: string
   history: EstimateHistoryItem[]
+  photos: AiEstimatePhotoInput[]
 }
 
 export const aiEstimateJsonSchema = {

@@ -5,7 +5,7 @@ import type {
   AiEstimateRequest,
 } from './types'
 
-const REQUEST_TIMEOUT_MS = 60_000
+const REQUEST_TIMEOUT_MS = 90_000
 
 export class AiEstimateServiceError extends Error {
   readonly code: string
@@ -41,6 +41,7 @@ export async function generateAiEstimate(input: {
   customerCity: string
   propertyType: 'residential' | 'commercial'
   jobCategory: string
+  photos: Array<{ fileName: string; dataUrl: string }>
 }): Promise<AiEstimateGeneration> {
   if (!cloudClient) {
     throw new AiEstimateServiceError(
@@ -66,6 +67,7 @@ export async function generateAiEstimate(input: {
     propertyType: input.propertyType,
     jobCategory: input.jobCategory.trim(),
     history: buildEstimateHistory(input.jobDescription, input.customerId),
+    photos: input.photos,
   }
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
