@@ -5,10 +5,11 @@ import {
   X,
 } from 'lucide-react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import { Capacitor } from '@capacitor/core'
 
 import { useOnlineStatus } from '../hooks/useOnlineStatus'
 
-function PwaLifecycle() {
+function WebPwaLifecycle() {
   const isOnline = useOnlineStatus()
   const {
     needRefresh: [needRefresh, setNeedRefresh],
@@ -89,6 +90,16 @@ function PwaLifecycle() {
   }
 
   return null
+}
+
+function PwaLifecycle() {
+  // Capacitor packages the web bundle inside the APK. A browser service worker
+  // can keep serving an older packaged bundle after a Play Store update, which
+  // leaves the native WebView on a blank page. Android updates are handled by
+  // Google Play, so the PWA updater must only run in a normal web browser.
+  if (Capacitor.isNativePlatform()) return null
+
+  return <WebPwaLifecycle />
 }
 
 export default PwaLifecycle

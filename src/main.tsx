@@ -7,6 +7,9 @@ import { AuthGate } from './features/auth/AuthGate.tsx'
 import { AuthProvider } from './features/auth/AuthProvider.tsx'
 import { CloudSyncProvider } from './features/cloud/CloudSyncProvider.tsx'
 import PwaLifecycle from './features/pwa/components/PwaLifecycle.tsx'
+import { clearNativePwaCache } from './features/pwa/clearNativePwaCache.ts'
+
+void clearNativePwaCache()
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
