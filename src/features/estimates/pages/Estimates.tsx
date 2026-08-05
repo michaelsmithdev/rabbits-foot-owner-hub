@@ -7,6 +7,8 @@ import {
 import Invoices from '../../invoices/pages/Invoices'
 import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
 import PricingInsightPanel from '../../pricing/components/PricingInsightPanel'
+import AiEstimateAssistant from '../ai/AiEstimateAssistant'
+import type { AiEstimateGeneration } from '../ai/types'
 
 import {
   createInvoiceNumber,
@@ -259,6 +261,7 @@ function createEmptyLineItem(): EstimateLineItem {
     id: createId(),
     description: '',
     quantity: 1,
+    unit: 'hour',
     unitPrice: 0,
   }
 }
@@ -370,6 +373,7 @@ function Estimates({
   const [jobCategory, setJobCategory] = useState('General handyman')
   const [materialCost, setMaterialCost] = useState(0)
   const [taxReservePercent, setTaxReservePercent] = useState(businessSettings.defaultTaxReservePercent)
+  const [aiGeneration, setAiGeneration] = useState<AiEstimateGeneration | null>(null)
 
   const [formError, setFormError] = useState('')
 
@@ -493,6 +497,7 @@ function Estimates({
     setJobCategory('General handyman')
     setMaterialCost(0)
     setTaxReservePercent(businessSettings.defaultTaxReservePercent)
+    setAiGeneration(null)
     setFormError('')
     setSaveMessage('')
   }
@@ -556,6 +561,7 @@ function Estimates({
     setJobCategory(estimate.jobCategory ?? 'General handyman')
     setMaterialCost(estimate.materialCost ?? 0)
     setTaxReservePercent(estimate.taxReservePercent ?? businessSettings.defaultTaxReservePercent)
+    setAiGeneration(estimate.aiEstimate ?? null)
 
     setFormError('')
     setSaveMessage('')
@@ -647,7 +653,8 @@ function Estimates({
           item.id === lineItemId
             ? {
                 ...item,
-                description: '',
+              description: '',
+                unit: 'hour',
                 unitPrice: 0,
               }
             : item,
@@ -669,6 +676,7 @@ function Estimates({
           ? {
               ...item,
               description: value,
+              unit: 'hour',
               unitPrice:
                 selectedService?.rate ?? 0,
             }
@@ -822,6 +830,7 @@ function Estimates({
         jobCategory: jobCategory.trim(),
         materialCost,
         taxReservePercent,
+        aiEstimate: aiGeneration ?? undefined,
         updatedAt: currentTimestamp,
       }
 
@@ -873,6 +882,8 @@ function Estimates({
         materialCost,
 
         taxReservePercent,
+
+        aiEstimate: aiGeneration ?? undefined,
 
         status: 'draft',
 
@@ -979,6 +990,8 @@ function Estimates({
       completionDate: estimate.completionDate,
 
       photoIds: estimate.photoIds ? [...estimate.photoIds] : [],
+
+      aiEstimate: estimate.aiEstimate,
 
       status: 'draft',
 
@@ -1113,6 +1126,39 @@ function Estimates({
         estimateTax -
         estimate.discount,
     )
+  }
+
+  function applyAiGeneration(generation: AiEstimateGeneration): void {
+    const result = generation.draft
+
+    if (result.questions.length > 0) {
+      setAiGeneration(generation)
+      return
+    }
+
+    setAiGeneration(generation)
+    setJobName(result.jobTitle)
+    setSelectedJobNameOption(getMatchingOption(result.jobTitle, JOB_NAME_OPTIONS))
+    setDescription(result.summary)
+    setLineItems(
+      result.lineItems.length > 0
+        ? result.lineItems.map((item) => ({
+            id: createId(),
+            description: item.description,
+            quantity: item.quantity,
+            unit: item.unit,
+            unitPrice: item.unitPrice,
+          }))
+        : [createEmptyLineItem()],
+    )
+    setMaterialCost(result.materialCost)
+    setNotes(
+      [result.customerNotes, businessSettings.estimateTerms]
+        .filter(Boolean)
+        .join('\n\n'),
+    )
+    setFormError('')
+    setSaveMessage('AI estimate applied. Review and edit every field before saving.')
   }
 
   function calculateEstimateSubtotal(
@@ -1556,6 +1602,16 @@ function Estimates({
               )}
             </div>
 
+            <AiEstimateAssistant
+              customer={selectedCustomer}
+              customerId={selectedCustomerId}
+              initialGeneration={aiGeneration ?? undefined}
+              jobCategory={jobCategory}
+              onGenerated={applyAiGeneration}
+              onGenerationChange={setAiGeneration}
+              propertyType={propertyType}
+            />
+
             <div className="estimate-line-items">
               <div className="estimate-help-bar">
                 Choose a repair from the
@@ -1568,9 +1624,11 @@ function Estimates({
                   Repair / Service
                 </span>
 
-                <span>Hours</span>
+                <span>Quantity</span>
 
-                <span>Rate</span>
+                <span>Unit</span>
+
+                <span>Unit price</span>
 
                 <span>Total</span>
 
@@ -1660,7 +1718,7 @@ function Estimates({
                       </div>
 
                       <input
-                        aria-label="Hours"
+                        aria-label="Quantity"
                         min="0"
                         onChange={(event) =>
                           updateLineItem(
@@ -1675,7 +1733,21 @@ function Estimates({
                       />
 
                       <input
-                        aria-label="Hourly rate"
+                        aria-label="Unit"
+                        onChange={(event) =>
+                          updateLineItem(
+                            item.id,
+                            'unit',
+                            event.target.value,
+                          )
+                        }
+                        placeholder="hour"
+                        type="text"
+                        value={item.unit ?? 'hour'}
+                      />
+
+                      <input
+                        aria-label="Unit price"
                         min="0"
                         onChange={(event) =>
                           updateLineItem(

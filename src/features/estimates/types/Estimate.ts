@@ -1,3 +1,5 @@
+import type { AiEstimateGeneration } from '../ai/types'
+
 export type EstimateStatus =
   | 'draft'
   | 'sent'
@@ -8,6 +10,7 @@ export interface EstimateLineItem {
   id: string
   description: string
   quantity: number
+  unit?: string
   unitPrice: number
 }
 
@@ -30,6 +33,7 @@ export interface Estimate {
   taxReservePercent?: number
   completionDate?: string
   photoIds?: string[]
+  aiEstimate?: AiEstimateGeneration
   status: EstimateStatus
   createdAt: string
   updatedAt: string

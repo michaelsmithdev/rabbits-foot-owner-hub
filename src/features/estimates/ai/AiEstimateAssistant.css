@@ -1,0 +1,241 @@
+.ai-estimate-assistant {
+  margin: 24px 0;
+  padding: 24px;
+  border: 1px solid rgba(126, 205, 0, 0.38);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top right, rgba(126, 205, 0, 0.16), transparent 35%),
+    #f8faf4;
+  box-shadow: 0 18px 50px rgba(16, 19, 15, 0.08);
+}
+
+.ai-estimate-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.ai-estimate-icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  place-items: center;
+  border-radius: 16px;
+  color: #10130f;
+  background: #8ed000;
+}
+
+.ai-estimate-header p,
+.ai-question-eyebrow {
+  margin: 0 0 4px;
+  color: #4e7900;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.ai-estimate-header h3 {
+  margin: 0;
+  color: #10130f;
+  font-size: 1.35rem;
+}
+
+.ai-estimate-header span {
+  display: block;
+  margin-top: 4px;
+  color: #697066;
+  font-size: 0.92rem;
+}
+
+.ai-estimate-description,
+.ai-estimate-result label,
+.ai-question-panel label {
+  display: grid;
+  gap: 7px;
+  color: #3d4439;
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+
+.ai-estimate-description textarea,
+.ai-estimate-result input,
+.ai-estimate-result textarea,
+.ai-question-panel input {
+  width: 100%;
+  border: 1px solid #d8ddd3;
+  border-radius: 14px;
+  color: #10130f;
+  background: #fff;
+  font: inherit;
+  font-weight: 500;
+  outline: none;
+}
+
+.ai-estimate-description textarea,
+.ai-estimate-result textarea {
+  padding: 13px 14px;
+  resize: vertical;
+}
+
+.ai-estimate-result input,
+.ai-question-panel input {
+  min-height: 44px;
+  padding: 10px 12px;
+}
+
+.ai-estimate-description textarea:focus,
+.ai-estimate-result input:focus,
+.ai-estimate-result textarea:focus,
+.ai-question-panel input:focus {
+  border-color: #78b900;
+  box-shadow: 0 0 0 3px rgba(126, 205, 0, 0.16);
+}
+
+.ai-estimate-guidance,
+.ai-history-note {
+  margin: 10px 0 0;
+  color: #70766d;
+  font-size: 0.83rem;
+}
+
+.ai-estimate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.ai-estimate-actions button {
+  display: inline-flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 14px;
+  color: #fff;
+  background: #10130f;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.ai-estimate-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.ai-estimate-actions .ai-apply-button {
+  border: 1px solid #b9d989;
+  color: #304b00;
+  background: #edf7dc;
+}
+
+.ai-estimate-spinner {
+  animation: ai-estimate-spin 0.9s linear infinite;
+}
+
+@keyframes ai-estimate-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ai-estimate-error,
+.ai-question-panel {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 16px;
+  border-radius: 16px;
+}
+
+.ai-estimate-error {
+  border: 1px solid #efb2aa;
+  color: #7d2014;
+  background: #fff1ef;
+}
+
+.ai-question-panel {
+  border: 1px solid #d6e9b6;
+  background: #fff;
+}
+
+.ai-question-panel h4 {
+  margin: 0 0 4px;
+  color: #10130f;
+}
+
+.ai-estimate-result {
+  display: grid;
+  gap: 16px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #d8e5c3;
+}
+
+.ai-result-topline,
+.ai-metric-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.ai-result-topline {
+  grid-template-columns: 2fr 1fr;
+}
+
+.ai-metric-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ai-metric-grid small {
+  color: #528000;
+  font-weight: 800;
+}
+
+.ai-duration-field {
+  grid-column: span 3;
+}
+
+.ai-line-item-summary {
+  overflow: hidden;
+  border: 1px solid #dbe2d4;
+  border-radius: 16px;
+  background: #fff;
+}
+
+.ai-line-item-summary > div,
+.ai-line-item-summary p {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf0e9;
+}
+
+.ai-line-item-summary > div {
+  align-items: flex-start;
+  color: #304b00;
+  background: #f2f8e8;
+  font-weight: 800;
+}
+
+.ai-line-item-summary > div small {
+  color: #6a7365;
+  font-weight: 500;
+}
+
+.ai-line-item-summary p:last-child {
+  border-bottom: 0;
+}
+
+@media (max-width: 760px) {
+  .ai-estimate-assistant { padding: 18px; border-radius: 20px; }
+  .ai-result-topline,
+  .ai-metric-grid { grid-template-columns: 1fr; }
+  .ai-duration-field { grid-column: auto; }
+  .ai-estimate-actions button { width: 100%; }
+}

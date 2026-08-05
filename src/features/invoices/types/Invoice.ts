@@ -1,3 +1,5 @@
+import type { AiEstimateGeneration } from '../../estimates/ai/types'
+
 export type InvoiceStatus =
   | 'draft'
   | 'sent'
@@ -26,6 +28,7 @@ export type InvoiceLineItem = {
   id: string
   description: string
   quantity: number
+  unit?: string
   unitPrice: number
 }
 
@@ -60,6 +63,7 @@ export type Invoice = {
   taxReservePercent?: number
   completionDate?: string
   photoIds?: string[]
+  aiEstimate?: AiEstimateGeneration
   status: InvoiceStatus
   payments: InvoicePayment[]
 

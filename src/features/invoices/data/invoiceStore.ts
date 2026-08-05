@@ -35,6 +35,7 @@ function isLineItem(value: unknown): value is InvoiceLineItem {
     typeof lineItem.description === 'string' &&
     typeof lineItem.quantity === 'number' &&
     Number.isFinite(lineItem.quantity) &&
+    (lineItem.unit === undefined || typeof lineItem.unit === 'string') &&
     typeof lineItem.unitPrice === 'number' &&
     Number.isFinite(lineItem.unitPrice)
   )

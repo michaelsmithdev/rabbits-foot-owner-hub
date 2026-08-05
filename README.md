@@ -57,3 +57,24 @@ are cached on the device for field use. New photos are retained in IndexedDB
 while offline, uploaded to a private Supabase Storage bucket when the connection
 returns, and restricted to organization members by database policy. The
 Settings screen also provides a portable JSON data backup.
+## AI Estimate Assistant configuration
+
+The AI estimator calls the OpenAI Responses API through the authenticated
+serverless route at `api/ai-estimate.ts`. The OpenAI key is never included in
+the browser or Android bundle.
+
+Required deployment variables:
+
+- `OPENAI_API_KEY` - server-only OpenAI Platform project key.
+- `VITE_SUPABASE_URL` - the Owner Hub Supabase project URL.
+- `VITE_SUPABASE_PUBLISHABLE_KEY` - the browser-safe Supabase key.
+
+Optional variables:
+
+- `OPENAI_ESTIMATE_MODEL` - defaults to `gpt-5.6-sol`.
+- `OWNER_HUB_ALLOWED_ORIGINS` - comma-separated additional web origins.
+- `VITE_OWNER_HUB_API_URL` - public API origin used by the Android bundle.
+
+The local `.env.local` and `.env.android.local` files are ignored by Git.
+OpenAI API billing must have available credit; a ChatGPT subscription does not
+provide API credit.

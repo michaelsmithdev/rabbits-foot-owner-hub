@@ -380,6 +380,9 @@ function Invoices() {
       jobCategory: draft.jobCategory.trim(),
       materialCost: draft.materialCost,
       taxReservePercent: draft.taxReservePercent,
+      completionDate: existingInvoice?.completionDate,
+      photoIds: existingInvoice?.photoIds ? [...existingInvoice.photoIds] : [],
+      aiEstimate: existingInvoice?.aiEstimate,
       status: draft.status,
       payments: existingInvoice?.payments ?? [],
       createdAt: existingInvoice?.createdAt ?? timestamp,
@@ -397,6 +400,10 @@ function Invoices() {
         adjustedStatus === 'paid'
           ? baseInvoice.paidAt ?? timestamp
           : null,
+      completionDate:
+        adjustedStatus === 'paid'
+          ? baseInvoice.completionDate ?? timestamp.slice(0, 10)
+          : baseInvoice.completionDate,
     }
 
     setInvoices((currentInvoices) =>
@@ -485,6 +492,10 @@ function Invoices() {
           ...updatedInvoice,
           status,
           paidAt: status === 'paid' ? timestamp : null,
+          completionDate:
+            status === 'paid'
+              ? updatedInvoice.completionDate ?? paymentDate
+              : updatedInvoice.completionDate,
         }
       }),
     )
