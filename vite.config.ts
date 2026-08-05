@@ -7,30 +7,35 @@ export default defineConfig(({ mode }) => {
   const isAndroidBuild = mode === 'android'
 
   return {
+    base: isAndroidBuild ? './' : '/',
     define: {
       __ANDROID_BUILD__: JSON.stringify(isAndroidBuild),
     },
     build: {
-      rolldownOptions: {
-        output: {
-          codeSplitting: {
-            groups: [
-              {
-                name: 'supabase',
-                test: /node_modules[\\/]@supabase/,
-                priority: 20,
+      target: isAndroidBuild ? 'es2020' : 'es2023',
+      modulePreload: !isAndroidBuild,
+      rolldownOptions: isAndroidBuild
+        ? {}
+        : {
+            output: {
+              codeSplitting: {
+                groups: [
+                  {
+                    name: 'supabase',
+                    test: /node_modules[\\/]@supabase/,
+                    priority: 20,
+                  },
+                  {
+                    name: 'vendor',
+                    test: /node_modules/,
+                    minSize: 100_000,
+                    maxSize: 300_000,
+                    priority: 10,
+                  },
+                ],
               },
-              {
-                name: 'vendor',
-                test: /node_modules/,
-                minSize: 100_000,
-                maxSize: 300_000,
-                priority: 10,
-              },
-            ],
+            },
           },
-        },
-      },
     },
     plugins: [
       react(),
