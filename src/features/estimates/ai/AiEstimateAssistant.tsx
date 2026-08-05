@@ -71,11 +71,7 @@ export default function AiEstimateAssistant({
 
     if (nextGeneration) {
       setAnswers({})
-      if (nextGeneration.draft.questions.length === 0) {
-        onGenerated(nextGeneration)
-      } else {
-        onGenerationChange(nextGeneration)
-      }
+      onGenerated(nextGeneration)
     }
   }
 
@@ -120,8 +116,8 @@ export default function AiEstimateAssistant({
 
       {result && result.questions.length > 0 && (
         <div className="ai-question-panel">
-          <p className="ai-question-eyebrow">A FEW DETAILS ARE NEEDED</p>
-          <h4>The assistant will not guess.</h4>
+          <p className="ai-question-eyebrow">OPTIONAL PRICE REFINEMENT</p>
+          <h4>Your estimate is ready. Answer only if you want it refined.</h4>
           {result.questions.map((question) => (
             <label key={question}>
               <span>{question}</span>
@@ -159,12 +155,12 @@ export default function AiEstimateAssistant({
           {isLoading
             ? 'Building professional estimate…'
             : result?.questions.length
-              ? 'Generate with answers'
+              ? 'Refine with answers'
               : result
                 ? 'Regenerate estimate'
                 : 'Generate AI estimate'}
         </button>
-        {generation && result && result.questions.length === 0 && (
+        {generation && result && result.lineItems.length > 0 && (
           <button
             className="ai-apply-button"
             onClick={() => onGenerated(generation)}
@@ -175,7 +171,7 @@ export default function AiEstimateAssistant({
         )}
       </div>
 
-      {result && result.questions.length === 0 && (
+      {result && result.lineItems.length > 0 && (
         <div className="ai-estimate-result">
           <div className="ai-result-topline">
             <label>

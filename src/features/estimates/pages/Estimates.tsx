@@ -1131,11 +1131,6 @@ function Estimates({
   function applyAiGeneration(generation: AiEstimateGeneration): void {
     const result = generation.draft
 
-    if (result.questions.length > 0) {
-      setAiGeneration(generation)
-      return
-    }
-
     setAiGeneration(generation)
     setJobName(result.jobTitle)
     setSelectedJobNameOption(getMatchingOption(result.jobTitle, JOB_NAME_OPTIONS))

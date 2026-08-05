@@ -90,11 +90,12 @@ export const aiEstimateJsonSchema = {
     contractorNotes: { type: 'string' },
     questions: {
       type: 'array',
-      maxItems: 12,
+      maxItems: 2,
       items: { type: 'string' },
     },
     lineItems: {
       type: 'array',
+      minItems: 1,
       maxItems: 30,
       items: {
         type: 'object',
