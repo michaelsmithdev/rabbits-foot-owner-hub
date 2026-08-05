@@ -97,7 +97,11 @@ function PwaLifecycle() {
   // can keep serving an older packaged bundle after a Play Store update, which
   // leaves the native WebView on a blank page. Android updates are handled by
   // Google Play, so the PWA updater must only run in a normal web browser.
-  if (Capacitor.isNativePlatform()) return null
+  // The build-time flag is authoritative for Play builds and prevents this
+  // updater from being bundled as an active path even before Capacitor's
+  // native bridge has initialized. The runtime check protects other native
+  // packaging workflows.
+  if (__ANDROID_BUILD__ || Capacitor.isNativePlatform()) return null
 
   return <WebPwaLifecycle />
 }

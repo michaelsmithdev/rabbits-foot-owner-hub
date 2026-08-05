@@ -6,16 +6,26 @@ const supabasePublishableKey =
 const forceLocalMode =
   import.meta.env.DEV && import.meta.env.VITE_LOCAL_MODE === 'true'
 
-export const isCloudConfigured = Boolean(
+const hasCloudConfiguration = Boolean(
   supabaseUrl && supabasePublishableKey && !forceLocalMode,
 )
 
-export const cloudClient = isCloudConfigured
-  ? createClient(supabaseUrl, supabasePublishableKey, {
+function createCloudClient() {
+  if (!hasCloudConfiguration) return null
+
+  try {
+    return createClient(supabaseUrl, supabasePublishableKey, {
       auth: {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
       },
     })
-  : null
+  } catch (error) {
+    console.error('Cloud client could not be initialized.', error)
+    return null
+  }
+}
+
+export const cloudClient = createCloudClient()
+export const isCloudConfigured = cloudClient !== null

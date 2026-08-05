@@ -3,40 +3,53 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
-export default defineConfig({
-  build: {
-    rolldownOptions: {
-      output: {
-        codeSplitting: {
-          groups: [
-            {
-              name: 'supabase',
-              test: /node_modules[\\/]@supabase/,
-              priority: 20,
-            },
-            {
-              name: 'vendor',
-              test: /node_modules/,
-              minSize: 100_000,
-              maxSize: 300_000,
-              priority: 10,
-            },
-          ],
+export default defineConfig(({ mode }) => {
+  const isAndroidBuild = mode === 'android'
+
+  return {
+    define: {
+      __ANDROID_BUILD__: JSON.stringify(isAndroidBuild),
+    },
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            groups: [
+              {
+                name: 'supabase',
+                test: /node_modules[\\/]@supabase/,
+                priority: 20,
+              },
+              {
+                name: 'vendor',
+                test: /node_modules/,
+                minSize: 100_000,
+                maxSize: 300_000,
+                priority: 10,
+              },
+            ],
+          },
         },
       },
     },
-  },
-  plugins: [
-    react(),
-    tailwindcss(),
-    VitePWA({
-      registerType: 'prompt',
-      includeAssets: [
-        'rabbits-foot-logo.png',
-        'pwa-64x64.png',
-        'apple-touch-icon-180x180.png',
-      ],
-      manifest: {
+    plugins: [
+      react(),
+      tailwindcss(),
+      VitePWA({
+        // Android WebView data survives Play Store upgrades. Older releases
+        // registered Workbox on Capacitor's localhost origin, so a cached
+        // index.html could keep referencing JavaScript removed by the new APK.
+        // The Android build replaces that worker with a self-destroying worker.
+        // This clears Cache Storage without touching business records stored in
+        // localStorage or IndexedDB.
+        selfDestroying: isAndroidBuild,
+        registerType: 'prompt',
+        includeAssets: [
+          'rabbits-foot-logo.png',
+          'pwa-64x64.png',
+          'apple-touch-icon-180x180.png',
+        ],
+        manifest: {
         name: "Rabbit's Foot Owner Hub",
         short_name: 'Owner Hub',
         description:
@@ -72,14 +85,15 @@ export default defineConfig({
             purpose: 'maskable',
           },
         ],
-      },
-      workbox: {
-        cleanupOutdatedCaches: true,
-        navigateFallback: '/index.html',
-        globPatterns: [
-          '**/*.{js,css,html,ico,png,svg,webp,woff2}',
-        ],
-      },
-    }),
-  ],
+        },
+        workbox: {
+          cleanupOutdatedCaches: true,
+          navigateFallback: '/index.html',
+          globPatterns: [
+            '**/*.{js,css,html,ico,png,svg,webp,woff2}',
+          ],
+        },
+      }),
+    ],
+  }
 })

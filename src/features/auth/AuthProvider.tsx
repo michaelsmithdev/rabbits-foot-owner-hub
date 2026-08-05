@@ -12,6 +12,9 @@ import {
   type AuthContextValue,
   type AuthMode,
 } from './authContext'
+import { recordStartupEvent } from '../../startup/startupDiagnostics'
+
+const AUTH_STARTUP_TIMEOUT_MS = 12_000
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
@@ -26,15 +29,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     let isMounted = true
+    const startupTimeout = window.setTimeout(() => {
+      if (!isMounted) return
+
+      recordStartupEvent('auth-startup-timeout')
+      setSession(null)
+      setMode('cloud')
+    }, AUTH_STARTUP_TIMEOUT_MS)
 
     void cloudClient.auth.getSession().then(({ data, error }) => {
       if (!isMounted) return
+      window.clearTimeout(startupTimeout)
 
       if (error) {
         console.error('Saved login session could not be loaded.', error)
       }
 
       setSession(data.session)
+      setMode('cloud')
+      recordStartupEvent('auth-session-loaded')
+    }).catch((error: unknown) => {
+      if (!isMounted) return
+      window.clearTimeout(startupTimeout)
+      recordStartupEvent('auth-session-failed', error)
+      setSession(null)
       setMode('cloud')
     })
 
@@ -45,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       isMounted = false
+      window.clearTimeout(startupTimeout)
       data.subscription.unsubscribe()
     }
   }, [])

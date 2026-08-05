@@ -18,9 +18,32 @@
     <link rel="icon" href="/pwa-64x64.png" sizes="64x64" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon-180x180.png" />
     <title>Rabbit's Foot Owner Hub</title>
+    <script>
+      window.__OWNER_HUB_READY__ = false;
+      window.__OWNER_HUB_BOOT_EVENTS__ = [{
+        at: new Date().toISOString(),
+        stage: 'document-loaded'
+      }];
+      window.setTimeout(function () {
+        if (window.__OWNER_HUB_READY__) return;
+        var title = document.getElementById('owner-hub-startup-title');
+        var detail = document.getElementById('owner-hub-startup-detail');
+        if (title) title.textContent = 'Owner Hub needs a safe restart.';
+        if (detail) detail.textContent =
+          'The workspace did not finish loading. Close the app completely and reopen it. Your saved records have not been deleted.';
+      }, 15000);
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main id="owner-hub-startup-fallback" style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#f7f8f3;color:#10130f;font-family:Arial,sans-serif">
+        <section role="status" style="width:min(520px,100%);padding:32px;border:1px solid #dfe4d8;border-radius:24px;background:#fff;box-shadow:0 16px 50px rgba(16,19,15,.08)">
+          <p style="margin:0 0 10px;color:#528c09;font-size:13px;font-weight:800;letter-spacing:.16em">OWNER HUB RECOVERY</p>
+          <h1 id="owner-hub-startup-title" style="margin:0 0 14px;font-size:30px;line-height:1.1">Opening your workspace…</h1>
+          <p id="owner-hub-startup-detail" style="margin:0;color:#62685f;font-size:17px;line-height:1.55">Your business records are staying safely on this device while the app starts.</p>
+        </section>
+      </main>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

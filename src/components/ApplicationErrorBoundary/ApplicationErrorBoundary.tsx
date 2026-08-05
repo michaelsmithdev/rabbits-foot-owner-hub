@@ -4,6 +4,10 @@ import {
   type ReactNode,
 } from 'react'
 import { AlertTriangle, RotateCcw } from 'lucide-react'
+import {
+  markStartupReady,
+  recordStartupEvent,
+} from '../../startup/startupDiagnostics'
 
 type ApplicationErrorBoundaryProps = {
   children: ReactNode
@@ -27,6 +31,8 @@ class ApplicationErrorBoundary extends Component<
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Owner Hub could not render.', error, errorInfo)
+    recordStartupEvent('react-render-failed', error)
+    markStartupReady('recovery-screen-ready')
   }
 
   render() {
