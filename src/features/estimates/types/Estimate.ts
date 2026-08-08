@@ -1,4 +1,4 @@
-import type { AiEstimateGeneration } from '../ai/types'
+import type { AiEstimateEconomics, AiEstimateGeneration } from '../ai/types'
 
 export type EstimateStatus =
   | 'draft'
@@ -21,6 +21,8 @@ export interface Estimate {
   jobName: string
   serviceAddress: string
   description: string
+  scopeOfWork?: string
+  exclusions?: string[]
   issueDate: string
   expirationDate: string
   lineItems: EstimateLineItem[]
@@ -34,6 +36,9 @@ export interface Estimate {
   completionDate?: string
   photoIds?: string[]
   aiEstimate?: AiEstimateGeneration
+  economics?: AiEstimateEconomics
+  walkthroughId?: string
+  jobId?: string
   status: EstimateStatus
   createdAt: string
   updatedAt: string

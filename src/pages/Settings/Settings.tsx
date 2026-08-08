@@ -2,6 +2,7 @@ import {
   Building2,
   Cloud,
   Download,
+  DollarSign,
   FileText,
   LockKeyhole,
   LogOut,
@@ -19,6 +20,9 @@ import { loadEstimates } from '../../features/estimates/data/estimateStore'
 import { loadInvoices } from '../../features/invoices/data/invoiceStore'
 import { loadLeads } from '../../features/leads/data/leadStore'
 import { loadPhotos } from '../../features/photos/data/photoStore'
+import { loadJobs } from '../../features/jobs/data/jobStore'
+import { loadPricebook } from '../../features/pricing/data/pricebookStore'
+import { loadWalkthroughs } from '../../features/walkthroughs/data/walkthroughStore'
 import {
   loadBusinessSettings,
   saveBusinessSettings,
@@ -81,6 +85,20 @@ function Settings() {
       settings.defaultTaxReservePercent > 35 ||
       settings.estimateValidDays < 1 ||
       settings.invoiceDueDays < 1
+      || settings.defaultLaborRate < 0
+      || settings.minimumJobCharge < 0
+      || settings.serviceCallCharge < 0
+      || settings.diagnosticFee < 0
+      || settings.travelCharge < 0
+      || settings.afterHoursRatePercent < 0
+      || settings.weekendRatePercent < 0
+      || settings.emergencyRatePercent < 0
+      || settings.defaultMaterialMarkupPercent < 0
+      || settings.defaultOverheadPercent < 0
+      || settings.targetGrossMarginPercent < 5
+      || settings.targetGrossMarginPercent > 80
+      || settings.defaultDeliveryCost < 0
+      || settings.defaultDisposalCost < 0
     ) {
       setFormError('Check the tax rate and document due-day defaults.')
       return
@@ -111,7 +129,7 @@ function Settings() {
 
   function downloadBackup() {
     const backup = {
-      version: 2,
+      version: 3,
       exportedAt: new Date().toISOString(),
       settings: loadBusinessSettings(),
       customers: loadCustomers(),
@@ -119,6 +137,9 @@ function Settings() {
       invoices: loadInvoices(),
       leads: loadLeads(),
       photoLibrary: loadPhotos(),
+      walkthroughs: loadWalkthroughs(),
+      pricebook: loadPricebook(),
+      jobs: loadJobs(),
     }
     const backupUrl = URL.createObjectURL(
       new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }),
@@ -320,6 +341,42 @@ function Settings() {
                 value={settings.invoiceTerms}
               />
             </label>
+          </div>
+        </article>
+
+        <article className="settings-form-card">
+          <header className="settings-section-header">
+            <span className="settings-card-icon"><DollarSign size={24} /></span>
+            <div>
+              <p className="eyebrow">PROFIT GUARD DEFAULTS</p>
+              <h2>Cost and pricing rules</h2>
+              <p>New AI estimates use these contractor-only defaults. Existing documents stay unchanged.</p>
+            </div>
+          </header>
+          <div className="settings-fields-grid">
+            {([
+              ['defaultLaborRate', 'Internal labor cost / hour', '$'],
+              ['minimumJobCharge', 'Minimum job charge', '$'],
+              ['serviceCallCharge', 'Service call charge', '$'],
+              ['diagnosticFee', 'Diagnostic fee', '$'],
+              ['travelCharge', 'Travel charge', '$'],
+              ['afterHoursRatePercent', 'After-hours premium', '%'],
+              ['weekendRatePercent', 'Weekend premium', '%'],
+              ['emergencyRatePercent', 'Emergency premium', '%'],
+              ['defaultMaterialMarkupPercent', 'Material markup', '%'],
+              ['defaultOverheadPercent', 'Overhead allowance', '%'],
+              ['targetGrossMarginPercent', 'Target gross margin', '%'],
+              ['defaultDeliveryCost', 'Default delivery cost', '$'],
+              ['defaultDisposalCost', 'Default disposal cost', '$'],
+            ] as const).map(([field, label, suffix]) => (
+              <label className="settings-field" key={field}>
+                <span>{label}</span>
+                <div className="settings-number-field">
+                  <input min="0" max={field === 'targetGrossMarginPercent' ? 80 : undefined} onChange={(event) => updateSetting(field, Number(event.target.value))} step="0.01" type="number" value={settings[field]} />
+                  <b>{suffix}</b>
+                </div>
+              </label>
+            ))}
           </div>
         </article>
 

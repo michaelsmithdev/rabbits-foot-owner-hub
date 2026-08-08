@@ -15,6 +15,19 @@ export const defaultBusinessSettings: BusinessSettings = {
   zipCode: '',
   defaultTaxRate: 0,
   defaultTaxReservePercent: 30,
+  defaultLaborRate: 45,
+  minimumJobCharge: 125,
+  serviceCallCharge: 65,
+  diagnosticFee: 65,
+  travelCharge: 0,
+  afterHoursRatePercent: 25,
+  weekendRatePercent: 25,
+  emergencyRatePercent: 50,
+  defaultMaterialMarkupPercent: 25,
+  defaultOverheadPercent: 12,
+  targetGrossMarginPercent: 35,
+  defaultDeliveryCost: 0,
+  defaultDisposalCost: 0,
   darkMode: false,
   estimateValidDays: 30,
   invoiceDueDays: 14,
@@ -68,11 +81,64 @@ export function loadBusinessSettings(): BusinessSettings {
 
     return isBusinessSettings(settingsRecord)
       ? {
+          ...defaultBusinessSettings,
           ...settingsRecord,
           defaultTaxReservePercent:
             typeof settingsRecord.defaultTaxReservePercent === 'number'
               ? settingsRecord.defaultTaxReservePercent
-              : 30,
+              : defaultBusinessSettings.defaultTaxReservePercent,
+          defaultLaborRate:
+            typeof settingsRecord.defaultLaborRate === 'number'
+              ? settingsRecord.defaultLaborRate
+              : defaultBusinessSettings.defaultLaborRate,
+          minimumJobCharge:
+            typeof settingsRecord.minimumJobCharge === 'number'
+              ? settingsRecord.minimumJobCharge
+              : defaultBusinessSettings.minimumJobCharge,
+          serviceCallCharge:
+            typeof settingsRecord.serviceCallCharge === 'number'
+              ? settingsRecord.serviceCallCharge
+              : defaultBusinessSettings.serviceCallCharge,
+          diagnosticFee:
+            typeof settingsRecord.diagnosticFee === 'number'
+              ? settingsRecord.diagnosticFee
+              : defaultBusinessSettings.diagnosticFee,
+          travelCharge:
+            typeof settingsRecord.travelCharge === 'number'
+              ? settingsRecord.travelCharge
+              : defaultBusinessSettings.travelCharge,
+          afterHoursRatePercent:
+            typeof settingsRecord.afterHoursRatePercent === 'number'
+              ? settingsRecord.afterHoursRatePercent
+              : defaultBusinessSettings.afterHoursRatePercent,
+          weekendRatePercent:
+            typeof settingsRecord.weekendRatePercent === 'number'
+              ? settingsRecord.weekendRatePercent
+              : defaultBusinessSettings.weekendRatePercent,
+          emergencyRatePercent:
+            typeof settingsRecord.emergencyRatePercent === 'number'
+              ? settingsRecord.emergencyRatePercent
+              : defaultBusinessSettings.emergencyRatePercent,
+          defaultMaterialMarkupPercent:
+            typeof settingsRecord.defaultMaterialMarkupPercent === 'number'
+              ? settingsRecord.defaultMaterialMarkupPercent
+              : defaultBusinessSettings.defaultMaterialMarkupPercent,
+          defaultOverheadPercent:
+            typeof settingsRecord.defaultOverheadPercent === 'number'
+              ? settingsRecord.defaultOverheadPercent
+              : defaultBusinessSettings.defaultOverheadPercent,
+          targetGrossMarginPercent:
+            typeof settingsRecord.targetGrossMarginPercent === 'number'
+              ? settingsRecord.targetGrossMarginPercent
+              : defaultBusinessSettings.targetGrossMarginPercent,
+          defaultDeliveryCost:
+            typeof settingsRecord.defaultDeliveryCost === 'number'
+              ? settingsRecord.defaultDeliveryCost
+              : defaultBusinessSettings.defaultDeliveryCost,
+          defaultDisposalCost:
+            typeof settingsRecord.defaultDisposalCost === 'number'
+              ? settingsRecord.defaultDisposalCost
+              : defaultBusinessSettings.defaultDisposalCost,
           darkMode:
             typeof settingsRecord.darkMode === 'boolean'
               ? settingsRecord.darkMode

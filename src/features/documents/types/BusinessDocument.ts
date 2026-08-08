@@ -28,6 +28,8 @@ export type PdfDocumentInput = {
   jobName: string
   serviceAddress: string
   description: string
+  scopeOfWork?: string
+  exclusions?: string[]
   issueDate: string
   dueDate: string
   lineItems: PdfLineItem[]

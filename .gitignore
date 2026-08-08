@@ -25,3 +25,6 @@ dist-ssr
 
 .vercel
 .env*
+
+# Local render and QA artifacts
+tmp/

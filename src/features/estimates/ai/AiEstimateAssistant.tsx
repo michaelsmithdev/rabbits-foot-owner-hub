@@ -3,6 +3,8 @@ import { useMemo, useRef, useState, type ChangeEvent } from 'react'
 
 import type { Customer } from '../../customers/types/Customer'
 import { queuePhotoFiles } from '../../photos/data/photoStore'
+import VoiceCapture from '../../voice/components/VoiceCapture'
+import type { VoiceNote } from '../../voice/types/VoiceNote'
 import {
   MAX_AI_ESTIMATE_PHOTOS,
   prepareEstimatePhoto,
@@ -52,6 +54,7 @@ export default function AiEstimateAssistant({
   )
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [photos, setPhotos] = useState<PreparedEstimatePhoto[]>([])
+  const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>(initialGeneration?.voiceNotes ?? [])
   const [photoError, setPhotoError] = useState('')
   const [isPreparingPhotos, setIsPreparingPhotos] = useState(false)
   const galleryInputRef = useRef<HTMLInputElement>(null)
@@ -175,9 +178,22 @@ export default function AiEstimateAssistant({
         photoIds: estimatePhotos.flatMap((photo) =>
           photo.photoId ? [photo.photoId] : [],
         ),
+        voiceNotes,
       }
       setGeneration(generationWithPhotos)
       onGenerated(generationWithPhotos)
+    }
+  }
+
+  function updateVoiceNotes(nextNotes: VoiceNote[]) {
+    setVoiceNotes(nextNotes)
+    const transcript = nextNotes
+      .filter((note) => note.state === 'complete' && note.transcript)
+      .map((note) => note.transcript.trim())
+      .filter(Boolean)
+      .join('\n\n')
+    if (transcript && !jobDescription.includes(transcript)) {
+      setJobDescription((current) => [current.trim(), `VOICE NOTES:\n${transcript}`].filter(Boolean).join('\n\n'))
     }
   }
 
@@ -215,6 +231,12 @@ export default function AiEstimateAssistant({
           value={jobDescription}
         />
       </label>
+
+      <div className="ai-estimate-voice">
+        <span>Voice description</span>
+        <small>Record the job details hands-free. Original audio is saved before transcription.</small>
+        <VoiceCapture label="Describe estimate by voice" notes={voiceNotes} onChange={updateVoiceNotes} />
+      </div>
 
       <div className="ai-estimate-photos">
         <div className="ai-estimate-photos-header">
@@ -460,6 +482,22 @@ export default function AiEstimateAssistant({
             />
           </label>
           <label className="ai-result-textarea">
+            <span>Customer scope of work</span>
+            <textarea
+              onChange={(event) => updateResult({ customerScope: event.target.value })}
+              rows={5}
+              value={result.customerScope ?? result.summary}
+            />
+          </label>
+          <label className="ai-result-textarea">
+            <span>Exclusions (one per line)</span>
+            <textarea
+              onChange={(event) => updateResult({ exclusions: event.target.value.split('\n').map((item) => item.trim()).filter(Boolean) })}
+              rows={4}
+              value={(result.exclusions ?? []).join('\n')}
+            />
+          </label>
+          <label className="ai-result-textarea">
             <span>Professional customer notes</span>
             <textarea
               onChange={(event) => updateResult({ customerNotes: event.target.value })}
@@ -467,6 +505,23 @@ export default function AiEstimateAssistant({
               value={result.customerNotes}
             />
           </label>
+
+          {result.warnings?.length > 0 && (
+            <div className="ai-profit-warnings">
+              <strong>Check before approval</strong>
+              {result.warnings.map((warning) => <p key={warning}>{warning}</p>)}
+            </div>
+          )}
+
+          {result.economics && (
+            <div className="ai-economics-summary">
+              <div><span>Estimated job cost</span><strong>{formatCurrency(result.economics.totalEstimatedCost)}</strong></div>
+              <div><span>Recommended range</span><strong>{formatCurrency(result.economics.recommendedLow)} - {formatCurrency(result.economics.recommendedHigh)}</strong></div>
+              <div><span>Projected gross profit</span><strong>{formatCurrency(result.economics.projectedGrossProfit)}</strong></div>
+              <div><span>Projected margin</span><strong>{result.economics.projectedMargin.toFixed(1)}%</strong></div>
+              <small>Contractor-only. These figures never appear on the customer PDF.</small>
+            </div>
+          )}
           <label className="ai-result-textarea">
             <span>Internal contractor notes</span>
             <textarea

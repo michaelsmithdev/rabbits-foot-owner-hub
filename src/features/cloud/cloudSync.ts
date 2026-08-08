@@ -99,24 +99,65 @@ export async function synchronizeBusinessRecords(
   const queuedChanges = loadSyncQueue()
 
   if (queuedChanges.length > 0) {
-    const { error: uploadError } = await client
-      .from('business_records')
-      .upsert(
-        queuedChanges.map((change) => ({
-          organization_id: organizationId,
-          record_type: change.recordType,
-          record_id: change.recordId,
-          payload: change.payload,
-          is_deleted: change.isDeleted,
-          client_updated_at: change.clientUpdatedAt,
-        })),
-        {
-          onConflict: 'organization_id,record_type,record_id',
-        },
-      )
+    const originalRecordTypes: CloudRecordType[] = [
+      'customer',
+      'estimate',
+      'invoice',
+      'settings',
+      'photo',
+    ]
+    const originalChanges = queuedChanges.filter((change) =>
+      originalRecordTypes.includes(change.recordType),
+    )
+    const operatingSystemChanges = queuedChanges.filter((change) =>
+      !originalRecordTypes.includes(change.recordType),
+    )
 
-    if (uploadError) throw uploadError
-    clearSyncQueue(queuedChanges)
+    const uploadChanges = async (changes: typeof queuedChanges) => {
+      if (changes.length === 0) return null
+
+      const { error } = await client
+        .from('business_records')
+        .upsert(
+          changes.map((change) => ({
+            organization_id: organizationId,
+            record_type: change.recordType,
+            record_id: change.recordId,
+            payload: change.payload,
+            is_deleted: change.isDeleted,
+            client_updated_at: change.clientUpdatedAt,
+          })),
+          {
+            onConflict: 'organization_id,record_type,record_id',
+          },
+        )
+
+      return error
+    }
+
+    const originalUploadError = await uploadChanges(originalChanges)
+    if (originalUploadError) throw originalUploadError
+    clearSyncQueue(originalChanges)
+
+    const operatingSystemUploadError = await uploadChanges(
+      operatingSystemChanges,
+    )
+
+    if (operatingSystemUploadError) {
+      const isPendingRecordTypeMigration =
+        operatingSystemUploadError.code === '23514' ||
+        /record_type|check constraint/i.test(
+          operatingSystemUploadError.message,
+        )
+
+      if (!isPendingRecordTypeMigration) throw operatingSystemUploadError
+
+      console.warn(
+        'New Owner Hub records remain safely queued on this device until the database migration is applied.',
+      )
+    } else {
+      clearSyncQueue(operatingSystemChanges)
+    }
   }
 
   const { data, error: downloadError } = await client

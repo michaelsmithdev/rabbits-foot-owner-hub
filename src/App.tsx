@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { ClipboardList, Plus } from 'lucide-react'
 
 import Sidebar from './components/Sidebar/Sidebar'
 import {
@@ -17,6 +17,8 @@ import Photos from './pages/Photos/Photos'
 import Settings from './pages/Settings/Settings'
 import DocumentsArchive from './features/documents/pages/DocumentsArchive'
 import PriceHistory from './features/pricing/pages/PriceHistory'
+import Walkthroughs from './features/walkthroughs/pages/Walkthroughs'
+import Jobs from './features/jobs/pages/Jobs'
 import { loadBusinessSettings } from './features/settings/data/businessSettingsStore'
 
 type EstimateLaunch = {
@@ -117,6 +119,12 @@ function App() {
       case 'customers':
         return <Customers onStartEstimate={openEstimateBuilder} />
 
+      case 'walkthrough':
+        return <Walkthroughs />
+
+      case 'jobs':
+        return <Jobs />
+
       case 'documents':
         return (
           <Estimates
@@ -173,6 +181,14 @@ function App() {
           <div className="topbar-actions">
             <ConnectionStatus />
             <CloudSyncStatus />
+            <button
+              className="new-estimate-button walkthrough-launch-button"
+              onClick={() => handlePageChange('walkthrough')}
+              type="button"
+            >
+              <ClipboardList aria-hidden="true" size={19} strokeWidth={2.5} />
+              <span>Start walkthrough</span>
+            </button>
             <button
               aria-label="New estimate"
               className="new-estimate-button"

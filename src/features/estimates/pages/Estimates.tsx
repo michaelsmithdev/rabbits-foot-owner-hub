@@ -7,8 +7,9 @@ import {
 import Invoices from '../../invoices/pages/Invoices'
 import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
 import PricingInsightPanel from '../../pricing/components/PricingInsightPanel'
+import ProfitGuard from '../components/ProfitGuard'
 import AiEstimateAssistant from '../ai/AiEstimateAssistant'
-import type { AiEstimateGeneration } from '../ai/types'
+import type { AiEstimateEconomics, AiEstimateGeneration } from '../ai/types'
 
 import {
   createInvoiceNumber,
@@ -22,6 +23,7 @@ import { loadCustomers } from '../../customers/data/customerStore'
 
 import type { Customer } from '../../customers/types/Customer'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
+import { createJobFromEstimate, loadJobs } from '../../jobs/data/jobStore'
 
 import {
   createEstimateNumber,
@@ -353,6 +355,8 @@ function Estimates({
 
   const [description, setDescription] =
     useState('')
+  const [scopeOfWork, setScopeOfWork] = useState('')
+  const [exclusions, setExclusions] = useState<string[]>([])
 
   const [issueDate, setIssueDate] =
     useState(getTodayDate())
@@ -374,6 +378,7 @@ function Estimates({
   const [materialCost, setMaterialCost] = useState(0)
   const [taxReservePercent, setTaxReservePercent] = useState(businessSettings.defaultTaxReservePercent)
   const [aiGeneration, setAiGeneration] = useState<AiEstimateGeneration | null>(null)
+  const [economics, setEconomics] = useState<AiEstimateEconomics | null>(null)
 
   const [formError, setFormError] = useState('')
 
@@ -487,6 +492,8 @@ function Estimates({
     setSelectedJobNameOption('')
     setServiceAddress('')
     setDescription('')
+    setScopeOfWork('')
+    setExclusions([])
     setIssueDate(getTodayDate())
     setExpirationDate(getExpirationDate(businessSettings.estimateValidDays))
     setLineItems([createEmptyLineItem()])
@@ -498,6 +505,7 @@ function Estimates({
     setMaterialCost(0)
     setTaxReservePercent(businessSettings.defaultTaxReservePercent)
     setAiGeneration(null)
+    setEconomics(null)
     setFormError('')
     setSaveMessage('')
   }
@@ -535,6 +543,8 @@ function Estimates({
     )
 
     setDescription(estimate.description)
+    setScopeOfWork(estimate.scopeOfWork ?? '')
+    setExclusions(estimate.exclusions ?? [])
 
     setIssueDate(estimate.issueDate)
 
@@ -562,6 +572,7 @@ function Estimates({
     setMaterialCost(estimate.materialCost ?? 0)
     setTaxReservePercent(estimate.taxReservePercent ?? businessSettings.defaultTaxReservePercent)
     setAiGeneration(estimate.aiEstimate ?? null)
+    setEconomics(estimate.economics ?? estimate.aiEstimate?.draft.economics ?? null)
 
     setFormError('')
     setSaveMessage('')
@@ -820,6 +831,8 @@ function Estimates({
         serviceAddress:
           serviceAddress.trim(),
         description: description.trim(),
+        scopeOfWork: scopeOfWork.trim(),
+        exclusions: exclusions.map((item) => item.trim()).filter(Boolean),
         issueDate,
         expirationDate,
         lineItems: completedLineItems,
@@ -837,6 +850,7 @@ function Estimates({
           ]),
         ),
         aiEstimate: aiGeneration ?? undefined,
+        economics: economics ?? undefined,
         updatedAt: currentTimestamp,
       }
 
@@ -868,6 +882,8 @@ function Estimates({
           serviceAddress.trim(),
 
         description: description.trim(),
+        scopeOfWork: scopeOfWork.trim(),
+        exclusions: exclusions.map((item) => item.trim()).filter(Boolean),
 
         issueDate,
 
@@ -892,6 +908,7 @@ function Estimates({
         photoIds: aiGeneration?.photoIds ? [...aiGeneration.photoIds] : [],
 
         aiEstimate: aiGeneration ?? undefined,
+        economics: economics ?? undefined,
 
         status: 'draft',
 
@@ -965,6 +982,8 @@ function Estimates({
         estimate.serviceAddress,
 
       description: estimate.description,
+      scopeOfWork: estimate.scopeOfWork,
+      exclusions: estimate.exclusions,
 
       issueDate:
         today.toISOString().split('T')[0],
@@ -1024,6 +1043,27 @@ function Estimates({
     setActiveDocumentTab('invoices')
   }
 
+  function updateEstimateStatus(estimateId: string, status: Estimate['status']) {
+    const updatedAt = new Date().toISOString()
+    setEstimates((current) => current.map((estimate) =>
+      estimate.id === estimateId ? { ...estimate, status, updatedAt } : estimate,
+    ))
+  }
+
+  function createJob(estimate: Estimate) {
+    if (estimate.status !== 'approved') {
+      window.alert('Mark the estimate Approved before creating the job.')
+      return
+    }
+    const job = createJobFromEstimate(estimate)
+    setEstimates((current) => current.map((item) =>
+      item.id === estimate.id
+        ? { ...item, jobId: job.id, updatedAt: new Date().toISOString() }
+        : item,
+    ))
+    window.location.assign(`${window.location.pathname}#jobs`)
+  }
+
   function duplicateEstimate(
     estimate: Estimate,
   ): void {
@@ -1041,6 +1081,10 @@ function Estimates({
       ),
 
       jobName: `${estimate.jobName} Copy`,
+
+      jobId: undefined,
+
+      walkthroughId: undefined,
 
       status: 'draft',
 
@@ -1083,6 +1127,14 @@ function Estimates({
     if (existingInvoice) {
       window.alert(
         `${estimate.estimateNumber} cannot be deleted because it was converted to ${existingInvoice.invoiceNumber}.`,
+      )
+      return
+    }
+
+    const existingJob = loadJobs().find((job) => job.estimateId === estimateId)
+    if (existingJob) {
+      window.alert(
+        `${estimate.estimateNumber} cannot be deleted because it is linked to ${existingJob.jobNumber}.`,
       )
       return
     }
@@ -1143,6 +1195,8 @@ function Estimates({
     setJobName(result.jobTitle)
     setSelectedJobNameOption(getMatchingOption(result.jobTitle, JOB_NAME_OPTIONS))
     setDescription(result.summary)
+    setScopeOfWork(result.customerScope ?? result.summary)
+    setExclusions(result.exclusions ?? [])
     setLineItems(
       result.lineItems.length > 0
         ? result.lineItems.map((item) => ({
@@ -1155,6 +1209,7 @@ function Estimates({
         : [createEmptyLineItem()],
     )
     setMaterialCost(result.materialCost)
+    setEconomics(result.economics ?? null)
     setNotes(
       [result.customerNotes, businessSettings.estimateTerms]
         .filter(Boolean)
@@ -1162,6 +1217,19 @@ function Estimates({
     )
     setFormError('')
     setSaveMessage('AI estimate applied. Review and edit every field before saving.')
+  }
+
+  function applyProtectedPrice(price: number): void {
+    const targetSubtotal = Math.max(0, price)
+    setLineItems((items) => {
+      const completed = items.filter((item) => item.description.trim() || item.unitPrice > 0)
+      const currentSubtotal = completed.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0)
+      if (completed.length === 0 || currentSubtotal <= 0) {
+        return [{ ...createEmptyLineItem(), description: jobName || 'Handyman service', quantity: 1, unitPrice: targetSubtotal }]
+      }
+      const scale = targetSubtotal / currentSubtotal
+      return items.map((item) => ({ ...item, unitPrice: Math.round(item.unitPrice * scale * 100) / 100 }))
+    })
   }
 
   function calculateEstimateSubtotal(
@@ -1392,6 +1460,18 @@ function Estimates({
                 </div>
 
                 <div className="customer-card-actions">
+                  <select
+                    aria-label={`Status for ${estimate.estimateNumber}`}
+                    className="estimate-status-select"
+                    onChange={(event) => updateEstimateStatus(estimate.id, event.target.value as Estimate['status'])}
+                    value={estimate.status}
+                  >
+                    <option value="draft">Draft</option>
+                    <option value="sent">Sent</option>
+                    <option value="approved">Approved</option>
+                    <option value="declined">Declined</option>
+                  </select>
+
                   <button
                     className="customer-primary-action"
                     onClick={() =>
@@ -1415,6 +1495,16 @@ function Estimates({
                   </button>
 
                   <DocumentPdfActions kind="estimate" document={estimate} customer={customers.find((item) => item.id === estimate.customerId)} />
+
+                  <button
+                    className="customer-secondary-action"
+                    disabled={Boolean(estimate.jobId)}
+                    onClick={() => createJob(estimate)}
+                    title={estimate.status === 'approved' ? 'Open this approved estimate in Job Mode' : 'Mark this estimate Approved first'}
+                    type="button"
+                  >
+                    {estimate.jobId ? 'Job created' : 'Create job'}
+                  </button>
 
                   <button
                     className="customer-secondary-action"
@@ -1799,6 +1889,16 @@ function Estimates({
 
             <div className="estimate-bottom-grid">
               <label className="estimate-notes">
+                <span>Customer scope of work</span>
+                <textarea onChange={(event) => setScopeOfWork(event.target.value)} placeholder="Customer-facing work included in this estimate" rows={5} value={scopeOfWork} />
+              </label>
+
+              <label className="estimate-notes">
+                <span>Exclusions (one per line)</span>
+                <textarea onChange={(event) => setExclusions(event.target.value.split('\n'))} placeholder="Permits&#10;Concealed damage&#10;Customer-supplied finish materials" rows={4} value={exclusions.join('\n')} />
+              </label>
+
+              <label className="estimate-notes">
                 <span>Notes</span>
 
                 <textarea
@@ -1866,6 +1966,8 @@ function Estimates({
                 <label className="tax-reserve-control"><span>Tax reserve: {taxReservePercent}%</span><input aria-label="Estimate tax reserve percentage" max="35" min="25" onChange={(event) => setTaxReservePercent(Number(event.target.value))} step="1" type="range" value={taxReservePercent} /><small>Reserve {formatCurrency(grandTotal * taxReservePercent / 100)} · Safe to spend {formatCurrency(grandTotal * (1 - taxReservePercent / 100))}</small></label>
 
                 <PricingInsightPanel category={jobCategory} customerId={selectedCustomerId} description={`${jobName} ${description} ${lineItems.map((item) => item.description).join(' ')}`} onUsePrice={(price) => setLineItems((items) => items.length ? items.map((item, index) => index === 0 ? { ...item, unitPrice: price, quantity: 1 } : item) : [{ ...createEmptyLineItem(), description: jobName || 'Handyman service', unitPrice: price }])} propertyType={propertyType} />
+
+                <ProfitGuard economics={economics} currentPrice={subtotal} onUsePrice={applyProtectedPrice} targetMargin={businessSettings.targetGrossMarginPercent} />
 
                 <div className="estimate-summary-row">
                   <span>Subtotal</span>

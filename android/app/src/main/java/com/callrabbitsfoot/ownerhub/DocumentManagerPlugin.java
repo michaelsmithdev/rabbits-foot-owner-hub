@@ -32,6 +32,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Locale;
 
 @CapacitorPlugin(name = "DocumentManager")
 public class DocumentManagerPlugin extends Plugin {
@@ -55,7 +56,7 @@ public class DocumentManagerPlugin extends Plugin {
 
     private String safeName(String value) {
         String name = value == null ? "RabbitFoot-Document.pdf" : value.replaceAll("[^A-Za-z0-9._-]", "-");
-        return name.toLowerCase().endsWith(".pdf") ? name : name + ".pdf";
+        return name.toLowerCase(Locale.ROOT).endsWith(".pdf") ? name : name + ".pdf";
     }
 
     @PluginMethod

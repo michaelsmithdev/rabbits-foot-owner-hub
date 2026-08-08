@@ -94,15 +94,19 @@ export async function generateBusinessDocumentPdf(input: PdfDocumentInput) {
   text('BILL TO', MARGIN, 9, bold, GREEN)
   text(input.kind === 'invoice' ? 'INVOICE DETAILS' : 'ESTIMATE DETAILS', 350, 9, bold, GREEN)
   y -= 18
-  text(input.customerName, MARGIN, 12, bold)
-  text(`Issued: ${date(input.issueDate)}`, 350)
-  y -= 15
-  if (input.customerEmail) { text(input.customerEmail, MARGIN, 9, regular, GRAY); y -= 13 }
-  if (input.customerPhone) { text(input.customerPhone, MARGIN, 9, regular, GRAY); y -= 13 }
-  if (input.customerAddress) { wrapped(input.customerAddress, MARGIN, 245, 9, regular, GRAY) }
-  const detailsY = y
-  page.drawText(`${input.kind === 'invoice' ? 'Due' : 'Valid through'}: ${date(input.dueDate)}`, { x: 350, y: Math.max(detailsY, y + 25), size: 10, font: regular, color: BLACK })
-  y -= 15
+  const billingTop = y
+  let customerY = billingTop
+  page.drawText(input.customerName, { x: MARGIN, y: customerY, size: 12, font: bold, color: BLACK })
+  customerY -= 15
+  if (input.customerEmail) { page.drawText(input.customerEmail, { x: MARGIN, y: customerY, size: 9, font: regular, color: GRAY }); customerY -= 13 }
+  if (input.customerPhone) { page.drawText(input.customerPhone, { x: MARGIN, y: customerY, size: 9, font: regular, color: GRAY }); customerY -= 13 }
+  if (input.customerAddress) {
+    const addressLines = wrapText(input.customerAddress, regular, 9, 245)
+    addressLines.forEach((line) => { page.drawText(line, { x: MARGIN, y: customerY, size: 9, font: regular, color: GRAY }); customerY -= 12 })
+  }
+  page.drawText(`Issued: ${date(input.issueDate)}`, { x: 350, y: billingTop, size: 10, font: regular, color: BLACK })
+  page.drawText(`${input.kind === 'invoice' ? 'Due' : 'Valid through'}: ${date(input.dueDate)}`, { x: 350, y: billingTop - 17, size: 10, font: regular, color: BLACK })
+  y = Math.min(customerY, billingTop - 34) - 10
 
   if (input.jobName || input.serviceAddress || input.description) {
     ensure(90)
@@ -112,6 +116,14 @@ export async function generateBusinessDocumentPdf(input: PdfDocumentInput) {
     const scope = wrapText(input.description, regular, 9, PAGE_WIDTH - MARGIN * 2 - 24).slice(0, 2)
     scope.forEach((line, index) => page.drawText(line, { x: MARGIN + 12, y: y - 43 - index * 11, size: 9, font: regular, color: BLACK }))
     y -= 82
+  }
+
+  if (input.scopeOfWork) {
+    ensure(45)
+    text('SCOPE OF WORK', MARGIN, 9, bold, GREEN)
+    y -= 16
+    wrapped(input.scopeOfWork, MARGIN, PAGE_WIDTH - MARGIN * 2, 9, regular, BLACK)
+    y -= 10
   }
 
   ensure(55)
@@ -153,8 +165,15 @@ export async function generateBusinessDocumentPdf(input: PdfDocumentInput) {
   page.drawText(money(total), { x: 470, y: y - 2, size: 15, font: bold, color: BLACK })
   y -= 52
 
+  if (input.exclusions?.length) {
+    text('EXCLUSIONS', MARGIN, 9, bold, GREEN)
+    y -= 15
+    wrapped(input.exclusions.map((item) => `- ${item}`).join('\n'), MARGIN, PAGE_WIDTH - MARGIN * 2, 9, regular, GRAY)
+    y -= 8
+  }
+
   if (input.notes) { text('NOTES', MARGIN, 9, bold, GREEN); y -= 15; wrapped(input.notes, MARGIN, PAGE_WIDTH - MARGIN * 2, 9, regular, GRAY); y -= 8 }
-  if (input.terms) { text('TERMS', MARGIN, 9, bold, GREEN); y -= 15; wrapped(input.terms, MARGIN, PAGE_WIDTH - MARGIN * 2, 8, regular, GRAY) }
+  if (input.terms && !input.notes.toLowerCase().includes(input.terms.toLowerCase())) { text('TERMS', MARGIN, 9, bold, GREEN); y -= 15; wrapped(input.terms, MARGIN, PAGE_WIDTH - MARGIN * 2, 8, regular, GRAY) }
 
   const pages = pdf.getPages()
   pages.forEach((currentPage: PDFPage, index: number) => {

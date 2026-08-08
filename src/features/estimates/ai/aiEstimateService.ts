@@ -1,5 +1,7 @@
 import { cloudClient } from '../../cloud/cloudClient'
 import { buildEstimateHistory } from './estimateHistory'
+import { relevantPricebookItems } from '../../pricing/data/pricebookStore'
+import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import type {
   AiEstimateGeneration,
   AiEstimateRequest,
@@ -60,6 +62,7 @@ export async function generateAiEstimate(input: {
     )
   }
 
+  const settings = loadBusinessSettings()
   const request: AiEstimateRequest = {
     jobDescription: input.jobDescription.trim(),
     answers: input.answers,
@@ -68,6 +71,29 @@ export async function generateAiEstimate(input: {
     jobCategory: input.jobCategory.trim(),
     history: buildEstimateHistory(input.jobDescription, input.customerId),
     photos: input.photos,
+    pricingDefaults: {
+      laborRate: settings.defaultLaborRate,
+      minimumJobCharge: settings.minimumJobCharge,
+      serviceCallCharge: settings.serviceCallCharge,
+      diagnosticFee: settings.diagnosticFee,
+      travelCharge: settings.travelCharge,
+      afterHoursRatePercent: settings.afterHoursRatePercent,
+      weekendRatePercent: settings.weekendRatePercent,
+      emergencyRatePercent: settings.emergencyRatePercent,
+      materialMarkupPercent: settings.defaultMaterialMarkupPercent,
+      overheadPercent: settings.defaultOverheadPercent,
+      targetGrossMarginPercent: settings.targetGrossMarginPercent,
+      deliveryCost: settings.defaultDeliveryCost,
+      disposalCost: settings.defaultDisposalCost,
+    },
+    pricebook: relevantPricebookItems(input.jobDescription).map((item) => ({
+      name: item.name,
+      category: item.category,
+      unit: item.unit,
+      unitCost: item.unitCost,
+      customerPrice: item.customerPrice,
+      notes: item.notes,
+    })),
   }
   const controller = new AbortController()
   const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)

@@ -1,14 +1,20 @@
 apply plugin: 'com.android.application'
 
+def releaseSigningReady = [
+    "RABBITFOOT_UPLOAD_STORE_FILE",
+    "RABBITFOOT_UPLOAD_STORE_PASSWORD",
+    "RABBITFOOT_UPLOAD_KEY_ALIAS",
+    "RABBITFOOT_UPLOAD_KEY_PASSWORD",
+].every { System.getenv(it) }
+
 android {
     namespace = "com.callrabbitsfoot.ownerhub"
     compileSdk = rootProject.ext.compileSdkVersion
 
     signingConfigs {
-        release {
-            def uploadStoreFile = System.getenv("RABBITFOOT_UPLOAD_STORE_FILE")
-            if (uploadStoreFile) {
-                storeFile file(uploadStoreFile)
+        if (releaseSigningReady) {
+            release {
+                storeFile file(System.getenv("RABBITFOOT_UPLOAD_STORE_FILE"))
                 storePassword System.getenv("RABBITFOOT_UPLOAD_STORE_PASSWORD")
                 keyAlias System.getenv("RABBITFOOT_UPLOAD_KEY_ALIAS")
                 keyPassword System.getenv("RABBITFOOT_UPLOAD_KEY_PASSWORD")
@@ -20,8 +26,8 @@ android {
         applicationId "com.callrabbitsfoot.ownerhub"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 8
-        versionName "2.1.2"
+        versionCode 9
+        versionName "2.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -31,7 +37,9 @@ android {
     }
     buildTypes {
         release {
-            signingConfig signingConfigs.release
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

@@ -43,10 +43,13 @@ export type Invoice = {
    * Null means the invoice was created manually.
    */
   estimateId: string | null
+  jobId?: string
 
   jobName: string
   serviceAddress: string
   description: string
+  scopeOfWork?: string
+  exclusions?: string[]
 
   issueDate: string
   dueDate: string

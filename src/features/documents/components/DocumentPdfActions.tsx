@@ -23,7 +23,7 @@ function customerAddress(customer?: Customer) {
 
 function toPdfInput(props: Props): PdfDocumentInput {
   const settings = loadBusinessSettings()
-  const common = { id: props.document.id, kind: props.kind, customerName: customerName(props.customer), customerEmail: props.customer?.email, customerPhone: props.customer?.phone, customerAddress: customerAddress(props.customer), jobName: props.document.jobName, serviceAddress: props.document.serviceAddress, description: props.document.description, issueDate: props.document.issueDate, lineItems: props.document.lineItems, taxRate: props.document.taxRate, discount: props.document.discount, notes: props.document.notes }
+  const common = { id: props.document.id, kind: props.kind, customerName: customerName(props.customer), customerEmail: props.customer?.email, customerPhone: props.customer?.phone, customerAddress: customerAddress(props.customer), jobName: props.document.jobName, serviceAddress: props.document.serviceAddress, description: props.document.description, scopeOfWork: props.document.scopeOfWork, exclusions: props.document.exclusions, issueDate: props.document.issueDate, lineItems: props.document.lineItems, taxRate: props.document.taxRate, discount: props.document.discount, notes: props.document.notes }
   return props.kind === 'invoice'
     ? { ...common, number: props.document.invoiceNumber, dueDate: props.document.dueDate, terms: settings.invoiceTerms }
     : { ...common, number: props.document.estimateNumber, dueDate: props.document.expirationDate, terms: settings.estimateTerms }

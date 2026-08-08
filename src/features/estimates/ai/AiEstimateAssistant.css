@@ -99,6 +99,7 @@
   color: #70766d;
   font-size: 0.83rem;
 }
+.ai-profit-warnings{display:grid;gap:5px;border:1px solid #e6a589;border-radius:14px;background:#fff3ee;color:#7d2d25;padding:14px}.ai-profit-warnings p{margin:0}.ai-economics-summary{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;border:1px solid #b9d989;border-radius:16px;background:#f2f8e8;padding:15px}.ai-economics-summary div{display:flex;justify-content:space-between;gap:12px}.ai-economics-summary span{color:#66705f}.ai-economics-summary small{grid-column:1/-1;color:#66705f}
 
 .ai-estimate-photos {
   display: grid;
@@ -397,4 +398,7 @@
   .ai-estimate-actions button { width: 100%; }
   .ai-photo-preview-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .ai-photo-actions button { flex: 1; }
+  .ai-economics-summary { grid-template-columns: 1fr; }
+  .ai-economics-summary small { grid-column: auto; }
 }
+.ai-estimate-voice{display:grid;gap:8px;margin-top:14px}.ai-estimate-voice>span{font-weight:800}.ai-estimate-voice>small{color:#697164}

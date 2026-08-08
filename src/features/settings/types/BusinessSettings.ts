@@ -10,6 +10,19 @@ export interface BusinessSettings {
   zipCode: string
   defaultTaxRate: number
   defaultTaxReservePercent: number
+  defaultLaborRate: number
+  minimumJobCharge: number
+  serviceCallCharge: number
+  diagnosticFee: number
+  travelCharge: number
+  afterHoursRatePercent: number
+  weekendRatePercent: number
+  emergencyRatePercent: number
+  defaultMaterialMarkupPercent: number
+  defaultOverheadPercent: number
+  targetGrossMarginPercent: number
+  defaultDeliveryCost: number
+  defaultDisposalCost: number
   darkMode: boolean
   estimateValidDays: number
   invoiceDueDays: number

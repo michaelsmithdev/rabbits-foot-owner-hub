@@ -45,6 +45,14 @@ wiring, structure, moisture, or code conditions. Record photo-based observations
 anything requiring onsite verification in contractorNotes. Project facts supplied in
 text take priority when an image is ambiguous.
 
+Build a structured job analysis before pricing. Classify each evidence statement as
+OBSERVED, CONTRACTOR_PROVIDED, INFERRED, or UNKNOWN. Never present an inference as a
+fact. Use configured business pricing and matching pricebook entries when supplied.
+Identify pricingSources plainly as BUSINESS SETTINGS, PRICEBOOK, JOB HISTORY, or
+AI ALLOWANCE. Include a customer-safe scope and exclusions. Flag low-margin, missing
+quantity, access, permit, disposal, delivery, hazardous-material, or concealed-condition
+risks when they could change the work.
+
 Return at most two short follow-up questions, and only when an answer could materially
 change the bid, code or safety requirements, or whether the work is feasible. Rank the
 most price-sensitive question first. Questions are optional refinements: even when
@@ -196,6 +204,7 @@ function parsePhotos(value: unknown): AiEstimateRequest['photos'] {
     const photo = item as { fileName?: unknown; dataUrl?: unknown }
     const fileName = cleanText(photo.fileName, 120) || 'job-photo.jpg'
     const dataUrl = typeof photo.dataUrl === 'string' ? photo.dataUrl.trim() : ''
+    const context = cleanText((photo as { context?: unknown }).context, 1000)
 
     if (
       !/^data:image\/(?:jpeg|png|webp);base64,[a-zA-Z0-9+/=]+$/.test(dataUrl) ||
@@ -204,7 +213,50 @@ function parsePhotos(value: unknown): AiEstimateRequest['photos'] {
       return []
     }
 
-    return [{ fileName, dataUrl }]
+    return [{ fileName, dataUrl, context }]
+  })
+}
+
+function parsePricingDefaults(value: unknown): AiEstimateRequest['pricingDefaults'] {
+  const defaults = value && typeof value === 'object'
+    ? value as Partial<AiEstimateRequest['pricingDefaults']>
+    : {}
+  const number = (input: unknown, fallback: number, maximum = 100_000) =>
+    isFiniteNonNegative(input) ? Math.min(input, maximum) : fallback
+
+  return {
+    laborRate: number(defaults.laborRate, 45, 500),
+    minimumJobCharge: number(defaults.minimumJobCharge, 125),
+    serviceCallCharge: number(defaults.serviceCallCharge, 65),
+    diagnosticFee: number(defaults.diagnosticFee, 65),
+    travelCharge: number(defaults.travelCharge, 0),
+    afterHoursRatePercent: number(defaults.afterHoursRatePercent, 25, 500),
+    weekendRatePercent: number(defaults.weekendRatePercent, 25, 500),
+    emergencyRatePercent: number(defaults.emergencyRatePercent, 50, 500),
+    materialMarkupPercent: number(defaults.materialMarkupPercent, 25, 500),
+    overheadPercent: number(defaults.overheadPercent, 12, 100),
+    targetGrossMarginPercent: number(defaults.targetGrossMarginPercent, 35, 80),
+    deliveryCost: number(defaults.deliveryCost, 0),
+    disposalCost: number(defaults.disposalCost, 0),
+  }
+}
+
+function parsePricebook(value: unknown): AiEstimateRequest['pricebook'] {
+  if (!Array.isArray(value)) return []
+  return value.slice(0, 20).flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return []
+    const item = entry as Partial<AiEstimateRequest['pricebook'][number]>
+    if (!isFiniteNonNegative(item.unitCost) || !isFiniteNonNegative(item.customerPrice)) return []
+    const name = cleanText(item.name, 160)
+    if (!name) return []
+    return [{
+      name,
+      category: cleanText(item.category, 40),
+      unit: cleanText(item.unit, 30) || 'each',
+      unitCost: item.unitCost,
+      customerPrice: item.customerPrice,
+      notes: cleanText(item.notes, 500),
+    }]
   })
 }
 
@@ -235,6 +287,8 @@ function parseRequest(value: unknown): AiEstimateRequest | null {
     jobCategory: cleanText(request.jobCategory, 120) || 'General handyman',
     history: parseHistory(request.history),
     photos: parsePhotos(request.photos),
+    pricingDefaults: parsePricingDefaults(request.pricingDefaults),
+    pricebook: parsePricebook(request.pricebook),
   }
 }
 
@@ -281,7 +335,16 @@ function money(value: number): number {
   return Math.round(value * 100) / 100
 }
 
-function normalizeResult(value: unknown): AiEstimateResult | null {
+function cleanTextArray(value: unknown, maximumItems: number, maximumLength = 500) {
+  return Array.isArray(value)
+    ? value.map((item) => cleanText(item, maximumLength)).filter(Boolean).slice(0, maximumItems)
+    : []
+}
+
+function normalizeResult(
+  value: unknown,
+  pricing: AiEstimateRequest['pricingDefaults'],
+): AiEstimateResult | null {
   if (!value || typeof value !== 'object') return null
   const result = value as Partial<AiEstimateResult>
 
@@ -297,10 +360,7 @@ function normalizeResult(value: unknown): AiEstimateResult | null {
     return null
   }
 
-  const questions = result.questions
-    .map((question) => cleanText(question, 300))
-    .filter(Boolean)
-    .slice(0, 2)
+  const questions = cleanTextArray(result.questions, 2, 300)
   const lineItems = result.lineItems.slice(0, 30).flatMap((item) => {
         if (
           !item ||
@@ -327,7 +387,26 @@ function normalizeResult(value: unknown): AiEstimateResult | null {
   const lineItemTotal = money(
     lineItems.reduce((sum, item) => sum + item.total, 0),
   )
-  const requestedBid = money(result.recommendedBid)
+  const rawEconomics = result.economics && typeof result.economics === 'object'
+    ? result.economics
+    : null
+  if (!rawEconomics) return null
+  const cost = (value: unknown, fallback = 0) => isFiniteNonNegative(value) ? money(value) : money(fallback)
+  const laborHours = cost(rawEconomics.laborHours, result.laborHours)
+  const laborCost = cost(rawEconomics.laborCost, laborHours * pricing.laborRate)
+  const materialCost = cost(rawEconomics.materialCost, result.materialCost)
+  const materialMarkup = cost(rawEconomics.materialMarkup, materialCost * pricing.materialMarkupPercent / 100)
+  const equipmentCost = cost(rawEconomics.equipmentCost)
+  const deliveryCost = cost(rawEconomics.deliveryCost, pricing.deliveryCost)
+  const disposalCost = cost(rawEconomics.disposalCost, pricing.disposalCost)
+  const subcontractorCost = cost(rawEconomics.subcontractorCost)
+  const directCost = money(laborCost + materialCost + equipmentCost + deliveryCost + disposalCost + subcontractorCost)
+  const overheadCost = cost(rawEconomics.overheadCost, directCost * pricing.overheadPercent / 100)
+  const contingencyCost = cost(rawEconomics.contingencyCost)
+  const totalEstimatedCost = money(directCost + overheadCost + contingencyCost)
+  const marginDenominator = Math.max(0.2, 1 - pricing.targetGrossMarginPercent / 100)
+  const targetPrice = money(Math.max(pricing.minimumJobCharge, totalEstimatedCost / marginDenominator))
+  const requestedBid = money(Math.max(result.recommendedBid, targetPrice))
 
   if (lineItems.length && requestedBid > lineItemTotal + 0.01) {
     const difference = money(requestedBid - lineItemTotal)
@@ -342,19 +421,92 @@ function normalizeResult(value: unknown): AiEstimateResult | null {
 
   const finalBid = money(lineItems.reduce((sum, item) => sum + item.total, 0))
 
+  const rawAnalysis = result.analysis && typeof result.analysis === 'object'
+    ? result.analysis
+    : null
+  if (!rawAnalysis) return null
+  const evidence = Array.isArray(rawAnalysis.evidence)
+    ? rawAnalysis.evidence.slice(0, 30).flatMap((entry) => {
+        if (!entry || typeof entry !== 'object') return []
+        const statement = cleanText(entry.statement, 500)
+        const classification = entry.classification
+        if (!statement || !['OBSERVED', 'CONTRACTOR_PROVIDED', 'INFERRED', 'UNKNOWN'].includes(classification)) return []
+        return [{ statement, classification }]
+      })
+    : []
+  const analysisMaterials = cleanTextArray(rawAnalysis.materials, 30)
+  const projectedGrossProfit = money(finalBid - totalEstimatedCost)
+  const projectedMargin = finalBid > 0 ? money(projectedGrossProfit / finalBid * 100) : 0
+  const effectiveHourlyRevenue = laborHours > 0 ? money(finalBid / laborHours) : 0
+  const warnings = cleanTextArray(result.warnings, 8)
+  if (projectedMargin + 0.01 < pricing.targetGrossMarginPercent) {
+    warnings.unshift(`Projected margin is below the ${pricing.targetGrossMarginPercent}% business target.`)
+  }
+  if (analysisMaterials.length > 0 && materialCost <= 0) {
+    warnings.push('Materials were identified but no material cost was captured.')
+  }
+
   return {
     jobTitle: cleanText(result.jobTitle, 180),
     summary: cleanText(result.summary, 2000),
     recommendedBid: finalBid,
-    laborHours: result.laborHours,
-    laborCost: money(result.laborCost),
-    materialCost: money(result.materialCost),
+    laborHours,
+    laborCost,
+    materialCost,
     markup: money(result.markup),
     difficulty: cleanText(result.difficulty, 120),
     confidence: cleanText(result.confidence, 180),
     estimatedDuration: cleanText(result.estimatedDuration, 180),
     customerNotes: cleanText(result.customerNotes, 2500),
     contractorNotes: cleanText(result.contractorNotes, 2500),
+    customerScope: cleanText(result.customerScope, 4000),
+    exclusions: cleanTextArray(result.exclusions, 12),
+    warnings: Array.from(new Set(warnings)).slice(0, 8),
+    pricingSources: cleanTextArray(result.pricingSources, 8, 100),
+    analysis: {
+      customerRequest: cleanText(rawAnalysis.customerRequest, 2000),
+      scope: cleanTextArray(rawAnalysis.scope, 20),
+      quantities: cleanTextArray(rawAnalysis.quantities, 20),
+      dimensions: cleanTextArray(rawAnalysis.dimensions, 20),
+      units: cleanTextArray(rawAnalysis.units, 15, 50),
+      crewSize: isFiniteNonNegative(rawAnalysis.crewSize) && rawAnalysis.crewSize >= 1 ? Math.min(20, rawAnalysis.crewSize) : 1,
+      laborOperations: cleanTextArray(rawAnalysis.laborOperations, 20),
+      demolition: cleanTextArray(rawAnalysis.demolition, 15),
+      preparation: cleanTextArray(rawAnalysis.preparation, 15),
+      installation: cleanTextArray(rawAnalysis.installation, 20),
+      materials: analysisMaterials,
+      equipment: cleanTextArray(rawAnalysis.equipment, 15),
+      delivery: cleanText(rawAnalysis.delivery, 1000),
+      disposal: cleanText(rawAnalysis.disposal, 1000),
+      afterHours: cleanText(rawAnalysis.afterHours, 1000),
+      subcontractors: cleanTextArray(rawAnalysis.subcontractors, 15),
+      permitConcerns: cleanTextArray(rawAnalysis.permitConcerns, 15),
+      licensingConcerns: cleanTextArray(rawAnalysis.licensingConcerns, 15),
+      access: cleanText(rawAnalysis.access, 1000),
+      assumptions: cleanTextArray(rawAnalysis.assumptions, 15),
+      exclusions: cleanTextArray(rawAnalysis.exclusions, 15),
+      unknowns: cleanTextArray(rawAnalysis.unknowns, 15),
+      evidence,
+    },
+    economics: {
+      laborHours,
+      laborCost,
+      materialCost,
+      materialMarkup,
+      equipmentCost,
+      deliveryCost,
+      disposalCost,
+      subcontractorCost,
+      overheadCost,
+      contingencyCost,
+      totalEstimatedCost,
+      recommendedLow: money(Math.max(pricing.minimumJobCharge, Math.min(finalBid, targetPrice) * 0.9)),
+      recommendedHigh: money(Math.max(finalBid, targetPrice) * 1.15),
+      recommendedPrice: finalBid,
+      projectedGrossProfit,
+      projectedMargin,
+      effectiveHourlyRevenue,
+    },
     questions,
     lineItems,
   }
@@ -449,13 +601,21 @@ export default async function handler(request: ApiRequest, response: ApiResponse
                   attachedPhotoCount: parsedRequest.photos.length,
                 },
                 similarCompletedJobs: parsedRequest.history,
+                businessPricing: parsedRequest.pricingDefaults,
+                matchingPricebookItems: parsedRequest.pricebook,
               }),
             },
-            ...parsedRequest.photos.map((photo) => ({
-              type: 'input_image' as const,
-              image_url: photo.dataUrl,
-              detail: 'auto' as const,
-            })),
+            ...parsedRequest.photos.flatMap((photo) => [
+              {
+                type: 'input_image' as const,
+                image_url: photo.dataUrl,
+                detail: 'auto' as const,
+              },
+              ...(photo.context ? [{
+                type: 'input_text' as const,
+                text: `Contractor context for ${photo.fileName}: ${photo.context}`,
+              }] : []),
+            ]),
           ],
         },
       ],
@@ -475,7 +635,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       safety_identifier: createHash('sha256').update(userId).digest('hex'),
     })
     const rawResult: unknown = JSON.parse(modelResponse.output_text)
-    const draft = normalizeResult(rawResult)
+    const draft = normalizeResult(rawResult, parsedRequest.pricingDefaults)
     if (!draft || draft.lineItems.length === 0 || draft.recommendedBid <= 0) {
       throw new Error('invalid_model_response')
     }

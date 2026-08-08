@@ -1,5 +1,7 @@
 import {
   FileText,
+  ClipboardList,
+  BriefcaseBusiness,
   FolderArchive,
   Images,
   Inbox,
@@ -13,6 +15,8 @@ import {
 export type PageName =
   | 'home'
   | 'customers'
+  | 'walkthrough'
+  | 'jobs'
   | 'documents'
   | 'archive'
   | 'pricing'
@@ -39,6 +43,18 @@ export const navigationItems: NavigationItem[] = [
     label: 'Customers',
     shortLabel: 'Customers',
     icon: UsersRound,
+  },
+  {
+    id: 'walkthrough',
+    label: 'AI Walkthrough',
+    shortLabel: 'Walkthrough',
+    icon: ClipboardList,
+  },
+  {
+    id: 'jobs',
+    label: 'Jobs',
+    shortLabel: 'Jobs',
+    icon: BriefcaseBusiness,
   },
   {
     id: 'documents',
