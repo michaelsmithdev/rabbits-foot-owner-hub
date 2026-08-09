@@ -16,7 +16,7 @@ export default async function handler(request: IncomingMessage, response: Health
   let databaseReachable = false
   if (url && key) {
     try {
-      const result = await fetch(`${url.replace(/\/$/, '')}/rest/v1/organizations?select=id&limit=1`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(5_000) })
+      const result = await fetch(`${url.replace(/\/$/, '')}/rest/v1/organization_members?select=organization_id&limit=1`, { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(5_000) })
       databaseReachable = result.ok
     } catch { databaseReachable = false }
   }
