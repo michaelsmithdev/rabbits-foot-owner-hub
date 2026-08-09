@@ -20,6 +20,7 @@ import PriceHistory from './features/pricing/pages/PriceHistory'
 import Walkthroughs from './features/walkthroughs/pages/Walkthroughs'
 import Jobs from './features/jobs/pages/Jobs'
 import { loadBusinessSettings } from './features/settings/data/businessSettingsStore'
+import Schedule from './features/schedule/pages/Schedule'
 
 type EstimateLaunch = {
   requestId: number
@@ -122,6 +123,9 @@ function App() {
       case 'walkthrough':
         return <Walkthroughs />
 
+      case 'schedule':
+        return <Schedule />
+
       case 'jobs':
         return <Jobs />
 
@@ -155,6 +159,7 @@ function App() {
           <Dashboard
             onOpenCustomers={() => handlePageChange('customers')}
             onOpenDocuments={() => handlePageChange('documents')}
+            onOpenSchedule={() => handlePageChange('schedule')}
           />
         )
     }

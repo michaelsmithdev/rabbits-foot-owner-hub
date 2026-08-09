@@ -13,10 +13,12 @@ import type { Estimate } from '../../features/estimates/types/Estimate'
 import { loadInvoices } from '../../features/invoices/data/invoiceStore'
 import type { Invoice } from '../../features/invoices/types/Invoice'
 import { loadBusinessSettings } from '../../features/settings/data/businessSettingsStore'
+import { loadAppointments } from '../../features/schedule/data/appointmentStore'
 
 type DashboardProps = {
   onOpenCustomers: () => void
   onOpenDocuments: () => void
+  onOpenSchedule: () => void
 }
 
 type FinancialDocument = Estimate | Invoice
@@ -49,11 +51,13 @@ function getGreeting() {
 function Dashboard({
   onOpenCustomers,
   onOpenDocuments,
+  onOpenSchedule,
 }: DashboardProps) {
   const customers = loadCustomers()
   const estimates = loadEstimates()
   const invoices = loadInvoices()
   const settings = loadBusinessSettings()
+  const appointments = loadAppointments()
   const customerNames = new Map(
     customers.map((customer) => [
       customer.id,
@@ -83,6 +87,15 @@ function Dashboard({
   )
   const sentEstimates = estimates.filter(
     (estimate) => estimate.status === 'sent',
+  )
+  const now = new Date()
+  const todayKey = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+  const todayAppointments = appointments.filter(
+    (appointment) => {
+      const start = new Date(appointment.startAt)
+      const localStartKey = new Date(start.getTime() - start.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
+      return localStartKey === todayKey && appointment.status !== 'canceled'
+    },
   )
 
   const recentDocuments = [
@@ -208,6 +221,14 @@ function Dashboard({
       </section>
 
       <section className="dashboard-content-grid">
+        <article className="dashboard-panel attention-panel">
+          <div className="panel-heading"><div><p className="eyebrow">TODAY</p><h2>Field schedule</h2></div><span className="attention-count">{todayAppointments.length}</span></div>
+          {todayAppointments.length ? todayAppointments.slice(0, 4).map((appointment) => (
+            <button className="attention-row" key={appointment.id} onClick={onOpenSchedule} type="button">
+              <span className="attention-dot" /><span><strong>{new Date(appointment.startAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · {appointment.title}</strong><span>{appointment.serviceAddress}</span></span><ArrowRight aria-hidden="true" size={16} />
+            </button>
+          )) : <div className="dashboard-empty-state compact"><CheckCircle2 aria-hidden="true" size={24}/><div><strong>No appointments today</strong><p>Open the schedule to book work.</p></div></div>}
+        </article>
         <article className="dashboard-panel recent-work-panel">
           <div className="panel-heading">
             <div>

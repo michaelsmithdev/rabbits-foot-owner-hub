@@ -23,6 +23,8 @@ import { loadPhotos } from '../../features/photos/data/photoStore'
 import { loadJobs } from '../../features/jobs/data/jobStore'
 import { loadPricebook } from '../../features/pricing/data/pricebookStore'
 import { loadWalkthroughs } from '../../features/walkthroughs/data/walkthroughStore'
+import { loadAppointments } from '../../features/schedule/data/appointmentStore'
+import { loadCommunications } from '../../features/communications/data/communicationStore'
 import {
   loadBusinessSettings,
   saveBusinessSettings,
@@ -140,6 +142,8 @@ function Settings() {
       walkthroughs: loadWalkthroughs(),
       pricebook: loadPricebook(),
       jobs: loadJobs(),
+      appointments: loadAppointments(),
+      communications: loadCommunications(),
     }
     const backupUrl = URL.createObjectURL(
       new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }),

@@ -7,6 +7,8 @@ export type CloudRecordType =
   | 'walkthrough'
   | 'pricebook'
   | 'job'
+  | 'appointment'
+  | 'communication'
 
 export type CloudRecord = Record<string, unknown> & {
   id: string
@@ -44,6 +46,8 @@ const storageKeys: Record<CloudRecordType, string> = {
   walkthrough: 'rabbits-foot-walkthroughs',
   pricebook: 'rabbits-foot-pricebook',
   job: 'rabbits-foot-jobs',
+  appointment: 'rabbits-foot-appointments',
+  communication: 'rabbits-foot-communications',
 }
 
 function getRecordKey(recordType: CloudRecordType, recordId: string) {
@@ -228,6 +232,8 @@ export function applyRemoteRecords(
     'walkthrough',
     'pricebook',
     'job',
+    'appointment',
+    'communication',
   ] as CloudRecordType[]).forEach(
     (recordType) => {
       const localRecords = readJson<CloudRecord[]>(storageKeys[recordType], [])

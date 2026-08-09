@@ -7,6 +7,7 @@ import {
   Plus,
   ReceiptText,
   Trash2,
+  WalletCards,
   X,
 } from 'lucide-react'
 
@@ -15,6 +16,7 @@ import type { Customer } from '../../customers/types/Customer'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import type { BusinessSettings } from '../../settings/types/BusinessSettings'
 import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
+import { useAuth } from '../../auth/authContext'
 import PricingInsightPanel from '../../pricing/components/PricingInsightPanel'
 import {
   createInvoiceNumber,
@@ -162,6 +164,7 @@ function formatCustomerAddress(customer: Customer) {
 }
 
 function Invoices() {
+  const { session } = useAuth()
   const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const [customers] = useState<Customer[]>(() => loadCustomers())
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoices())
@@ -184,6 +187,8 @@ function Invoices() {
   const [paymentNotes, setPaymentNotes] = useState('')
   const [paymentError, setPaymentError] = useState('')
   const [printInvoiceId] = useState<string | null>(null)
+  const [squareLinkInvoiceId, setSquareLinkInvoiceId] = useState<string | null>(null)
+  const [squareMessage, setSquareMessage] = useState('')
 
   useEffect(() => {
     saveInvoices(invoices)
@@ -225,6 +230,37 @@ function Invoices() {
     setDraft(createEmptyDraft(businessSettings))
     setEditingInvoiceId(null)
     setFormError('')
+  }
+
+  async function createSquarePaymentLink(invoice: Invoice) {
+    if (!session?.access_token) {
+      setSquareMessage('Sign in and sync the invoice before creating a Square payment link.')
+      return
+    }
+    setSquareLinkInvoiceId(invoice.id)
+    setSquareMessage('')
+    try {
+      const apiOrigin = import.meta.env.VITE_OWNER_HUB_API_URL?.trim().replace(/\/$/, '') ?? ''
+      const response = await fetch(`${apiOrigin}/api/square-payment-link`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId: invoice.id }),
+      })
+      const payload = await response.json() as { error?: string; url?: string; paymentLinkId?: string; orderId?: string; amount?: number }
+      if (!response.ok || !payload.url || typeof payload.amount !== 'number') throw new Error(payload.error || 'Square did not return a payment link.')
+      const createdAt = new Date().toISOString()
+      setInvoices((current) => current.map((item) => item.id === invoice.id ? {
+        ...item,
+        squarePaymentLink: { url: payload.url!, paymentLinkId: payload.paymentLinkId, orderId: payload.orderId, amount: payload.amount!, createdAt },
+        updatedAt: createdAt,
+      } : item))
+      setSquareMessage(`Square checkout created for ${formatCurrency(payload.amount)}.`)
+      window.open(payload.url, '_blank', 'noopener,noreferrer')
+    } catch (error) {
+      setSquareMessage(error instanceof Error ? error.message : 'Square payment link failed.')
+    } finally {
+      setSquareLinkInvoiceId(null)
+    }
   }
 
   function openNewInvoice() {
@@ -576,6 +612,8 @@ function Invoices() {
           </aside>
         )}
 
+        {squareMessage && <aside className="invoice-guidance" role="status">{squareMessage}</aside>}
+
         {invoices.length === 0 ? (
           <div className="customers-empty-state invoice-empty-state">
             <div className="customers-empty-icon">
@@ -653,6 +691,21 @@ function Invoices() {
                       Edit
                     </button>
                     <DocumentPdfActions kind="invoice" document={invoice} customer={customer} />
+                    {balance > 0 && invoice.status !== 'void' && (
+                      <button
+                        disabled={squareLinkInvoiceId === invoice.id}
+                        onClick={() => void createSquarePaymentLink(invoice)}
+                        type="button"
+                      >
+                        <WalletCards aria-hidden="true" size={16} />
+                        {squareLinkInvoiceId === invoice.id ? 'Connecting Square…' : invoice.squarePaymentLink ? 'Refresh Square link' : 'Pay with Square'}
+                      </button>
+                    )}
+                    {invoice.squarePaymentLink && balance > 0 && invoice.status !== 'void' && (
+                      <button onClick={() => window.open(invoice.squarePaymentLink?.url, '_blank', 'noopener,noreferrer')} type="button">
+                        Open payment page
+                      </button>
+                    )}
                     {balance > 0 && invoice.status !== 'void' && (
                       <button
                         className="invoice-payment-button"

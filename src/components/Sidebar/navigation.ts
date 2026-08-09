@@ -7,6 +7,7 @@ import {
   Inbox,
   LayoutDashboard,
   Settings,
+  CalendarDays,
   Sparkles,
   UsersRound,
   type LucideIcon,
@@ -23,6 +24,7 @@ export type PageName =
   | 'inbox'
   | 'photos'
   | 'settings'
+  | 'schedule'
 
 type NavigationItem = {
   id: PageName
@@ -43,6 +45,12 @@ export const navigationItems: NavigationItem[] = [
     label: 'Customers',
     shortLabel: 'Customers',
     icon: UsersRound,
+  },
+  {
+    id: 'schedule',
+    label: 'Schedule',
+    shortLabel: 'Schedule',
+    icon: CalendarDays,
   },
   {
     id: 'walkthrough',

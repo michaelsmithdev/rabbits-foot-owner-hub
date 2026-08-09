@@ -57,6 +57,29 @@ are cached on the device for field use. New photos are retained in IndexedDB
 while offline, uploaded to a private Supabase Storage bucket when the connection
 returns, and restricted to organization members by database policy. The
 Settings screen also provides a portable JSON data backup.
+
+## Scheduling, Customer Hub, and Square
+
+Owner Hub 2.3 adds a field schedule, appointment conflict protection, customer
+message handoff, and expiring Customer Hub links. Customers can review and
+approve estimates, request changes, view scheduled work, and open Square-hosted
+invoice checkout without signing in.
+
+Run `supabase/migrations/202608090004_schedule_and_communications.sql` before
+using these features in production. Then add the following server-only values
+to Vercel:
+
+- `SQUARE_ACCESS_TOKEN` - production token from the Square Developer Console.
+- `SQUARE_LOCATION_ID` - the Square location receiving Owner Hub payments.
+- `SQUARE_ENVIRONMENT` - `production` for live payments or `sandbox` for tests.
+- `SQUARE_WEBHOOK_SIGNATURE_KEY` - signature key for the webhook subscription.
+- `SQUARE_WEBHOOK_NOTIFICATION_URL` - exact HTTPS URL ending in
+  `/api/square-webhook`.
+
+In the Square Developer Console, subscribe that URL to `payment.created` and
+`payment.updated`. Completed checkouts are matched to their secure Square order
+and recorded once on the corresponding invoice. Keep every Square credential
+out of variables beginning with `VITE_`.
 ## AI Estimate Assistant configuration
 
 The AI estimator calls the OpenAI Responses API through the authenticated

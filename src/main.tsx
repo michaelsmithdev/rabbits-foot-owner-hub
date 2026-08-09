@@ -9,6 +9,7 @@ import { CloudSyncProvider } from './features/cloud/CloudSyncProvider.tsx'
 import PwaLifecycle from './features/pwa/components/PwaLifecycle.tsx'
 import { clearNativePwaCache } from './features/pwa/clearNativePwaCache.ts'
 import StartupReady from './startup/StartupReady.tsx'
+import PublicCustomerPortal from './features/portal/PublicCustomerPortal.tsx'
 import { repairStoredData } from './startup/repairStoredData.ts'
 import {
   installGlobalStartupLogging,
@@ -20,18 +21,24 @@ recordStartupEvent('main-module-loaded')
 repairStoredData()
 void clearNativePwaCache()
 
+const portalToken = window.location.hash.startsWith('#portal/')
+  ? decodeURIComponent(window.location.hash.slice('#portal/'.length))
+  : ''
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ApplicationErrorBoundary>
       <StartupReady />
-      <AuthProvider>
-        <AuthGate>
-          <CloudSyncProvider>
-            <App />
-            <PwaLifecycle />
-          </CloudSyncProvider>
-        </AuthGate>
-      </AuthProvider>
+      {portalToken ? <PublicCustomerPortal token={portalToken} /> : (
+        <AuthProvider>
+          <AuthGate>
+            <CloudSyncProvider>
+              <App />
+              <PwaLifecycle />
+            </CloudSyncProvider>
+          </AuthGate>
+        </AuthProvider>
+      )}
     </ApplicationErrorBoundary>
   </StrictMode>,
 )

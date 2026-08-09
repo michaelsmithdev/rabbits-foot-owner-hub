@@ -69,6 +69,13 @@ export type Invoice = {
   aiEstimate?: AiEstimateGeneration
   status: InvoiceStatus
   payments: InvoicePayment[]
+  squarePaymentLink?: {
+    url: string
+    paymentLinkId?: string
+    orderId?: string
+    amount: number
+    createdAt: string
+  }
 
   createdAt: string
   updatedAt: string
