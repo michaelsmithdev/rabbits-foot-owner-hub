@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { getSquareMerchantCredentials } from './_square-merchant.ts'
+import { getSquareMerchantCredentials } from './_square-merchant.js'
 import { applyCors, requestedOrganizationId } from './_http-security.js'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
