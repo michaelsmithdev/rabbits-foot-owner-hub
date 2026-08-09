@@ -3,6 +3,7 @@ import {
   useMemo,
   useState,
 } from 'react'
+import { Trash2 } from 'lucide-react'
 
 import Invoices from '../../invoices/pages/Invoices'
 import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
@@ -1503,18 +1504,6 @@ function Estimates({
                     </p>
                   </div>
 
-                  <button
-                    aria-label={`Delete ${estimate.estimateNumber}`}
-                    className="customer-delete-button"
-                    onClick={() =>
-                      deleteEstimate(
-                        estimate.id,
-                      )
-                    }
-                    type="button"
-                  >
-                    ×
-                  </button>
                 </div>
 
                 <div className="customer-contact-details">
@@ -1639,6 +1628,16 @@ function Estimates({
                     type="button"
                   >
                     {estimate.jobId ? 'Final invoice in Job Mode' : 'Convert to invoice'}
+                  </button>
+
+                  <button
+                    aria-label={`Delete ${estimate.estimateNumber}`}
+                    className="customer-secondary-action estimate-delete-button"
+                    onClick={() => deleteEstimate(estimate.id)}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" size={16} />
+                    Delete estimate
                   </button>
                 </div>
               </article>
