@@ -1,5 +1,3 @@
-import type { IncomingMessage, ServerResponse } from 'node:http'
-
 const productionOrigins = new Set([
   'https://rabbits-foot-owner-hub.vercel.app',
 ])
@@ -11,7 +9,7 @@ function configuredOrigins() {
     .filter(Boolean)
 }
 
-export function isAllowedOrigin(origin: string | undefined) {
+export function isAllowedOrigin(origin) {
   if (!origin) return true
 
   try {
@@ -32,11 +30,7 @@ export function isAllowedOrigin(origin: string | undefined) {
   }
 }
 
-export function applyCors(
-  request: IncomingMessage,
-  response: ServerResponse<IncomingMessage>,
-  methods: string,
-) {
+export function applyCors(request, response, methods) {
   const origin = request.headers.origin
   if (!isAllowedOrigin(origin)) return false
 
@@ -47,7 +41,7 @@ export function applyCors(
   return true
 }
 
-export function requestedOrganizationId(request: IncomingMessage) {
+export function requestedOrganizationId(request) {
   const value = request.headers['x-owner-hub-organization']
   const organizationId = Array.isArray(value) ? value[0] : value
   return typeof organizationId === 'string' &&

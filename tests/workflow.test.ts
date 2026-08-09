@@ -18,7 +18,7 @@ import {
 import { mergeRemoteLeadSnapshot } from '../src/features/leads/data/leadMerge.ts'
 import type { Lead } from '../src/features/leads/types/Lead.ts'
 import { nextEstimateNumber } from '../src/features/estimates/data/estimateNumber.ts'
-import { isAllowedOrigin, requestedOrganizationId } from '../api/_http-security.ts'
+import { isAllowedOrigin, requestedOrganizationId } from '../api/_http-security.js'
 
 test('AI estimate scope stays exact unless upsells are explicitly requested', () => {
   assert.equal(isUpsellRequested('Replace 2 storm doors'), false)

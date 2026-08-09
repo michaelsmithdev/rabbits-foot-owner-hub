@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import OpenAI from 'openai'
-import { applyCors, requestedOrganizationId } from './_http-security.ts'
+import { applyCors, requestedOrganizationId } from './_http-security.js'
 
 import {
   aiEstimateJsonSchema,

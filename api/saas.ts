@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
-import { applyCors, requestedOrganizationId } from './_http-security.ts'
+import { applyCors, requestedOrganizationId } from './_http-security.js'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
