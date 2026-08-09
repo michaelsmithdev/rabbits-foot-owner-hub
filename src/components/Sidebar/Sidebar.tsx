@@ -1,4 +1,5 @@
 import { navigationItems, type PageName } from './navigation'
+import { useSaas } from '../../features/saas/saasContext'
 
 type NavigationProps = {
   activePage: PageName
@@ -6,18 +7,18 @@ type NavigationProps = {
 }
 
 function Brand() {
+  const { organization } = useSaas()
   return (
     <div className="sidebar-brand">
       <img
-        alt=""
-        aria-hidden="true"
+        alt={`${organization?.name ?? 'Business'} logo`}
         className="brand-logo"
         height="64"
         src="/rabbits-foot-logo.png"
         width="64"
       />
       <div>
-        <h1>RABBIT&apos;S FOOT</h1>
+        <h1>{(organization?.name ?? 'OWNER HUB').toUpperCase()}</h1>
         <p>OWNER HUB</p>
       </div>
     </div>

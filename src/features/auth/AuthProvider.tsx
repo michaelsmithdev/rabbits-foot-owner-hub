@@ -82,8 +82,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (error) throw error
       },
-      async signUp(email, password) {
+      async signUp(email, password, businessName, displayName) {
         if (!cloudClient) throw new Error('Cloud login is not configured.')
+
+        const cleanBusinessName = businessName.trim()
+        const cleanDisplayName = displayName.trim()
+        if (!cleanBusinessName) throw new Error('Enter your business name.')
+        if (!cleanDisplayName) throw new Error('Enter your name.')
 
         const { data, error } = await cloudClient.auth.signUp({
           email: email.trim(),
@@ -91,7 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           options: {
             emailRedirectTo: window.location.origin,
             data: {
-              organization_name: "Rabbit's Foot Handyman Services",
+              organization_name: cleanBusinessName,
+              display_name: cleanDisplayName,
             },
           },
         })

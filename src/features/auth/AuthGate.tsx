@@ -1,4 +1,4 @@
-import { CloudOff, LoaderCircle, ShieldCheck } from 'lucide-react'
+import { BriefcaseBusiness, CloudOff, LoaderCircle, ShieldCheck } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
 
 import { useAuth } from './authContext'
@@ -7,10 +7,13 @@ import './auth.css'
 type LoginView = 'sign-in' | 'sign-up' | 'reset'
 
 function LoginScreen() {
+  const joiningTeam = window.location.hash.startsWith('#invite/')
   const { sendPasswordReset, signIn, signUp } = useAuth()
   const [view, setView] = useState<LoginView>('sign-in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [businessName, setBusinessName] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -25,7 +28,7 @@ function LoginScreen() {
       if (view === 'sign-in') {
         await signIn(email, password)
       } else if (view === 'sign-up') {
-        setMessage(await signUp(email, password))
+        setMessage(await signUp(email, password, businessName || (joiningTeam ? 'Invitation pending' : ''), displayName))
       } else {
         await sendPasswordReset(email)
         setMessage('Password reset instructions were sent to your email.')
@@ -43,26 +46,38 @@ function LoginScreen() {
     <main className="auth-screen">
       <section className="auth-card" aria-labelledby="auth-title">
         <img
-          alt="Rabbit's Foot Handyman Services"
+          alt="Owner Hub"
           className="auth-logo"
           height="112"
           src="/rabbits-foot-logo.png"
           width="112"
         />
-        <p className="eyebrow">SECURE OWNER WORKSPACE</p>
+        <p className="eyebrow">CONTRACTOR BUSINESS PLATFORM</p>
         <h1 id="auth-title">
           {view === 'sign-in'
             ? 'Welcome back.'
             : view === 'sign-up'
-              ? 'Create the owner account.'
+              ? joiningTeam ? 'Create your team login.' : 'Start your 14-day trial.'
               : 'Reset your password.'}
         </h1>
         <p className="auth-intro">
-          Customers, estimates, invoices, payments, and website leads stay
-          protected behind your login.
+          Run estimates, jobs, customer communication, invoices, and payments
+          from one protected workspace.
         </p>
 
         <form className="auth-form" onSubmit={handleSubmit}>
+          {view === 'sign-up' && (
+            <>
+              <label>
+                <span>Your name</span>
+                <input autoComplete="name" onChange={(event) => setDisplayName(event.target.value)} required value={displayName} />
+              </label>
+              {!joiningTeam && <label>
+                <span>Business name</span>
+                <input autoComplete="organization" onChange={(event) => setBusinessName(event.target.value)} required value={businessName} />
+              </label>}
+            </>
+          )}
           <label>
             <span>Email address</span>
             <input
@@ -98,12 +113,12 @@ function LoginScreen() {
             {isSubmitting ? (
               <LoaderCircle aria-hidden="true" className="auth-spinner" size={20} />
             ) : (
-              <ShieldCheck aria-hidden="true" size={20} />
+              view === 'sign-up' ? <BriefcaseBusiness aria-hidden="true" size={20} /> : <ShieldCheck aria-hidden="true" size={20} />
             )}
             {view === 'sign-in'
               ? 'Sign in securely'
               : view === 'sign-up'
-                ? 'Create secure account'
+                ? 'Start free trial'
                 : 'Send reset link'}
           </button>
         </form>
@@ -117,7 +132,7 @@ function LoginScreen() {
           {view === 'sign-in' && (
             <>
               <button onClick={() => setView('sign-up')} type="button">
-                First-time setup
+                Start free trial
               </button>
               <button onClick={() => setView('reset')} type="button">
                 Forgot password?

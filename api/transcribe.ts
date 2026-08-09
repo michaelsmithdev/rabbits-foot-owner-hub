@@ -91,6 +91,34 @@ async function verifyUser(accessToken: string): Promise<string | null> {
     : null
 }
 
+async function serviceDatabase(path: string, init: RequestInit = {}) {
+  const url = process.env.SUPABASE_URL?.trim() ?? process.env.VITE_SUPABASE_URL?.trim()
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  if (!url || !key) throw new Error('supabase_service_not_configured')
+  return fetch(`${url.replace(/\/$/, '')}${path}`, { ...init, headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) }, signal: AbortSignal.timeout(10_000) })
+}
+
+async function checkTranscriptionEntitlement(userId: string) {
+  const membershipResponse = await serviceDatabase(`/rest/v1/organization_members?user_id=eq.${encodeURIComponent(userId)}&select=organization_id&limit=1`)
+  const organizationId = ((await membershipResponse.json() as Array<{ organization_id?: string }>)[0]?.organization_id)
+  if (!membershipResponse.ok || !organizationId) throw new Error('workspace_not_found')
+  const subscriptionResponse = await serviceDatabase(`/rest/v1/organization_subscriptions?organization_id=eq.${organizationId}&select=plan,status,trial_ends_at&limit=1`)
+  const subscription = (await subscriptionResponse.json() as Array<{ plan?: string; status?: string; trial_ends_at?: string | null }>)[0]
+  const trialValid = subscription?.status === 'trialing' && (!subscription.trial_ends_at || new Date(subscription.trial_ends_at).getTime() > Date.now())
+  if (!subscriptionResponse.ok || !subscription || (subscription.status !== 'active' && !trialValid)) throw new Error('subscription_inactive')
+  const limits: Record<string, number> = { starter: 30, pro: 200, team: 600 }
+  const limit = limits[subscription.plan ?? 'starter'] ?? limits.starter
+  const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0)
+  const usageResponse = await serviceDatabase(`/rest/v1/usage_events?organization_id=eq.${organizationId}&event_type=eq.ai_transcription&occurred_at=gte.${encodeURIComponent(monthStart.toISOString())}&select=quantity`)
+  const usage = usageResponse.ok ? await usageResponse.json() as Array<{ quantity?: number }> : []
+  if (usage.reduce((sum, item) => sum + (item.quantity ?? 0), 0) >= limit) throw new Error('transcription_limit_reached')
+  return organizationId
+}
+
+async function recordTranscriptionUsage(organizationId: string, model: string, durationBytes: number) {
+  await serviceDatabase('/rest/v1/usage_events', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ organization_id: organizationId, event_type: 'ai_transcription', quantity: 1, metadata: { model, bytes: durationBytes } }) })
+}
+
 function isRateLimited(userId: string) {
   const now = Date.now()
   const current = rateLimits.get(userId)
@@ -151,6 +179,20 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     sendJson(response, 401, { error: 'Your secure session expired. Sign in and retry.' })
     return
   }
+  let organizationId: string
+  try {
+    organizationId = await checkTranscriptionEntitlement(userId)
+  } catch (error) {
+    const code = error instanceof Error ? error.message : ''
+    sendJson(response, code === 'transcription_limit_reached' ? 429 : code === 'subscription_inactive' ? 402 : 503, {
+      error: code === 'transcription_limit_reached'
+        ? 'This month’s voice transcription allowance has been used. Upgrade the plan or type the note.'
+        : code === 'subscription_inactive'
+          ? 'Choose an active plan in Business & billing to use voice transcription.'
+          : 'Your voice allowance could not be verified. Retry shortly.',
+    })
+    return
+  }
   if (isRateLimited(userId)) {
     response.setHeader('Retry-After', '60')
     sendJson(response, 429, { error: 'Too many transcription requests. Wait one minute and retry.' })
@@ -179,14 +221,23 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
   try {
     const openai = new OpenAI({ apiKey, timeout: 50_000, maxRetries: 1 })
-    const transcript = await openai.audio.transcriptions.create({
+    const model = process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() || 'gpt-4o-transcribe'
+    const transcription = await openai.audio.transcriptions.create({
       file: await toFile(audio.buffer, audio.fileName, { type: audio.mimeType }),
-      model: process.env.OPENAI_TRANSCRIPTION_MODEL?.trim() || 'gpt-4o-mini-transcribe',
-      response_format: 'text',
-      prompt: "Handyman job walkthrough for Rabbit's Foot Handyman Services. Preserve measurements, room names, materials, model numbers, customer requests, exclusions, and safety concerns accurately.",
+      model,
+      language: 'en',
+      response_format: 'json',
+      prompt: [
+        'English contractor job-site note.',
+        'Transcribe only what the speaker says; do not guess or rewrite the scope.',
+        'Measurements, quantities, fractions, model numbers, and product sizes must be preserved exactly.',
+        'Use clear contractor notation: 32-inch screen door, 36-inch screen door, 2x4, 3/4-inch, 8 feet 2 inches.',
+        'Expected vocabulary includes screen door, storm door, rough opening, jamb, frame, trim, drywall, outlet, plumbing, labor, materials, remove, replace, install, repair, customer-supplied, disposal, and haul-away.',
+      ].join(' '),
     })
-    const cleanTranscript = transcript.trim().slice(0, 12_000)
+    const cleanTranscript = transcription.text.trim().slice(0, 12_000)
     if (!cleanTranscript) throw new Error('empty_transcript')
+    await recordTranscriptionUsage(organizationId, model, audio.buffer.length)
     sendJson(response, 200, {
       transcript: cleanTranscript,
       recordingId: createHash('sha256').update(`${userId}:${audio.fileName}`).digest('hex').slice(0, 16),

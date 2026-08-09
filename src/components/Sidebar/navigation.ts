@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Settings,
   CalendarDays,
+  Building2,
   Sparkles,
   UsersRound,
   type LucideIcon,
@@ -25,6 +26,7 @@ export type PageName =
   | 'photos'
   | 'settings'
   | 'schedule'
+  | 'business'
 
 type NavigationItem = {
   id: PageName
@@ -93,6 +95,12 @@ export const navigationItems: NavigationItem[] = [
     label: 'Photos',
     shortLabel: 'Photos',
     icon: Images,
+  },
+  {
+    id: 'business',
+    label: 'Business & billing',
+    shortLabel: 'Business',
+    icon: Building2,
   },
   {
     id: 'settings',

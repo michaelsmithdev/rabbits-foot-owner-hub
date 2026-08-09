@@ -152,7 +152,7 @@ function Settings() {
     )
     const downloadLink = document.createElement('a')
     downloadLink.href = backupUrl
-    downloadLink.download = `rabbits-foot-owner-hub-${new Date()
+    downloadLink.download = `owner-hub-business-backup-${new Date()
       .toISOString()
       .slice(0, 10)}.json`
     downloadLink.click()

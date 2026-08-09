@@ -19,6 +19,38 @@
   font-weight: 800;
 }
 
+.voice-transcript-review {
+  display: grid;
+  gap: 7px;
+}
+
+.voice-transcript-review > span {
+  color: #4f7200;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.voice-transcript-review textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  border: 1px solid #cfd8c8;
+  border-radius: 13px;
+  background: #fff;
+  padding: 11px 12px;
+  color: #151915;
+  font: inherit;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.voice-transcript-review textarea:focus {
+  border-color: #78c800;
+  outline: 3px solid rgba(120, 200, 0, 0.16);
+}
+
 @media (max-width: 700px) {
   .voice-record-actions {
     display: grid;

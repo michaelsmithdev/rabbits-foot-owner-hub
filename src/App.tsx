@@ -21,6 +21,8 @@ import Walkthroughs from './features/walkthroughs/pages/Walkthroughs'
 import Jobs from './features/jobs/pages/Jobs'
 import { loadBusinessSettings } from './features/settings/data/businessSettingsStore'
 import Schedule from './features/schedule/pages/Schedule'
+import BusinessWorkspace from './features/saas/pages/BusinessWorkspace'
+import { useSaas } from './features/saas/saasContext'
 
 type EstimateLaunch = {
   requestId: number
@@ -41,6 +43,7 @@ function getPageFromHash(): PageName {
 }
 
 function App() {
+  const { organization } = useSaas()
   const [activePage, setActivePage] = useState<PageName>(getPageFromHash)
   const [estimateLaunch, setEstimateLaunch] = useState<EstimateLaunch>({
     requestId: 0,
@@ -75,10 +78,9 @@ function App() {
       (item) => item.id === activePage,
     )
 
-    document.title = currentPage
-      ? `${currentPage.label} | Rabbit's Foot Owner Hub`
-      : "Rabbit's Foot Owner Hub"
-  }, [activePage])
+    const workspaceName = organization?.name ?? 'Owner Hub'
+    document.title = currentPage ? `${currentPage.label} | ${workspaceName}` : workspaceName
+  }, [activePage, organization?.name])
 
   useEffect(() => {
     document.documentElement.dataset.theme = loadBusinessSettings().darkMode ? 'dark' : 'light'
@@ -152,6 +154,9 @@ function App() {
 
       case 'settings':
         return <Settings />
+
+      case 'business':
+        return <BusinessWorkspace />
 
       case 'home':
       default:

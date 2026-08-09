@@ -11,6 +11,9 @@ import { clearNativePwaCache } from './features/pwa/clearNativePwaCache.ts'
 import StartupReady from './startup/StartupReady.tsx'
 import PublicCustomerPortal from './features/portal/PublicCustomerPortal.tsx'
 import { repairStoredData } from './startup/repairStoredData.ts'
+import { SaasProvider } from './features/saas/SaasProvider.tsx'
+import InviteAcceptance from './features/saas/InviteAcceptance.tsx'
+import SubscriptionGate from './features/saas/SubscriptionGate.tsx'
 import {
   installGlobalStartupLogging,
   recordStartupEvent,
@@ -24,6 +27,9 @@ void clearNativePwaCache()
 const portalToken = window.location.hash.startsWith('#portal/')
   ? decodeURIComponent(window.location.hash.slice('#portal/'.length))
   : ''
+const inviteToken = window.location.hash.startsWith('#invite/')
+  ? decodeURIComponent(window.location.hash.slice('#invite/'.length))
+  : ''
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -32,10 +38,14 @@ createRoot(document.getElementById('root')!).render(
       {portalToken ? <PublicCustomerPortal token={portalToken} /> : (
         <AuthProvider>
           <AuthGate>
-            <CloudSyncProvider>
-              <App />
-              <PwaLifecycle />
-            </CloudSyncProvider>
+            <SaasProvider>
+              {inviteToken ? <InviteAcceptance token={inviteToken} /> : (
+                <CloudSyncProvider>
+                  <SubscriptionGate><App /></SubscriptionGate>
+                  <PwaLifecycle />
+                </CloudSyncProvider>
+              )}
+            </SaasProvider>
           </AuthGate>
         </AuthProvider>
       )}

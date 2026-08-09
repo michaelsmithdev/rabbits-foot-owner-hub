@@ -21,8 +21,8 @@ const MAX_PHOTO_DATA_URL_LENGTH = 320_000
 const rateLimits = new Map<string, { count: number; resetAt: number }>()
 
 const ESTIMATOR_INSTRUCTIONS = `
-You are the estimating assistant for Rabbit's Foot Handyman Services, a residential
-and commercial handyman company. Produce accurate, fair, profitable contractor
+You are the estimating assistant for the authenticated subscriber's residential
+and commercial service business. Produce accurate, fair, profitable contractor
 estimates. Think like an experienced contractor and consider labor, materials,
 difficulty, travel, setup, cleanup, disposal, overhead, profit, commercial
 complexity, emergency work, customer-supplied materials, and realistic time.
@@ -318,6 +318,46 @@ async function verifyUser(accessToken: string): Promise<string | null> {
     : null
 }
 
+async function serviceDatabase(path: string, init: RequestInit = {}) {
+  const url = process.env.SUPABASE_URL?.trim() ?? process.env.VITE_SUPABASE_URL?.trim()
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+  if (!url || !key) throw new Error('supabase_service_not_configured')
+  return fetch(`${url.replace(/\/$/, '')}${path}`, {
+    ...init,
+    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+    signal: AbortSignal.timeout(10_000),
+  })
+}
+
+async function checkAiEntitlement(userId: string) {
+  const membershipResponse = await serviceDatabase(`/rest/v1/organization_members?user_id=eq.${encodeURIComponent(userId)}&select=organization_id&limit=1`)
+  const memberships = await membershipResponse.json() as Array<{ organization_id?: string }>
+  const organizationId = memberships[0]?.organization_id
+  if (!membershipResponse.ok || !organizationId) throw new Error('workspace_not_found')
+  const subscriptionResponse = await serviceDatabase(`/rest/v1/organization_subscriptions?organization_id=eq.${organizationId}&select=plan,status,trial_ends_at&limit=1`)
+  const subscriptions = await subscriptionResponse.json() as Array<{ plan?: string; status?: string; trial_ends_at?: string | null }>
+  const subscription = subscriptions[0]
+  if (!subscriptionResponse.ok || !subscription) throw new Error('subscription_not_found')
+  const trialValid = subscription.status === 'trialing' && (!subscription.trial_ends_at || new Date(subscription.trial_ends_at).getTime() > Date.now())
+  if (subscription.status !== 'active' && !trialValid) throw new Error('subscription_inactive')
+  const limits: Record<string, number> = { starter: 15, pro: 100, team: 300 }
+  const limit = limits[subscription.plan ?? 'starter'] ?? limits.starter
+  const monthStart = new Date(); monthStart.setUTCDate(1); monthStart.setUTCHours(0, 0, 0, 0)
+  const usageResponse = await serviceDatabase(`/rest/v1/usage_events?organization_id=eq.${organizationId}&event_type=eq.ai_estimate&occurred_at=gte.${encodeURIComponent(monthStart.toISOString())}&select=quantity`)
+  const usage = usageResponse.ok ? await usageResponse.json() as Array<{ quantity?: number }> : []
+  const used = usage.reduce((sum, item) => sum + (typeof item.quantity === 'number' ? item.quantity : 0), 0)
+  if (used >= limit) throw new Error('ai_limit_reached')
+  return { organizationId, used, limit }
+}
+
+async function recordAiUsage(organizationId: string, model: string, photos: number) {
+  const result = await serviceDatabase('/rest/v1/usage_events', {
+    method: 'POST', headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ organization_id: organizationId, event_type: 'ai_estimate', quantity: 1, metadata: { model, photos } }),
+  })
+  if (!result.ok) console.error('AI usage event could not be recorded.', result.status)
+}
+
 function rateLimit(userId: string): boolean {
   const now = Date.now()
   const current = rateLimits.get(userId)
@@ -548,6 +588,22 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     sendJson(response, 401, { error: 'Your secure session expired. Sign in and retry.' })
     return
   }
+  let entitlement: { organizationId: string; used: number; limit: number }
+  try {
+    entitlement = await checkAiEntitlement(userId)
+  } catch (error) {
+    const code = error instanceof Error ? error.message : ''
+    if (code === 'subscription_inactive') {
+      sendJson(response, 402, { error: 'Choose an active plan in Business & billing to use AI estimates.' })
+      return
+    }
+    if (code === 'ai_limit_reached') {
+      sendJson(response, 429, { error: 'This month’s AI estimate allowance has been used. Upgrade the plan or wait until next month.' })
+      return
+    }
+    sendJson(response, 503, { error: 'Your plan allowance could not be verified. Retry shortly.' })
+    return
+  }
   if (rateLimit(userId)) {
     response.setHeader('Retry-After', '60')
     sendJson(response, 429, { error: 'Too many estimate requests. Wait one minute and retry.' })
@@ -588,7 +644,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
               type: 'input_text',
               text: JSON.stringify({
                 business: {
-                  name: "Rabbit's Foot Handyman Services",
+                  name: 'Authenticated service business',
                   type: 'Residential and Commercial Handyman',
                   goal: 'Generate accurate, fair, and profitable estimates.',
                 },
@@ -647,6 +703,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       historyUsed: parsedRequest.history.length,
       draft,
     }
+    await recordAiUsage(entitlement.organizationId, model, parsedRequest.photos.length)
     sendJson(response, 200, generation)
   } catch (error) {
     console.error('AI estimate generation failed.', {

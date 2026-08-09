@@ -78,7 +78,14 @@ export default function VoiceCapture({ notes, onChange, label = 'Talk through th
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      })
       const preferredType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find((type) => MediaRecorder.isTypeSupported(type))
       const recorder = preferredType ? new MediaRecorder(stream, { mimeType: preferredType }) : new MediaRecorder(stream)
       chunksRef.current = []
@@ -153,6 +160,10 @@ export default function VoiceCapture({ notes, onChange, label = 'Talk through th
     }
   }
 
+  function editTranscript(noteId: string, transcript: string) {
+    onChange(notesRef.current.map((item) => item.id === noteId ? { ...item, transcript } : item))
+  }
+
   return (
     <div className="voice-capture">
       <div className="voice-record-actions">
@@ -167,11 +178,16 @@ export default function VoiceCapture({ notes, onChange, label = 'Talk through th
       {notes.map((note) => (
         <article className="voice-note" key={note.id}>
           <div>
-            <strong>{note.state === 'transcribing' ? 'Transcribing saved audio…' : note.transcript || 'Recording saved for retry'}</strong>
+            {note.state === 'complete' ? (
+              <label className="voice-transcript-review">
+                <span>Review transcript—especially measurements</span>
+                <textarea aria-label="Editable voice transcript" onChange={(event) => editTranscript(note.id, event.target.value)} rows={3} value={note.transcript}/>
+              </label>
+            ) : <strong>{note.state === 'transcribing' ? 'Transcribing saved audio…' : note.transcript || 'Recording saved for retry'}</strong>}
             <span>{formatElapsed(note.durationSeconds)} · {new Date(note.createdAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
           </div>
           <div className="voice-note-actions">
-            {note.state === 'error' && <button aria-label="Retry transcription" onClick={() => void transcribeSavedNote(note)} type="button"><RotateCcw size={17} /></button>}
+            {(note.state === 'error' || note.state === 'complete') && <button aria-label="Retry transcription" onClick={() => void transcribeSavedNote(note)} type="button"><RotateCcw size={17} /></button>}
             <button aria-label="Remove voice note" onClick={() => void removeVoiceNote(note.id)} type="button"><Trash2 size={17} /></button>
           </div>
         </article>

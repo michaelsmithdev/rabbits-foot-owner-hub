@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { getSquareMerchantCredentials } from './_square-merchant.ts'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -103,21 +104,17 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const amount = Math.min(balance, Math.max(0, Math.round(requested * 100) / 100))
     if (amount < 0.5) return sendJson(response, 400, { error: 'This invoice has no payable balance.' })
 
-    const squareToken = process.env.SQUARE_ACCESS_TOKEN?.trim()
-    const locationId = process.env.SQUARE_LOCATION_ID?.trim()
-    if (!squareToken || !locationId) return sendJson(response, 503, { error: 'Square payments are ready for connection. Add the Square access token and location ID in Vercel.' })
-    const sandbox = process.env.SQUARE_ENVIRONMENT?.trim().toLowerCase() === 'sandbox'
-    const squareUrl = sandbox ? 'https://connect.squareupsandbox.com' : 'https://connect.squareup.com'
+    const merchant = await getSquareMerchantCredentials(organizationId)
     const invoiceNumber = typeof invoice.invoiceNumber === 'string' ? invoice.invoiceNumber : 'Invoice'
     const idempotencyKey = createHash('sha256').update(`${organizationId}:${body.invoiceId}:${amount}:${String(invoice.updatedAt ?? '')}`).digest('hex')
     const origin = request.headers.origin && allowedOrigin(request, response) ? request.headers.origin : 'https://rabbits-foot-owner-hub.vercel.app'
-    const squareResponse = await fetch(`${squareUrl}/v2/online-checkout/payment-links`, {
+    const squareResponse = await fetch(`${merchant.baseUrl}/v2/online-checkout/payment-links`, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${squareToken}`, 'Square-Version': '2026-07-15', 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${merchant.token}`, 'Square-Version': '2026-07-15', 'Content-Type': 'application/json' },
       body: JSON.stringify({
         idempotency_key: idempotencyKey || randomUUID(),
         description: `Owner Hub ${invoiceNumber}`,
-        quick_pay: { name: `${invoiceNumber} - ${String(invoice.jobName ?? 'Handyman services').slice(0, 80)}`, price_money: { amount: Math.round(amount * 100), currency: 'USD' }, location_id: locationId },
+        quick_pay: { name: `${invoiceNumber} - ${String(invoice.jobName ?? 'Handyman services').slice(0, 80)}`, price_money: { amount: Math.round(amount * 100), currency: 'USD' }, location_id: merchant.locationId },
         checkout_options: { redirect_url: `${origin}/#documents` },
         pre_populated_data: {},
       }),

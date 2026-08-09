@@ -5,10 +5,10 @@ const SETTINGS_STORAGE_KEY = 'rabbits-foot-business-settings'
 
 export const defaultBusinessSettings: BusinessSettings = {
   id: 'business-settings',
-  businessName: "Rabbit's Foot Handyman Services",
-  phone: '(574) 703-5978',
-  email: 'callrabbitsfoot@gmail.com',
-  website: 'callrabbitsfoot.com',
+  businessName: 'My Service Business',
+  phone: '',
+  email: '',
+  website: '',
   streetAddress: '',
   city: '',
   state: 'IN',

@@ -7,7 +7,7 @@ export type AuthContextValue = {
   mode: AuthMode
   session: Session | null
   signIn: (email: string, password: string) => Promise<void>
-  signUp: (email: string, password: string) => Promise<string>
+  signUp: (email: string, password: string, businessName: string, displayName: string) => Promise<string>
   sendPasswordReset: (email: string) => Promise<void>
   signOut: () => Promise<void>
 }

@@ -79,15 +79,15 @@ export async function getOrganizationId(client: SupabaseClient) {
   const { data, error } = await client
     .from('organization_members')
     .select('organization_id')
-    .limit(1)
-    .maybeSingle()
 
   if (error) throw error
-  if (!data?.organization_id) {
+  const activeOrganizationId = localStorage.getItem('owner-hub-active-organization')
+  const organizationId = data?.find((membership) => membership.organization_id === activeOrganizationId)?.organization_id ?? data?.[0]?.organization_id
+  if (!organizationId) {
     throw new Error('No business workspace is connected to this account.')
   }
 
-  return data.organization_id as string
+  return organizationId as string
 }
 
 export async function synchronizeBusinessRecords(

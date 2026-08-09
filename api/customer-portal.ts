@@ -1,5 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { getSquareMerchantCredentials } from './_square-merchant.ts'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -168,14 +169,7 @@ async function createCustomerSquareCheckout(
     return { url: existingLink.url, amount }
   }
 
-  const squareToken = process.env.SQUARE_ACCESS_TOKEN?.trim()
-  const locationId = process.env.SQUARE_LOCATION_ID?.trim()
-  if (!squareToken || !locationId) throw new Error('square_not_configured')
-
-  const sandbox = process.env.SQUARE_ENVIRONMENT?.trim().toLowerCase() === 'sandbox'
-  const squareOrigin = sandbox
-    ? 'https://connect.squareupsandbox.com'
-    : 'https://connect.squareup.com'
+  const merchant = await getSquareMerchantCredentials(portal.link.organization_id)
   const invoiceNumber = clean(record.payload.invoiceNumber, 80) || 'Invoice'
   const jobName = clean(record.payload.jobName, 80) || 'Handyman services'
   const idempotencyKey = createHash('sha256')
@@ -184,10 +178,10 @@ async function createCustomerSquareCheckout(
     )
     .digest('hex')
   const origin = request.headers.origin ?? 'https://rabbits-foot-owner-hub.vercel.app'
-  const squareResponse = await fetch(`${squareOrigin}/v2/online-checkout/payment-links`, {
+  const squareResponse = await fetch(`${merchant.baseUrl}/v2/online-checkout/payment-links`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${squareToken}`,
+      Authorization: `Bearer ${merchant.token}`,
       'Square-Version': '2026-07-15',
       'Content-Type': 'application/json',
     },
@@ -197,7 +191,7 @@ async function createCustomerSquareCheckout(
       quick_pay: {
         name: `${invoiceNumber} - ${jobName}`,
         price_money: { amount: Math.round(amount * 100), currency: 'USD' },
-        location_id: locationId,
+        location_id: merchant.locationId,
       },
       checkout_options: {
         redirect_url: `${origin}/?payment=return#portal/${rawToken}`,

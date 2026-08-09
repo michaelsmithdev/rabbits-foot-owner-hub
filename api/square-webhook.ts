@@ -84,6 +84,18 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const eventType = typeof event.type === 'string' ? event.type : ''
     const data = event.data && typeof event.data === 'object' ? event.data as Json : {}
     const object = data.object && typeof data.object === 'object' ? data.object as Json : {}
+    const subscription = object.subscription && typeof object.subscription === 'object' ? object.subscription as Json : {}
+    if (eventId && eventType.startsWith('subscription.') && typeof subscription.id === 'string') {
+      const squareStatus = typeof subscription.status === 'string' ? subscription.status.toUpperCase() : ''
+      const status = squareStatus === 'ACTIVE' ? 'active' : squareStatus === 'PAUSED' ? 'paused' : squareStatus === 'CANCELED' || squareStatus === 'DEACTIVATED' ? 'canceled' : 'past_due'
+      const updateResponse = await supabaseRequest(`/rest/v1/organization_subscriptions?square_subscription_id=eq.${encodeURIComponent(subscription.id)}`, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ status, current_period_ends_at: typeof subscription.charged_through_date === 'string' ? `${subscription.charged_through_date}T23:59:59Z` : null, updated_at: new Date().toISOString() }),
+      })
+      if (!updateResponse.ok) throw new Error('subscription_update_failed')
+      await recordEvent(eventId)
+      return sendJson(response, 200, { received: true })
+    }
     const payment = object.payment && typeof object.payment === 'object' ? object.payment as Json : {}
     if (!eventId || (eventType !== 'payment.created' && eventType !== 'payment.updated') || payment.status !== 'COMPLETED') {
       return sendJson(response, 200, { received: true })
