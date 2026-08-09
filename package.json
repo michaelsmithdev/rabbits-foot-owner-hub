@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:android": "tsc -b && vite build --mode android",
+    "build": "tsc -b && vite build && node scripts/verify-production-build.mjs",
+    "build:android": "tsc -b && vite build --mode android && node scripts/verify-production-build.mjs",
     "lint": "eslint .",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "preview": "vite preview"

@@ -14,28 +14,11 @@ export default defineConfig(({ mode }) => {
     build: {
       target: isAndroidBuild ? 'es2020' : 'es2023',
       modulePreload: !isAndroidBuild,
-      rolldownOptions: isAndroidBuild
-        ? {}
-        : {
-            output: {
-              codeSplitting: {
-                groups: [
-                  {
-                    name: 'supabase',
-                    test: /node_modules[\\/]@supabase/,
-                    priority: 20,
-                  },
-                  {
-                    name: 'vendor',
-                    test: /node_modules/,
-                    minSize: 100_000,
-                    maxSize: 300_000,
-                    priority: 10,
-                  },
-                ],
-              },
-            },
-          },
+      // Keep the application and its dependencies in one deterministic entry
+      // chunk. Size-based vendor groups produced circular chunk imports in the
+      // optimized web build, which stopped module initialization before React
+      // could mount and left only the static startup recovery screen visible.
+      rolldownOptions: {},
     },
     plugins: [
       react(),
