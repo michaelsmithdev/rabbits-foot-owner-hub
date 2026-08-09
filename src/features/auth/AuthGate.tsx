@@ -140,6 +140,7 @@ function LoginScreen() {
             </>
           )}
         </div>
+        <footer className="auth-legal-links"><a href="#privacy">Privacy</a><a href="#terms">Terms</a><a href="#delete-account">Delete account</a><a href="#support">Support</a></footer>
       </section>
     </main>
   )

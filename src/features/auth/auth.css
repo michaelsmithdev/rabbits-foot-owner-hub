@@ -149,6 +149,25 @@
   color: #4e7200;
 }
 
+.auth-legal-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid #e2e7df;
+}
+
+.auth-legal-links a {
+  color: #5f695f;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.auth-legal-links a:hover { color: #4d7c00; }
+
 @keyframes auth-spin {
   to { transform: rotate(360deg); }
 }

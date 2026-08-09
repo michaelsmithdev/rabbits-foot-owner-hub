@@ -108,6 +108,22 @@ async function createSquareSubscription(organizationId: string, email: string, p
   if (!update.ok) throw new Error('The subscription started, but the workspace status could not be saved. Contact support.')
 }
 
+async function manageSquareSubscription(organizationId: string, action: 'cancel' | 'resume') {
+  const token = process.env.SQUARE_BILLING_ACCESS_TOKEN?.trim() ?? process.env.SQUARE_ACCESS_TOKEN?.trim()
+  if (!token) throw new Error('Subscription billing is not configured.')
+  const subscriptionRecord = await database(`/rest/v1/organization_subscriptions?organization_id=eq.${organizationId}&select=square_subscription_id&limit=1`)
+  const subscriptionId = (await subscriptionRecord.json() as Array<{ square_subscription_id?: string }>)[0]?.square_subscription_id
+  if (!subscriptionRecord.ok || !subscriptionId) throw new Error('No Square subscription is attached to this workspace.')
+  const headers = { Authorization: `Bearer ${token}`, 'Square-Version': '2026-07-15', 'Content-Type': 'application/json' }
+  const squareResponse = action === 'cancel'
+    ? await fetch(`${squareBase()}/v2/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, { method: 'POST', headers, body: '{}', signal: AbortSignal.timeout(15_000) })
+    : await fetch(`${squareBase()}/v2/subscriptions/${encodeURIComponent(subscriptionId)}`, { method: 'PUT', headers, body: JSON.stringify({ subscription: { canceled_date: null } }), signal: AbortSignal.timeout(15_000) })
+  const squarePayload = await squareResponse.json() as { errors?: Array<{ detail?: string }> }
+  if (!squareResponse.ok) throw new Error(squarePayload.errors?.[0]?.detail || `Square could not ${action} the subscription.`)
+  const update = await database(`/rest/v1/organization_subscriptions?organization_id=eq.${organizationId}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ cancel_at_period_end: action === 'cancel', updated_at: new Date().toISOString() }) })
+  if (!update.ok) throw new Error('Square accepted the change, but subscription status could not be refreshed.')
+}
+
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (!setCors(request, response)) return send(response, 403, { error: 'This request origin is not allowed.' })
   if (request.method === 'OPTIONS') { response.statusCode = 204; return response.end() }
@@ -199,6 +215,14 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       if (plan !== 'starter' && plan !== 'pro' && plan !== 'team') return send(response, 400, { error: 'Choose a valid subscription plan.' })
       await createSquareSubscription(membership.organization_id, user.email, plan)
       return send(response, 200, { message: `${plan[0].toUpperCase()}${plan.slice(1)} subscription started. Square will email the billing receipt.` })
+    }
+
+    if (action === 'cancel-subscription' || action === 'resume-subscription') {
+      if (membership.role !== 'owner') return send(response, 403, { error: 'Only the workspace owner can change subscription renewal.' })
+      const operation = action === 'cancel-subscription' ? 'cancel' : 'resume'
+      await manageSquareSubscription(membership.organization_id, operation)
+      await database('/rest/v1/audit_logs', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ organization_id: membership.organization_id, actor_user_id: user.id, action: `subscription.${operation}_requested`, entity_type: 'subscription', entity_id: membership.organization_id }) })
+      return send(response, 200, { message: operation === 'cancel' ? 'Subscription cancellation scheduled for the end of the billing period.' : 'Subscription renewal restored.' })
     }
 
     if (action === 'square-oauth-start') {

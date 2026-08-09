@@ -1,7 +1,9 @@
 import {
   BadgeCheck, Building2, Check, Circle, Copy, CreditCard, ExternalLink,
-  LoaderCircle, Palette, RefreshCw, ShieldCheck, Sparkles, Trash2, UsersRound,
+  FileText, LifeBuoy, LoaderCircle, Palette, RefreshCw, ShieldCheck, Sparkles,
+  Trash2, UserX, UsersRound,
 } from 'lucide-react'
+import { Capacitor } from '@capacitor/core'
 import { type FormEvent, useMemo, useState } from 'react'
 
 import { useAuth } from '../../auth/authContext'
@@ -39,6 +41,7 @@ export default function BusinessWorkspace() {
   const settings = loadBusinessSettings()
   const square = integrations.find((item) => item.provider === 'square')
   const canManage = role === 'owner' || role === 'admin'
+  const isNativeApp = Capacitor.isNativePlatform()
   const onboarding = useMemo(() => [
     { label: 'Add business contact information', complete: Boolean(settings.businessName && settings.email && settings.phone) },
     { label: 'Choose pricing and tax defaults', complete: settings.minimumJobCharge > 0 && settings.targetGrossMarginPercent > 0 },
@@ -89,6 +92,31 @@ export default function BusinessWorkspace() {
       const payload = await apiAction(session.access_token, { action: 'start-subscription', plan, billingCycle: 'monthly' })
       setMessage(String(payload.message ?? 'Subscription started.'))
       await refresh()
+    })
+  }
+
+  async function changeRenewal(action: 'cancel-subscription' | 'resume-subscription') {
+    if (!session || role !== 'owner') return
+    if (action === 'cancel-subscription' && !window.confirm('Stop renewal at the end of the current billing period? Your records will remain available until then.')) return
+    await runAction(action, async () => {
+      const payload = await apiAction(session.access_token, { action })
+      setMessage(String(payload.message ?? 'Subscription renewal updated.'))
+      await refresh()
+    })
+  }
+
+  async function requestAccountDeletion() {
+    if (!session || role !== 'owner') return
+    if (!window.confirm('Send a request to delete this account and business workspace? Support will verify the request before any data is removed.')) return
+    await runAction('delete-account', async () => {
+      const response = await fetch(`${apiOrigin}/api/account-deletion-request`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json', 'X-Owner-Hub-Organization': organization?.id ?? '' },
+        body: JSON.stringify({ reason: 'Requested by the workspace owner from Business & billing.', source: isNativeApp ? 'android-app' : 'web-app' }),
+      })
+      const payload = await response.json() as { error?: string; message?: string }
+      if (!response.ok) throw new Error(payload.error || 'The deletion request could not be submitted.')
+      setMessage(payload.message ?? 'Account deletion request received.')
     })
   }
 
@@ -160,7 +188,18 @@ export default function BusinessWorkspace() {
         </article>
       </div>
 
-      <section className="plans-section"><header><div><p className="eyebrow">SIMPLE PRICING</p><h2>Choose the plan that fits the crew</h2></div><p>Annual billing includes two months free. AI and storage limits protect the business from surprise costs.</p></header><div className="plan-grid">{Object.values(planCatalog).map((plan) => <article className={`plan-card ${plan.id === subscription?.plan ? 'current' : ''}`} key={plan.id}><p className="eyebrow">{plan.name}</p><h3>${plan.monthlyPrice}<span>/month</span></h3><p>{plan.seats} seat{plan.seats === 1 ? '' : 's'} · {plan.aiEstimates} AI estimates/month</p><ul>{plan.features.map((feature) => <li key={feature}><Check size={17}/>{feature}</li>)}</ul><button disabled={!canManage || plan.id === subscription?.plan || busyAction === `plan-${plan.id}`} onClick={() => void choosePlan(plan.id)} type="button">{plan.id === subscription?.plan ? <><ShieldCheck/>Current plan</> : <>Choose {plan.name}</>}</button></article>)}</div></section>
+      <section className="plans-section"><header><div><p className="eyebrow">SIMPLE PRICING</p><h2>Choose the plan that fits the crew</h2></div><p>Annual billing includes two months free. AI and storage limits protect the business from surprise costs.</p></header>{isNativeApp && <div className="native-billing-note"><ShieldCheck size={20}/><p>Plan purchases and changes are managed in the secure web dashboard. Your Android app will reflect the updated plan after you sign in or refresh.</p></div>}<div className="plan-grid">{Object.values(planCatalog).map((plan) => <article className={`plan-card ${plan.id === subscription?.plan ? 'current' : ''}`} key={plan.id}><p className="eyebrow">{plan.name}</p><h3>${plan.monthlyPrice}<span>/month</span></h3><p>{plan.seats} seat{plan.seats === 1 ? '' : 's'} · {plan.aiEstimates} AI estimates/month</p><ul>{plan.features.map((feature) => <li key={feature}><Check size={17}/>{feature}</li>)}</ul><button disabled={isNativeApp || !canManage || plan.id === subscription?.plan || busyAction === `plan-${plan.id}`} onClick={() => void choosePlan(plan.id)} type="button">{plan.id === subscription?.plan ? <><ShieldCheck/>Current plan</> : <>Choose {plan.name}</>}</button></article>)}</div></section>
+
+      <section className="business-panel account-control">
+        <header><span><ShieldCheck size={22}/></span><div><p className="eyebrow">ACCOUNT CONTROL</p><h2>Renewal, support, and privacy</h2><p>Clear controls for billing, legal information, support, and account deletion.</p></div></header>
+        <div className="account-control-grid">
+          <a href="#privacy"><FileText size={19}/><span><strong>Privacy policy</strong><small>How information is stored and protected</small></span></a>
+          <a href="#terms"><FileText size={19}/><span><strong>Terms of service</strong><small>Subscription and acceptable-use terms</small></span></a>
+          <a href="#support"><LifeBuoy size={19}/><span><strong>Support</strong><small>Get help with your workspace</small></span></a>
+          {role === 'owner' && <button className="danger-control" disabled={busyAction === 'delete-account'} onClick={() => void requestAccountDeletion()} type="button"><UserX size={19}/><span><strong>Request account deletion</strong><small>Verification is required before records are removed</small></span></button>}
+        </div>
+        {role === 'owner' && !isNativeApp && subscription && subscription.status !== 'trialing' && <div className="renewal-control"><div><strong>{subscription.cancelAtPeriodEnd ? 'Renewal is scheduled to stop' : 'Automatic renewal is on'}</strong><p>{subscription.cancelAtPeriodEnd ? 'Access continues through the current paid period. You can restore renewal before it ends.' : 'Your plan renews automatically until you cancel.'}</p></div><button disabled={busyAction === 'cancel-subscription' || busyAction === 'resume-subscription'} onClick={() => void changeRenewal(subscription.cancelAtPeriodEnd ? 'resume-subscription' : 'cancel-subscription')} type="button">{subscription.cancelAtPeriodEnd ? 'Restore renewal' : 'Cancel at period end'}</button></div>}
+      </section>
 
       <button className="refresh-workspace" onClick={() => void refresh()} type="button"><RefreshCw size={17}/>Refresh subscription status</button>
     </section>
