@@ -498,6 +498,30 @@ function Invoices() {
     )
   }
 
+  function changeInvoiceStatus(
+    invoice: Invoice,
+    requestedStatus: InvoiceStatus,
+  ) {
+    const timestamp = new Date().toISOString()
+    const status = getPaymentAdjustedStatus(invoice, requestedStatus)
+
+    setInvoices((currentInvoices) =>
+      currentInvoices.map((currentInvoice) =>
+        currentInvoice.id === invoice.id
+          ? {
+              ...currentInvoice,
+              status,
+              updatedAt: timestamp,
+              paidAt:
+                status === 'paid'
+                  ? currentInvoice.paidAt ?? timestamp
+                  : null,
+            }
+          : currentInvoice,
+      ),
+    )
+  }
+
   function openPayment(invoice: Invoice) {
     setPaymentInvoiceId(invoice.id)
     setPaymentDate(getTodayDate())
@@ -684,11 +708,21 @@ function Invoices() {
                       <h2>{invoice.jobName}</h2>
                       <p>{formatCustomerName(customer)}</p>
                     </div>
-                    <span
-                      className={`invoice-status status-${invoice.status}`}
+                    <select
+                      aria-label={`Status for ${invoice.invoiceNumber}`}
+                      className={`invoice-status invoice-status-select status-${invoice.status}`}
+                      onChange={(event) =>
+                        changeInvoiceStatus(
+                          invoice,
+                          event.target.value as InvoiceStatus,
+                        )
+                      }
+                      value={invoice.status}
                     >
-                      {statusLabels[invoice.status]}
-                    </span>
+                      {Object.entries(statusLabels).map(([value, label]) => (
+                        <option key={value} value={value}>{label}</option>
+                      ))}
+                    </select>
                   </div>
 
                   <div className="invoice-card-dates">

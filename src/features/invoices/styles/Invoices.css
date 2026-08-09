@@ -90,6 +90,18 @@
   text-transform: uppercase;
 }
 
+.invoice-status-select {
+  max-width: 150px;
+  border: 1px solid transparent;
+  outline: none;
+  cursor: pointer;
+}
+
+.invoice-status-select:focus-visible {
+  border-color: #70ad00;
+  box-shadow: 0 0 0 3px rgb(112 173 0 / 18%);
+}
+
 .invoice-status.status-sent {
   background: #e8f1ff;
   color: #2f6299;

@@ -575,8 +575,8 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   }
 
   try {
-    const model = process.env.OPENAI_ESTIMATE_MODEL?.trim() || 'gpt-5.6-sol'
-    const openai = new OpenAI({ apiKey, timeout: 50_000, maxRetries: 1 })
+    const model = process.env.OPENAI_ESTIMATE_MODEL?.trim() || 'gpt-5.4-mini'
+    const openai = new OpenAI({ apiKey, timeout: 42_000, maxRetries: 0 })
     const modelResponse = await openai.responses.create({
       model,
       instructions: ESTIMATOR_INSTRUCTIONS,
@@ -619,7 +619,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
           ],
         },
       ],
-      reasoning: { effort: 'medium' },
+      reasoning: { effort: 'low' },
       text: {
         verbosity: 'medium',
         format: {
@@ -630,7 +630,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
           schema: aiEstimateJsonSchema,
         },
       },
-      max_output_tokens: 6_000,
+      max_output_tokens: 4_000,
       store: false,
       safety_identifier: createHash('sha256').update(userId).digest('hex'),
     })
@@ -654,9 +654,33 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       status: error instanceof OpenAI.APIError ? error.status : undefined,
     })
 
+    if (error instanceof OpenAI.APIConnectionTimeoutError) {
+      sendJson(response, 504, {
+        error: 'The AI estimator took too long. Retry once; your estimate details are still saved.',
+      })
+      return
+    }
+
+    if (error instanceof OpenAI.APIError && error.status === 401) {
+      sendJson(response, 503, {
+        error: 'The AI estimator key needs attention in the secure server settings.',
+      })
+      return
+    }
+
+    if (error instanceof OpenAI.APIError && [403, 404].includes(error.status ?? 0)) {
+      sendJson(response, 503, {
+        error: 'The configured AI model is not available to this API project.',
+      })
+      return
+    }
+
     if (error instanceof OpenAI.APIError && error.status === 429) {
+      const isQuotaError = error.code === 'insufficient_quota'
       sendJson(response, 429, {
-        error: 'The AI estimator is temporarily busy or needs additional API credit. Retry shortly.',
+        error: isQuotaError
+          ? 'The AI estimator has run out of API credit or reached its spending limit.'
+          : 'The AI estimator is temporarily busy. Wait one minute and retry.',
       })
       return
     }

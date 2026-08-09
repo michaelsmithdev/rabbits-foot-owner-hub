@@ -7,7 +7,7 @@ import type {
   AiEstimateRequest,
 } from './types'
 
-const REQUEST_TIMEOUT_MS = 90_000
+const REQUEST_TIMEOUT_MS = 55_000
 
 export class AiEstimateServiceError extends Error {
   readonly code: string
