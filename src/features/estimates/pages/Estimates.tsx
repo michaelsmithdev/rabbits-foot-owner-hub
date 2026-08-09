@@ -44,6 +44,8 @@ import '../styles/Estimates.css'
 
 type EstimatesProps = {
   initialCustomerId: string | null
+  initialDocumentId?: string | null
+  initialDocumentKind?: 'estimate' | 'invoice' | null
   openBuilderOnMount?: boolean
 }
 
@@ -55,6 +57,25 @@ type ServiceOption = {
 type DocumentTab = 'estimates' | 'invoices'
 
 const CUSTOM_OPTION = '__custom__'
+const DOCUMENT_TAB_STORAGE_KEY = 'rabbit-foot-owner-hub-document-tab'
+
+function loadDocumentTab(): DocumentTab {
+  try {
+    return window.localStorage.getItem(DOCUMENT_TAB_STORAGE_KEY) === 'invoices'
+      ? 'invoices'
+      : 'estimates'
+  } catch {
+    return 'estimates'
+  }
+}
+
+function saveDocumentTab(tab: DocumentTab): void {
+  try {
+    window.localStorage.setItem(DOCUMENT_TAB_STORAGE_KEY, tab)
+  } catch {
+    // The page still works when storage is unavailable or blocked.
+  }
+}
 
 const JOB_NAME_OPTIONS = [
   'General Handyman Service',
@@ -306,13 +327,21 @@ function getMatchingOption(
 
 function Estimates({
   initialCustomerId,
+  initialDocumentId = null,
+  initialDocumentKind = null,
   openBuilderOnMount = false,
 }: EstimatesProps) {
   const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const [
     activeDocumentTab,
     setActiveDocumentTab,
-  ] = useState<DocumentTab>('estimates')
+  ] = useState<DocumentTab>(
+    initialDocumentKind === 'invoice'
+      ? 'invoices'
+      : initialDocumentKind === 'estimate'
+        ? 'estimates'
+        : loadDocumentTab(),
+  )
 
   const [customers] = useState<Customer[]>(
     () => loadCustomers(),
@@ -322,32 +351,43 @@ function Estimates({
     Estimate[]
   >(() => loadEstimates())
 
+  const initialEstimate =
+    initialDocumentKind === 'estimate' && initialDocumentId
+      ? estimates.find((estimate) => estimate.id === initialDocumentId)
+      : undefined
+
   const [
     printEstimateId,
   ] = useState<string | null>(null)
 
   const [isBuilderOpen, setIsBuilderOpen] =
-    useState(openBuilderOnMount)
+    useState(openBuilderOnMount || Boolean(initialEstimate))
 
   const [
     editingEstimateId,
     setEditingEstimateId,
-  ] = useState<string | null>(null)
+  ] = useState<string | null>(initialEstimate?.id ?? null)
 
   const [
     selectedCustomerId,
     setSelectedCustomerId,
-  ] = useState(initialCustomerId ?? '')
+  ] = useState(initialEstimate?.customerId ?? initialCustomerId ?? '')
 
-  const [jobName, setJobName] = useState('')
+  const [jobName, setJobName] = useState(initialEstimate?.jobName ?? '')
 
   const [
     selectedJobNameOption,
     setSelectedJobNameOption,
-  ] = useState('')
+  ] = useState(() =>
+    initialEstimate
+      ? getMatchingOption(initialEstimate.jobName, JOB_NAME_OPTIONS)
+      : '',
+  )
 
   const [serviceAddress, setServiceAddress] =
     useState(() => {
+      if (initialEstimate) return initialEstimate.serviceAddress
+
       const initialCustomer = customers.find(
         (customer) => customer.id === initialCustomerId,
       )
@@ -358,31 +398,33 @@ function Estimates({
     })
 
   const [description, setDescription] =
-    useState('')
-  const [scopeOfWork, setScopeOfWork] = useState('')
-  const [exclusions, setExclusions] = useState<string[]>([])
+    useState(initialEstimate?.description ?? '')
+  const [scopeOfWork, setScopeOfWork] = useState(initialEstimate?.scopeOfWork ?? '')
+  const [exclusions, setExclusions] = useState<string[]>(initialEstimate?.exclusions ?? [])
 
   const [issueDate, setIssueDate] =
-    useState(getTodayDate())
+    useState(initialEstimate?.issueDate ?? getTodayDate())
 
   const [expirationDate, setExpirationDate] =
-    useState(() => getExpirationDate(businessSettings.estimateValidDays))
+    useState(() => initialEstimate?.expirationDate ?? getExpirationDate(businessSettings.estimateValidDays))
 
   const [lineItems, setLineItems] = useState<
     EstimateLineItem[]
-  >([createEmptyLineItem()])
+  >(() => initialEstimate?.lineItems.length
+    ? initialEstimate.lineItems.map((lineItem) => ({ ...lineItem }))
+    : [createEmptyLineItem()])
 
-  const [taxRate, setTaxRate] = useState(businessSettings.defaultTaxRate)
+  const [taxRate, setTaxRate] = useState(initialEstimate?.taxRate ?? businessSettings.defaultTaxRate)
 
-  const [discount, setDiscount] = useState(0)
+  const [discount, setDiscount] = useState(initialEstimate?.discount ?? 0)
 
-  const [notes, setNotes] = useState(businessSettings.estimateTerms)
-  const [propertyType, setPropertyType] = useState<'residential' | 'commercial'>('residential')
-  const [jobCategory, setJobCategory] = useState('General handyman')
-  const [materialCost, setMaterialCost] = useState(0)
-  const [taxReservePercent, setTaxReservePercent] = useState(businessSettings.defaultTaxReservePercent)
-  const [aiGeneration, setAiGeneration] = useState<AiEstimateGeneration | null>(null)
-  const [economics, setEconomics] = useState<AiEstimateEconomics | null>(null)
+  const [notes, setNotes] = useState(initialEstimate?.notes || businessSettings.estimateTerms)
+  const [propertyType, setPropertyType] = useState<'residential' | 'commercial'>(initialEstimate?.propertyType ?? 'residential')
+  const [jobCategory, setJobCategory] = useState(initialEstimate?.jobCategory ?? 'General handyman')
+  const [materialCost, setMaterialCost] = useState(initialEstimate?.materialCost ?? 0)
+  const [taxReservePercent, setTaxReservePercent] = useState(initialEstimate?.taxReservePercent ?? businessSettings.defaultTaxReservePercent)
+  const [aiGeneration, setAiGeneration] = useState<AiEstimateGeneration | null>(initialEstimate?.aiEstimate ?? null)
+  const [economics, setEconomics] = useState<AiEstimateEconomics | null>(initialEstimate?.economics ?? initialEstimate?.aiEstimate?.draft.economics ?? null)
 
   const [formError, setFormError] = useState('')
 
@@ -398,6 +440,10 @@ function Estimates({
   useEffect(() => {
     saveEstimates(estimates)
   }, [estimates])
+
+  useEffect(() => {
+    saveDocumentTab(activeDocumentTab)
+  }, [activeDocumentTab])
 
   useEffect(() => {
     if (!isBuilderOpen) {
@@ -1398,7 +1444,11 @@ function Estimates({
           </button>
         </div>
 
-        <Invoices />
+        <Invoices
+          initialInvoiceId={
+            initialDocumentKind === 'invoice' ? initialDocumentId : null
+          }
+        />
       </>
     )
   }

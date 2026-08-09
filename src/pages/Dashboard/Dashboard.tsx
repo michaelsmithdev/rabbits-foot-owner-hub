@@ -17,6 +17,10 @@ import { loadAppointments } from '../../features/schedule/data/appointmentStore'
 
 type DashboardProps = {
   onOpenCustomers: () => void
+  onOpenDocument: (
+    documentKind: 'estimate' | 'invoice',
+    documentId: string,
+  ) => void
   onOpenDocuments: () => void
   onOpenSchedule: () => void
 }
@@ -50,6 +54,7 @@ function getGreeting() {
 
 function Dashboard({
   onOpenCustomers,
+  onOpenDocument,
   onOpenDocuments,
   onOpenSchedule,
 }: DashboardProps) {
@@ -250,7 +255,12 @@ function Dashboard({
                 <button
                   className="document-row"
                   key={`${document.kind}-${document.id}`}
-                  onClick={onOpenDocuments}
+                  onClick={() =>
+                    onOpenDocument(
+                      document.kind === 'Estimate' ? 'estimate' : 'invoice',
+                      document.id,
+                    )
+                  }
                   type="button"
                 >
                   <span className="document-symbol">
@@ -305,7 +315,7 @@ function Dashboard({
               <button
                 className="attention-row"
                 key={estimate.id}
-                onClick={onOpenDocuments}
+                onClick={() => onOpenDocument('estimate', estimate.id)}
                 type="button"
               >
                 <span className="attention-dot" />

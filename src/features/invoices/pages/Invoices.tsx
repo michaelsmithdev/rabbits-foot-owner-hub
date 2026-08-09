@@ -58,6 +58,10 @@ type InvoiceDraft = {
   status: InvoiceStatus
 }
 
+type InvoicesProps = {
+  initialInvoiceId?: string | null
+}
+
 const statusLabels: Record<InvoiceStatus, string> = {
   draft: 'Draft',
   sent: 'Sent',
@@ -125,6 +129,30 @@ function createEmptyDraft(settings: BusinessSettings): InvoiceDraft {
     materialCost: 0,
     taxReservePercent: settings.defaultTaxReservePercent,
     status: 'draft',
+  }
+}
+
+function createDraftFromInvoice(
+  invoice: Invoice,
+  settings: BusinessSettings,
+): InvoiceDraft {
+  return {
+    customerId: invoice.customerId,
+    jobName: invoice.jobName,
+    serviceAddress: invoice.serviceAddress,
+    description: invoice.description,
+    issueDate: invoice.issueDate,
+    dueDate: invoice.dueDate,
+    lineItems: invoice.lineItems.map((lineItem) => ({ ...lineItem })),
+    taxRate: invoice.taxRate,
+    discount: invoice.discount,
+    notes: invoice.notes,
+    propertyType: invoice.propertyType ?? 'residential',
+    jobCategory: invoice.jobCategory ?? 'General handyman',
+    materialCost: invoice.materialCost ?? 0,
+    taxReservePercent:
+      invoice.taxReservePercent ?? settings.defaultTaxReservePercent,
+    status: invoice.status,
   }
 }
 
@@ -199,18 +227,23 @@ async function requestSquarePaymentLink(
   }
 }
 
-function Invoices() {
+function Invoices({ initialInvoiceId = null }: InvoicesProps) {
   const { session } = useAuth()
   const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const [customers] = useState<Customer[]>(() => loadCustomers())
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoices())
+  const initialInvoice = initialInvoiceId
+    ? invoices.find((invoice) => invoice.id === initialInvoiceId)
+    : undefined
   const [draft, setDraft] = useState<InvoiceDraft>(() =>
-    createEmptyDraft(businessSettings),
+    initialInvoice
+      ? createDraftFromInvoice(initialInvoice, businessSettings)
+      : createEmptyDraft(businessSettings),
   )
   const [editingInvoiceId, setEditingInvoiceId] = useState<string | null>(
-    null,
+    initialInvoice?.id ?? null,
   )
-  const [isBuilderOpen, setIsBuilderOpen] = useState(false)
+  const [isBuilderOpen, setIsBuilderOpen] = useState(Boolean(initialInvoice))
   const [formError, setFormError] = useState('')
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(
     null,
@@ -302,23 +335,7 @@ function Invoices() {
 
   function openEditInvoice(invoice: Invoice) {
     setEditingInvoiceId(invoice.id)
-    setDraft({
-      customerId: invoice.customerId,
-      jobName: invoice.jobName,
-      serviceAddress: invoice.serviceAddress,
-      description: invoice.description,
-      issueDate: invoice.issueDate,
-      dueDate: invoice.dueDate,
-      lineItems: invoice.lineItems.map((lineItem) => ({ ...lineItem })),
-      taxRate: invoice.taxRate,
-      discount: invoice.discount,
-      notes: invoice.notes,
-      propertyType: invoice.propertyType ?? 'residential',
-      jobCategory: invoice.jobCategory ?? 'General handyman',
-      materialCost: invoice.materialCost ?? 0,
-      taxReservePercent: invoice.taxReservePercent ?? businessSettings.defaultTaxReservePercent,
-      status: invoice.status,
-    })
+    setDraft(createDraftFromInvoice(invoice, businessSettings))
     setFormError('')
     setIsBuilderOpen(true)
   }

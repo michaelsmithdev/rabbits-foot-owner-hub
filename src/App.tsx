@@ -24,10 +24,12 @@ import Schedule from './features/schedule/pages/Schedule'
 import BusinessWorkspace from './features/saas/pages/BusinessWorkspace'
 import { useSaas } from './features/saas/saasContext'
 
-type EstimateLaunch = {
+type DocumentLaunch = {
   requestId: number
   customerId: string | null
   openBuilder: boolean
+  documentKind: 'estimate' | 'invoice' | null
+  documentId: string | null
 }
 
 const validPages = new Set<PageName>(
@@ -45,10 +47,12 @@ function getPageFromHash(): PageName {
 function App() {
   const { organization } = useSaas()
   const [activePage, setActivePage] = useState<PageName>(getPageFromHash)
-  const [estimateLaunch, setEstimateLaunch] = useState<EstimateLaunch>({
+  const [documentLaunch, setDocumentLaunch] = useState<DocumentLaunch>({
     requestId: 0,
     customerId: null,
     openBuilder: false,
+    documentKind: null,
+    documentId: null,
   })
   const [dataRevision, setDataRevision] = useState(0)
 
@@ -97,20 +101,38 @@ function App() {
   }
 
   function openEstimateBuilder(customerId?: string) {
-    setEstimateLaunch((currentLaunch) => ({
+    setDocumentLaunch((currentLaunch) => ({
       requestId: currentLaunch.requestId + 1,
       customerId: customerId ?? null,
       openBuilder: true,
+      documentKind: null,
+      documentId: null,
+    }))
+    navigateTo('documents')
+  }
+
+  function openDocument(
+    documentKind: 'estimate' | 'invoice',
+    documentId: string,
+  ) {
+    setDocumentLaunch((currentLaunch) => ({
+      requestId: currentLaunch.requestId + 1,
+      customerId: null,
+      openBuilder: false,
+      documentKind,
+      documentId,
     }))
     navigateTo('documents')
   }
 
   function handlePageChange(page: PageName) {
     if (page === 'documents') {
-      setEstimateLaunch((currentLaunch) => ({
+      setDocumentLaunch((currentLaunch) => ({
         requestId: currentLaunch.requestId + 1,
         customerId: null,
         openBuilder: false,
+        documentKind: null,
+        documentId: null,
       }))
     }
 
@@ -134,9 +156,11 @@ function App() {
       case 'documents':
         return (
           <Estimates
-            initialCustomerId={estimateLaunch.customerId}
-            key={estimateLaunch.requestId}
-            openBuilderOnMount={estimateLaunch.openBuilder}
+            initialCustomerId={documentLaunch.customerId}
+            initialDocumentId={documentLaunch.documentId}
+            initialDocumentKind={documentLaunch.documentKind}
+            key={documentLaunch.requestId}
+            openBuilderOnMount={documentLaunch.openBuilder}
           />
         )
 
@@ -163,6 +187,7 @@ function App() {
         return (
           <Dashboard
             onOpenCustomers={() => handlePageChange('customers')}
+            onOpenDocument={openDocument}
             onOpenDocuments={() => handlePageChange('documents')}
             onOpenSchedule={() => handlePageChange('schedule')}
           />
