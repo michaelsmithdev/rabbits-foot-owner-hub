@@ -38,9 +38,10 @@ async function supabaseRequest(path: string, init: RequestInit = {}) {
   const url = process.env.SUPABASE_URL?.trim() ?? process.env.VITE_SUPABASE_URL?.trim()
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   if (!url || !key) throw new Error('supabase_not_configured')
+  const authorization = key.split('.').length === 3 ? { Authorization: `Bearer ${key}` } : {}
   return fetch(`${url.replace(/\/$/, '')}${path}`, {
     ...init,
-    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+    headers: { apikey: key, ...authorization, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
     signal: AbortSignal.timeout(12_000),
   })
 }

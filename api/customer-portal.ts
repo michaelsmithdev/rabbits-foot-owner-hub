@@ -44,7 +44,8 @@ function config() {
 
 async function database(path: string, init: RequestInit = {}) {
   const { url, key } = config()
-  return fetch(`${url}${path}`, { ...init, headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) }, signal: AbortSignal.timeout(12_000) })
+  const authorization = key.split('.').length === 3 ? { Authorization: `Bearer ${key}` } : {}
+  return fetch(`${url}${path}`, { ...init, headers: { apikey: key, ...authorization, 'Content-Type': 'application/json', ...(init.headers ?? {}) }, signal: AbortSignal.timeout(12_000) })
 }
 
 async function userId(token: string) {

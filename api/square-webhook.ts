@@ -34,9 +34,10 @@ async function supabaseRequest(path: string, init: RequestInit = {}) {
   const url = process.env.SUPABASE_URL?.trim() ?? process.env.VITE_SUPABASE_URL?.trim()
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   if (!url || !key) throw new Error('supabase_not_configured')
+  const authorization = key.split('.').length === 3 ? { Authorization: `Bearer ${key}` } : {}
   return fetch(`${url.replace(/\/$/, '')}${path}`, {
     ...init,
-    headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
+    headers: { apikey: key, ...authorization, 'Content-Type': 'application/json', ...(init.headers ?? {}) },
     signal: AbortSignal.timeout(12_000),
   })
 }
@@ -95,7 +96,11 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     if (!paymentId || !orderId || !Number.isFinite(cents) || cents <= 0) return sendJson(response, 200, { received: true })
 
     const recordsResponse = await supabaseRequest('/rest/v1/business_records?record_type=eq.invoice&is_deleted=eq.false&select=organization_id,record_id,payload,client_updated_at')
-    if (!recordsResponse.ok) throw new Error('invoice_lookup_failed')
+    if (!recordsResponse.ok) {
+      const detail = (await recordsResponse.text()).slice(0, 300)
+      console.error('Square invoice lookup rejected.', recordsResponse.status, detail)
+      throw new Error('invoice_lookup_failed')
+    }
     const records = await recordsResponse.json() as Array<{ organization_id: string; record_id: string; payload: Json; client_updated_at: string }>
     const record = records.find((entry) => {
       const link = entry.payload.squarePaymentLink
