@@ -1,5 +1,6 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from 'pdf-lib'
 
+import googleReviewQrUrl from '../../../assets/google-review-qr.jpg'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import { saveDocumentPdf, saveDocumentRecord } from '../data/documentArchiveStore'
 import { bytesToBase64, isNativePlatform, NativeDocumentManager } from './nativeDocumentManager'
@@ -12,6 +13,9 @@ const GREEN = rgb(0.48, 0.75, 0)
 const BLACK = rgb(0.05, 0.07, 0.06)
 const GRAY = rgb(0.38, 0.42, 0.39)
 const LIGHT = rgb(0.94, 0.96, 0.92)
+const REVIEW_GOLD = rgb(0.95, 0.67, 0.08)
+const REVIEW_PANEL = rgb(0.985, 0.98, 0.94)
+const STAR_PATH = 'M 10 1.5 L 12.6 6.8 L 18.5 7.7 L 14.25 11.8 L 15.3 17.6 L 10 14.8 L 4.7 17.6 L 5.75 11.8 L 1.5 7.7 L 7.4 6.8 Z'
 
 function money(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value)
@@ -182,6 +186,57 @@ export async function generateBusinessDocumentPdf(input: PdfDocumentInput) {
     page.drawText(input.approval.customerName, { x: MARGIN + 12, y: y - 22, size: 11, font: bold, color: BLACK })
     page.drawText(`${new Date(input.approval.acceptedAt).toLocaleString()}  /  ${input.approval.method.replaceAll('_', ' ')}`, { x: 250, y: y - 22, size: 8, font: regular, color: GRAY })
     y -= 58
+  }
+
+  if (input.kind === 'invoice') {
+    ensure(150)
+    y -= 8
+    const panelHeight = 130
+    const panelBottom = y - panelHeight
+    const qrSize = 88
+    const qrX = PAGE_WIDTH - MARGIN - qrSize - 12
+    const qrY = y - qrSize - 10
+
+    page.drawRectangle({
+      x: MARGIN,
+      y: panelBottom,
+      width: PAGE_WIDTH - MARGIN * 2,
+      height: panelHeight,
+      color: REVIEW_PANEL,
+      borderColor: LIGHT,
+      borderWidth: 1,
+    })
+    page.drawText('LOVE THE RESULT?', { x: MARGIN + 16, y: y - 28, size: 9, font: bold, color: GREEN })
+    page.drawText('Share your experience', { x: MARGIN + 16, y: y - 51, size: 17, font: bold, color: BLACK })
+    page.drawText('Scan the QR code to leave a Google review.', { x: MARGIN + 16, y: y - 72, size: 9, font: regular, color: GRAY })
+    page.drawText('Your feedback helps our local business grow.', { x: MARGIN + 16, y: y - 88, size: 9, font: regular, color: GRAY })
+    page.drawText('Thank you for choosing us.', { x: MARGIN + 16, y: y - 108, size: 9, font: bold, color: BLACK })
+
+    try {
+      const reviewQrBytes = await fetch(googleReviewQrUrl).then((response) => {
+        if (!response.ok) throw new Error('review_qr_unavailable')
+        return response.arrayBuffer()
+      })
+      const reviewQr = await pdf.embedJpg(reviewQrBytes)
+      page.drawImage(reviewQr, { x: qrX, y: qrY, width: qrSize, height: qrSize })
+    } catch {
+      page.drawRectangle({ x: qrX, y: qrY, width: qrSize, height: qrSize, borderColor: GRAY, borderWidth: 1 })
+      page.drawText('Review QR', { x: qrX + 21, y: qrY + 42, size: 8, font: bold, color: GRAY })
+    }
+
+    const starSize = 9
+    const starGap = 3
+    const starsWidth = starSize * 5 + starGap * 4
+    const starsX = qrX + (qrSize - starsWidth) / 2
+    for (let index = 0; index < 5; index += 1) {
+      page.drawSvgPath(STAR_PATH, {
+        x: starsX + index * (starSize + starGap),
+        y: panelBottom + 7,
+        scale: starSize / 20,
+        color: REVIEW_GOLD,
+      })
+    }
+    y -= panelHeight + 10
   }
 
   const pages = pdf.getPages()
