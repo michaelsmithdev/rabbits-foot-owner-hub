@@ -31,8 +31,9 @@ alter table public.customer_portal_links enable row level security;
 drop policy if exists "Members can manage customer portal links" on public.customer_portal_links;
 create policy "Members can manage customer portal links"
 on public.customer_portal_links for all
-using (public.is_organization_member(organization_id))
-with check (public.is_organization_member(organization_id));
+to authenticated
+using (private.is_organization_member(organization_id))
+with check (private.is_organization_member(organization_id));
 
 grant select, insert, update, delete on public.customer_portal_links to authenticated;
 
