@@ -81,6 +81,7 @@ export type EstimatePricingDefaults = {
   targetGrossMarginPercent: number
   deliveryCost: number
   disposalCost: number
+  paymentProcessingOverheadPercent: number
 }
 
 export type EstimatePricebookItem = {
@@ -109,6 +110,7 @@ export type AiEstimateResult = {
   exclusions: string[]
   warnings: string[]
   pricingSources: string[]
+  upsellSuggestions: string[]
   analysis: AiJobAnalysis
   economics: AiEstimateEconomics
   questions: string[]
@@ -173,6 +175,7 @@ export const aiEstimateJsonSchema = {
     'exclusions',
     'warnings',
     'pricingSources',
+    'upsellSuggestions',
     'analysis',
     'economics',
     'questions',
@@ -205,6 +208,11 @@ export const aiEstimateJsonSchema = {
     pricingSources: {
       type: 'array',
       maxItems: 8,
+      items: { type: 'string' },
+    },
+    upsellSuggestions: {
+      type: 'array',
+      maxItems: 12,
       items: { type: 'string' },
     },
     analysis: {

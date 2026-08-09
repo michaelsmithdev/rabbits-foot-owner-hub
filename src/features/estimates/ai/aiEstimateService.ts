@@ -85,6 +85,7 @@ export async function generateAiEstimate(input: {
       targetGrossMarginPercent: settings.targetGrossMarginPercent,
       deliveryCost: settings.defaultDeliveryCost,
       disposalCost: settings.defaultDisposalCost,
+      paymentProcessingOverheadPercent: settings.paymentProcessingOverheadPercent,
     },
     pricebook: relevantPricebookItems(input.jobDescription).map((item) => ({
       name: item.name,

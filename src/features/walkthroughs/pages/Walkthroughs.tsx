@@ -18,6 +18,10 @@ import { loadPendingPhotoBlob } from '../../photos/data/photoBlobStore'
 import { getPhotoUrl, loadPhotos, queuePhotoFiles } from '../../photos/data/photoStore'
 import { cloudClient } from '../../cloud/cloudClient'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
+import {
+  applyPaymentOverheadToAmount,
+  applyPaymentOverheadToLineItems,
+} from '../../pricing/utils/paymentOverhead'
 import VoiceCapture from '../../voice/components/VoiceCapture'
 import type { VoiceNote } from '../../voice/types/VoiceNote'
 import { latestDraftWalkthrough, upsertWalkthrough } from '../data/walkthroughStore'
@@ -68,6 +72,7 @@ function customerAddress(customer: ReturnType<typeof loadCustomers>[number]) {
 
 export default function Walkthroughs() {
   const customers = useMemo(() => loadCustomers(), [])
+  const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const [walkthrough, setWalkthrough] = useState<Walkthrough>(() => latestDraftWalkthrough() ?? blankWalkthrough())
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -77,6 +82,15 @@ export default function Walkthroughs() {
   const selectedCustomer = customers.find((customer) => customer.id === walkthrough.customerId)
   const attachedPhotos = loadPhotos().filter((photo) => walkthrough.photoIds.includes(photo.id))
   const result = walkthrough.aiEstimate?.draft
+  const quotedTotal = result
+    ? applyPaymentOverheadToAmount(
+        result.economics.recommendedPrice,
+        businessSettings.paymentProcessingOverheadPercent,
+      )
+    : 0
+  const processingAllowance = result
+    ? quotedTotal - result.economics.recommendedPrice
+    : 0
 
   useEffect(() => {
     if (initialRender.current) {
@@ -200,7 +214,7 @@ export default function Walkthroughs() {
 
   function createEstimate() {
     if (!result || !selectedCustomer) return
-    const settings = loadBusinessSettings()
+    const settings = businessSettings
     const estimates = loadEstimates()
     const now = new Date().toISOString()
     const estimate: Estimate = {
@@ -214,7 +228,10 @@ export default function Walkthroughs() {
       exclusions: result.exclusions,
       issueDate: today(),
       expirationDate: dateAfter(settings.estimateValidDays),
-      lineItems: result.lineItems.map((item) => ({
+      lineItems: applyPaymentOverheadToLineItems(
+        result.lineItems,
+        settings.paymentProcessingOverheadPercent,
+      ).map((item) => ({
         id: createId(),
         description: item.description,
         quantity: item.quantity,
@@ -295,33 +312,28 @@ export default function Walkthroughs() {
       </section>
 
       <section className="walkthrough-finish">
-        <div><span className="eyebrow">STEP 4 · PRICE IT</span><h2>Build the structured scope and estimate</h2><p>The AI uses your business settings, matching pricebook entries, completed work, transcript, and photos. You approve every customer-facing detail.</p></div>
+        <div><span className="eyebrow">STEP 4 · PRICE IT</span><h2>Build the exact-scope estimate</h2><p>The AI quotes only the work you described. Optional upsells stay separate, and the configured card-processing allowance is added automatically.</p></div>
         <button className="walkthrough-primary" disabled={busy} onClick={() => void analyze()} type="button"><Sparkles size={20} /> {busy ? 'Analyzing safely…' : result ? 'Reanalyze walkthrough' : 'Finish and analyze'}</button>
       </section>
 
       {result && (
         <section className="walkthrough-results">
-          <header><div><span className="eyebrow">OWNER REVIEW</span><h2>{result.jobTitle}</h2><p>{result.summary}</p></div><div className="recommended-price"><span>Recommended</span><strong>{currency.format(result.economics.recommendedPrice)}</strong><small>{result.confidence}</small></div></header>
+          <header><div><span className="eyebrow">OWNER REVIEW</span><h2>{result.jobTitle}</h2><p>{result.summary}</p></div><div className="recommended-price"><span>Customer total</span><strong>{currency.format(quotedTotal)}</strong><small>{result.confidence}</small></div></header>
 
           {result.warnings.length > 0 && <div className="profit-warnings"><AlertTriangle size={20} /><div><strong>Check before approval</strong>{result.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div></div>}
 
           <div className="result-columns">
             <article><h3><ClipboardList size={18} /> Customer scope</h3><p>{result.customerScope}</p><h4>Exclusions</h4><ul>{result.exclusions.map((item) => <li key={item}>{item}</li>)}</ul></article>
-            <article><h3><Sparkles size={18} /> Profit Guard</h3><dl>
-              <div><dt>Customer price</dt><dd>{currency.format(result.economics.recommendedPrice)}</dd></div>
-              <div><dt>Labor hours / cost</dt><dd>{result.economics.laborHours.toFixed(1)} · {currency.format(result.economics.laborCost)}</dd></div>
-              <div><dt>Materials / markup</dt><dd>{currency.format(result.economics.materialCost)} · {currency.format(result.economics.materialMarkup)}</dd></div>
-              <div><dt>Equipment</dt><dd>{currency.format(result.economics.equipmentCost)}</dd></div>
-              <div><dt>Delivery / disposal</dt><dd>{currency.format(result.economics.deliveryCost)} · {currency.format(result.economics.disposalCost)}</dd></div>
-              <div><dt>Subcontractors</dt><dd>{currency.format(result.economics.subcontractorCost)}</dd></div>
-              <div><dt>Overhead / contingency</dt><dd>{currency.format(result.economics.overheadCost)} · {currency.format(result.economics.contingencyCost)}</dd></div>
-              <div><dt>Total estimated cost</dt><dd>{currency.format(result.economics.totalEstimatedCost)}</dd></div>
-              <div><dt>Gross profit</dt><dd>{currency.format(result.economics.projectedGrossProfit)}</dd></div>
-              <div><dt>Projected margin</dt><dd>{result.economics.projectedMargin.toFixed(1)}%</dd></div>
-              <div><dt>Revenue per labor hour</dt><dd>{currency.format(result.economics.effectiveHourlyRevenue)}</dd></div>
-              <div><dt>Recommended range</dt><dd>{currency.format(result.economics.recommendedLow)} - {currency.format(result.economics.recommendedHigh)}</dd></div>
-            </dl><small>Contractor-only. Never shown on the customer PDF.</small></article>
+            <article><h3><Sparkles size={18} /> Exact quote summary</h3><dl>
+              <div><dt>Requested work</dt><dd>{currency.format(result.economics.recommendedPrice)}</dd></div>
+              <div><dt>Card allowance ({businessSettings.paymentProcessingOverheadPercent.toFixed(1)}%)</dt><dd>{currency.format(processingAllowance)}</dd></div>
+              <div><dt>Customer total</dt><dd>{currency.format(quotedTotal)}</dd></div>
+              <div><dt>Labor hours / direct labor</dt><dd>{result.economics.laborHours.toFixed(1)} · {currency.format(result.economics.laborCost)}</dd></div>
+              <div><dt>Direct materials</dt><dd>{currency.format(result.economics.materialCost)}</dd></div>
+            </dl><small>Only the work you described is included. No automatic markup, overhead, contingency, or profit padding.</small></article>
           </div>
+
+          {(result.upsellSuggestions ?? []).length > 0 && <article className="smart-questions"><h3>Optional upsell ideas</h3><p>These ideas are not included in the quoted total.</p><ul>{result.upsellSuggestions.map((item) => <li key={item}>{item}</li>)}</ul></article>}
 
           {result.questions.length > 0 && <article className="smart-questions"><h3>Optional price-sensitive questions</h3><p>The estimate is complete now. Answer only if you want the AI to refine it.</p>{result.questions.map((question) => <label key={question}><span>{question}</span><input onChange={(event) => update({ answers: { ...walkthrough.answers, [question]: event.target.value } })} value={walkthrough.answers[question] ?? ''} /></label>)}</article>}
 

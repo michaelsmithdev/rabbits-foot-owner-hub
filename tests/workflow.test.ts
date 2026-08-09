@@ -11,6 +11,31 @@ import {
   applyPaymentOverheadToAmount,
   applyPaymentOverheadToLineItems,
 } from '../src/features/pricing/utils/paymentOverhead.ts'
+import {
+  isExactScopeLineItemAllowed,
+  isUpsellRequested,
+} from '../src/features/estimates/ai/scopePolicy.ts'
+
+test('AI estimate scope stays exact unless upsells are explicitly requested', () => {
+  assert.equal(isUpsellRequested('Replace 2 storm doors'), false)
+  assert.equal(isUpsellRequested('Replace 2 storm doors and give me upsell ideas'), true)
+  assert.equal(
+    isExactScopeLineItemAllowed('Replace 2 storm doors', 'Project overhead and profit'),
+    false,
+  )
+  assert.equal(
+    isExactScopeLineItemAllowed('Replace 2 storm doors', 'Disposal fee'),
+    false,
+  )
+  assert.equal(
+    isExactScopeLineItemAllowed('Replace 2 storm doors and dispose of the old doors', 'Disposal fee'),
+    true,
+  )
+  assert.equal(
+    isExactScopeLineItemAllowed('Replace 2 storm doors', 'Install 2 standard storm doors'),
+    true,
+  )
+})
 
 test('payment overhead is folded into customer pricing without mutating base prices', () => {
   const baseLineItems = [{ id: 'line-1', quantity: 1, unitPrice: 500 }]

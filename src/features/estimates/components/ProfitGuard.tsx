@@ -25,6 +25,25 @@ export default function ProfitGuard({ economics, currentPrice, targetMargin, onU
     )
   }
 
+  const exactScopeMode =
+    economics.projectedGrossProfit === 0 &&
+    economics.projectedMargin === 0 &&
+    economics.recommendedLow === economics.recommendedHigh
+
+  if (exactScopeMode) {
+    return (
+      <aside className="profit-guard">
+        <header><div><ShieldCheck size={20} /><strong>Exact-scope quote</strong></div><span>Contractor only</span></header>
+        <dl>
+          <div><dt>Requested work</dt><dd>{currency.format(currentPrice)}</dd></div>
+          <div><dt>AI-added markup</dt><dd>{currency.format(0)}</dd></div>
+          <div><dt>AI-added overhead</dt><dd>{currency.format(0)}</dd></div>
+        </dl>
+        <p>The AI included only the work you described. The app adds your card-processing allowance to the customer subtotal separately.</p>
+      </aside>
+    )
+  }
+
   const profit = currentPrice - economics.totalEstimatedCost
   const margin = currentPrice > 0 ? profit / currentPrice * 100 : 0
   const belowTarget = margin + 0.01 < targetMargin

@@ -5,6 +5,8 @@ import type { Customer } from '../../customers/types/Customer'
 import { queuePhotoFiles } from '../../photos/data/photoStore'
 import VoiceCapture from '../../voice/components/VoiceCapture'
 import type { VoiceNote } from '../../voice/types/VoiceNote'
+import { applyPaymentOverheadToAmount } from '../../pricing/utils/paymentOverhead'
+import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import {
   MAX_AI_ESTIMATE_PHOTOS,
   prepareEstimatePhoto,
@@ -62,6 +64,13 @@ export default function AiEstimateAssistant({
   const { error, generate, generation, isLoading, setGeneration } =
     useAiEstimateAssistant(initialGeneration)
   const result = generation?.draft ?? null
+  const businessSettings = useMemo(() => loadBusinessSettings(), [])
+  const customerTotal = result
+    ? applyPaymentOverheadToAmount(
+        result.recommendedBid,
+        businessSettings.paymentProcessingOverheadPercent,
+      )
+    : 0
   const canGenerate = Boolean(
     customerId && jobDescription.trim().length >= 10 && !isPreparingPhotos,
   )
@@ -405,7 +414,7 @@ export default function AiEstimateAssistant({
 
           <div className="ai-metric-grid">
             <label>
-              <span>Suggested bid</span>
+              <span>Requested work</span>
               <input
                 min="0"
                 onChange={(event) =>
@@ -445,16 +454,6 @@ export default function AiEstimateAssistant({
                 step="0.01"
                 type="number"
                 value={result.materialCost}
-              />
-            </label>
-            <label>
-              <span>Suggested markup %</span>
-              <input
-                min="0"
-                onChange={(event) => updateResult({ markup: numericValue(event.target.value) })}
-                step="0.5"
-                type="number"
-                value={result.markup}
               />
             </label>
             <label>
@@ -515,11 +514,17 @@ export default function AiEstimateAssistant({
 
           {result.economics && (
             <div className="ai-economics-summary">
-              <div><span>Estimated job cost</span><strong>{formatCurrency(result.economics.totalEstimatedCost)}</strong></div>
-              <div><span>Recommended range</span><strong>{formatCurrency(result.economics.recommendedLow)} - {formatCurrency(result.economics.recommendedHigh)}</strong></div>
-              <div><span>Projected gross profit</span><strong>{formatCurrency(result.economics.projectedGrossProfit)}</strong></div>
-              <div><span>Projected margin</span><strong>{result.economics.projectedMargin.toFixed(1)}%</strong></div>
-              <small>Contractor-only. These figures never appear on the customer PDF.</small>
+              <div><span>Requested work</span><strong>{formatCurrency(result.recommendedBid)}</strong></div>
+              <div><span>Card allowance ({businessSettings.paymentProcessingOverheadPercent.toFixed(1)}%)</span><strong>{formatCurrency(customerTotal - result.recommendedBid)}</strong></div>
+              <div><span>Customer total</span><strong>{formatCurrency(customerTotal)}</strong></div>
+              <small>No automatic markup, overhead, contingency, or profit padding is included.</small>
+            </div>
+          )}
+          {(result.upsellSuggestions ?? []).length > 0 && (
+            <div className="ai-economics-summary">
+              <strong>Optional upsell ideas</strong>
+              {(result.upsellSuggestions ?? []).map((suggestion) => <div key={suggestion}>{suggestion}</div>)}
+              <small>These ideas are separate and are not included in the estimate.</small>
             </div>
           )}
           <label className="ai-result-textarea">
@@ -547,7 +552,7 @@ export default function AiEstimateAssistant({
           <p className="ai-history-note">
             {generation?.historyUsed
               ? `Compared with ${generation.historyUsed} completed Rabbit's Foot job${generation.historyUsed === 1 ? '' : 's'}.`
-              : 'No close completed-job match was available, so industry-standard assumptions were used.'}
+              : 'No close completed-job match was available. The quote remains limited to the work you described.'}
           </p>
         </div>
       )}
