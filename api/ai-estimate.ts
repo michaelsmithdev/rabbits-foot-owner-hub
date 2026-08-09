@@ -37,11 +37,20 @@ for that specific item. Set markup and all internal markup, overhead, contingenc
 and profit fields to zero. The app handles its configured 3.5% card-processing
 allowance separately and deterministically; never add that fee yourself.
 
+The configured labor rate is authoritative. Price hourly labor at exactly that rate,
+currently $120 per labor hour. Never replace it with an industry average, a completed
+job's old rate, or a discounted rate.
+
 "Replace" may include the physically necessary labor steps to remove the old item,
 install the stated quantity, adjust it, and test it. It must not expand into unrelated
 repairs, finish work, disposal fees, cleanup fees, or upgrades. Preserve every stated
 quantity and dimension exactly. When facts are unknown, state the uncertainty without
 adding an assumption charge.
+
+Keep exclusions empty unless the contractor explicitly says to exclude something,
+that an item is not included, or that the customer will handle it. Keep warnings empty
+unless the contractor explicitly reports a real safety, code, hazardous-material,
+electrical, or structural condition. Do not generate generic caution lists.
 
 Use completed jobs and pricebook entries only as factual direct-cost references.
 Never copy their profit, markup, overhead, extra scope, or final total into this quote.
@@ -237,7 +246,7 @@ function parsePricingDefaults(value: unknown): AiEstimateRequest['pricingDefault
     isFiniteNonNegative(input) ? Math.min(input, maximum) : fallback
 
   return {
-    laborRate: number(defaults.laborRate, 45, 500),
+    laborRate: number(defaults.laborRate, 120, 500),
     minimumJobCharge: number(defaults.minimumJobCharge, 125),
     serviceCallCharge: number(defaults.serviceCallCharge, 65),
     diagnosticFee: number(defaults.diagnosticFee, 65),
@@ -433,13 +442,18 @@ function normalizeResult(
           !isExactScopeLineItemAllowed(requestedScope, description)
         ) return []
 
+        const unit = cleanText(item.unit, 30) || 'each'
+        const unitPrice = /^(?:hours?|hrs?)$/i.test(unit)
+          ? pricing.laborRate
+          : item.unitPrice
+
         return [
           {
             description,
             quantity: item.quantity,
-            unit: cleanText(item.unit, 30) || 'each',
-            unitPrice: money(item.unitPrice),
-            total: money(item.quantity * item.unitPrice),
+            unit,
+            unitPrice: money(unitPrice),
+            total: money(item.quantity * unitPrice),
           },
         ]
       })
@@ -450,7 +464,7 @@ function normalizeResult(
   if (!rawEconomics) return null
   const cost = (value: unknown, fallback = 0) => isFiniteNonNegative(value) ? money(value) : money(fallback)
   const laborHours = cost(rawEconomics.laborHours, result.laborHours)
-  const laborCost = cost(rawEconomics.laborCost, laborHours * pricing.laborRate)
+  const laborCost = money(laborHours * pricing.laborRate)
   const materialCost = cost(rawEconomics.materialCost, result.materialCost)
   const materialMarkup = 0
   const equipmentCost = cost(rawEconomics.equipmentCost)
@@ -483,7 +497,9 @@ function normalizeResult(
   const projectedGrossProfit = 0
   const projectedMargin = 0
   const effectiveHourlyRevenue = laborHours > 0 ? money(finalBid / laborHours) : 0
-  const warnings = cleanTextArray(result.warnings, 8)
+  const warnings = /\b(?:hazard|unsafe|code|asbestos|lead|mold|electrical damage|structural damage)\b/i.test(requestedScope)
+    ? cleanTextArray(result.warnings, 8)
+    : []
   if (analysisMaterials.length > 0 && materialCost <= 0) {
     warnings.push('Materials were identified but no material cost was captured.')
   }
@@ -502,7 +518,9 @@ function normalizeResult(
     customerNotes: cleanText(result.customerNotes, 2500),
     contractorNotes: cleanText(result.contractorNotes, 2500),
     customerScope: cleanText(result.customerScope, 4000),
-    exclusions: cleanTextArray(result.exclusions, 12),
+    exclusions: /\b(?:exclude|excluding|not included|do not include|customer will handle)\b/i.test(requestedScope)
+      ? cleanTextArray(result.exclusions, 12)
+      : [],
     warnings: Array.from(new Set(warnings)).slice(0, 8),
     pricingSources: cleanTextArray(result.pricingSources, 8, 100),
     upsellSuggestions: upsellsRequested

@@ -15,7 +15,7 @@ export const defaultBusinessSettings: BusinessSettings = {
   zipCode: '',
   defaultTaxRate: 0,
   defaultTaxReservePercent: 30,
-  defaultLaborRate: 45,
+  defaultLaborRate: 120,
   minimumJobCharge: 125,
   serviceCallCharge: 65,
   diagnosticFee: 65,
@@ -89,7 +89,8 @@ export function loadBusinessSettings(): BusinessSettings {
               ? settingsRecord.defaultTaxReservePercent
               : defaultBusinessSettings.defaultTaxReservePercent,
           defaultLaborRate:
-            typeof settingsRecord.defaultLaborRate === 'number'
+            typeof settingsRecord.defaultLaborRate === 'number' &&
+            settingsRecord.defaultLaborRate !== 45
               ? settingsRecord.defaultLaborRate
               : defaultBusinessSettings.defaultLaborRate,
           minimumJobCharge:
