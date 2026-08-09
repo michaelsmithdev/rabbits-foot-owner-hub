@@ -4,6 +4,31 @@ import type { VoiceNote } from '../../voice/types/VoiceNote'
 export type JobStatus = 'scheduled' | 'in_progress' | 'paused' | 'completed' | 'invoiced'
 export type JobExpenseCategory = 'materials' | 'delivery' | 'disposal' | 'equipment' | 'subcontractor' | 'other'
 
+export type JobMaterialItem = {
+  id: string
+  item: string
+  purchased: boolean
+  loaded: boolean
+  delivered: boolean
+}
+
+export type JobChangeOrderStatus = 'draft' | 'approved' | 'declined'
+
+export type JobChangeOrder = {
+  id: string
+  discoveredCondition: string
+  additionalWork: string
+  additionalMaterial: string
+  estimatedMaterialCost: number
+  additionalLaborHours: number
+  priceChange: number
+  scheduleImpact: string
+  status: JobChangeOrderStatus
+  approvedBy?: string
+  approvedAt?: string
+  createdAt: string
+}
+
 export type JobTimeEntry = {
   id: string
   startedAt: string
@@ -35,6 +60,7 @@ export type JobProfitability = {
   actualProfit: number
   estimatedMargin: number
   actualMargin: number
+  approvedChangeOrderTotal: number
   capturedAt: string
 }
 
@@ -58,6 +84,8 @@ export type Job = {
   estimatedMaterialCost: number
   estimatedCost: number
   materials: string[]
+  materialChecklist: JobMaterialItem[]
+  changeOrders: JobChangeOrder[]
   photoIds: string[]
   voiceNotes: VoiceNote[]
   internalNotes: string

@@ -30,9 +30,14 @@ export default function VoiceCapture({ notes, onChange, label = 'Talk through th
   const chunksRef = useRef<Blob[]>([])
   const startedAtRef = useRef(0)
   const cancelledRef = useRef(false)
+  const notesRef = useRef(notes)
   const [recording, setRecording] = useState(false)
   const [elapsed, setElapsed] = useState(0)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    notesRef.current = notes
+  }, [notes])
 
   useEffect(() => {
     if (!recording) return
@@ -54,13 +59,13 @@ export default function VoiceCapture({ notes, onChange, label = 'Talk through th
       return
     }
 
-    onChange(notes.map((item) => item.id === note.id ? { ...item, state: 'transcribing' } : item))
+    onChange(notesRef.current.map((item) => item.id === note.id ? { ...item, state: 'transcribing' } : item))
     try {
       const transcript = await transcribeAudio(blob, note.fileName)
-      onChange(notes.map((item) => item.id === note.id ? { ...item, transcript, state: 'complete' } : item))
+      onChange(notesRef.current.map((item) => item.id === note.id ? { ...item, transcript, state: 'complete' } : item))
       setError('')
     } catch (transcriptionError) {
-      onChange(notes.map((item) => item.id === note.id ? { ...item, state: 'error' } : item))
+      onChange(notesRef.current.map((item) => item.id === note.id ? { ...item, state: 'error' } : item))
       setError(transcriptionError instanceof Error ? transcriptionError.message : 'Transcription failed.')
     }
   }
@@ -109,12 +114,12 @@ export default function VoiceCapture({ notes, onChange, label = 'Talk through th
 
         try {
           await saveAudioBlob(id, blob)
-          const nextNotes = [...notes, { ...note, state: 'transcribing' as const }]
+          const nextNotes = [...notesRef.current.filter((item) => item.id !== note.id), { ...note, state: 'transcribing' as const }]
           onChange(nextNotes)
           const transcript = await transcribeAudio(blob, note.fileName)
-          onChange([...notes, { ...note, transcript, state: 'complete' }])
+          onChange([...notesRef.current.filter((item) => item.id !== note.id), { ...note, transcript, state: 'complete' }])
         } catch (recordingError) {
-          onChange([...notes, { ...note, state: 'error' }])
+          onChange([...notesRef.current.filter((item) => item.id !== note.id), { ...note, state: 'error' }])
           setError(recordingError instanceof Error ? recordingError.message : 'The recording was saved but could not be transcribed.')
         }
       }
@@ -140,7 +145,7 @@ export default function VoiceCapture({ notes, onChange, label = 'Talk through th
   }
 
   async function removeVoiceNote(noteId: string) {
-    onChange(notes.filter((item) => item.id !== noteId))
+    onChange(notesRef.current.filter((item) => item.id !== noteId))
     try {
       await deleteAudioBlob(noteId)
     } catch {

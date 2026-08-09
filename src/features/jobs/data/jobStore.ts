@@ -42,17 +42,51 @@ export function loadJobs(): Job[] {
     const stored = localStorage.getItem(STORAGE_KEY)
     const parsed: unknown = stored ? JSON.parse(stored) : []
     return Array.isArray(parsed)
-      ? parsed.filter(isJob).map((job) => ({
+      ? parsed.filter(isJob).map((job) => {
+          const rawChangeOrders = Array.isArray((job as { changeOrders?: unknown }).changeOrders)
+            ? (job as unknown as { changeOrders: unknown[] }).changeOrders
+            : []
+          const changeOrders = rawChangeOrders.flatMap((value) => {
+            if (!value || typeof value !== 'object') return []
+            const item = value as Partial<Job['changeOrders'][number]>
+            if (
+              typeof item.id !== 'string' ||
+              typeof item.discoveredCondition !== 'string' ||
+              typeof item.additionalWork !== 'string' ||
+              typeof item.additionalMaterial !== 'string' ||
+              typeof item.additionalLaborHours !== 'number' ||
+              typeof item.priceChange !== 'number' ||
+              typeof item.scheduleImpact !== 'string' ||
+              !['draft', 'approved', 'declined'].includes(item.status ?? '') ||
+              typeof item.createdAt !== 'string'
+            ) return []
+            return [{
+              ...item,
+              estimatedMaterialCost: typeof item.estimatedMaterialCost === 'number' ? item.estimatedMaterialCost : 0,
+            } as Job['changeOrders'][number]]
+          })
+
+          return {
           ...job,
           estimatedLaborCost: typeof job.estimatedLaborCost === 'number' ? job.estimatedLaborCost : 0,
           estimatedMaterialCost: typeof job.estimatedMaterialCost === 'number' ? job.estimatedMaterialCost : 0,
           materials: Array.isArray(job.materials) ? job.materials : [],
+          materialChecklist: Array.isArray(job.materialChecklist)
+            ? job.materialChecklist
+            : (Array.isArray(job.materials) ? job.materials : []).map((item, index) => ({
+                id: `${job.id}-material-${index}`,
+                item,
+                purchased: false,
+                loaded: false,
+                delivered: false,
+              })),
+          changeOrders,
           expenses: job.expenses.map((expense) => ({
             ...expense,
             vendor: typeof expense.vendor === 'string' ? expense.vendor : '',
             notes: typeof expense.notes === 'string' ? expense.notes : '',
           })),
-        }))
+        }})
       : []
   } catch {
     return []
@@ -82,25 +116,35 @@ export function createJobFromEstimate(estimate: Estimate, jobs = loadJobs()): Jo
   const existing = jobs.find((job) => job.estimateId === estimate.id)
   if (existing) return existing
   const now = new Date().toISOString()
+  const materials = estimate.aiEstimate?.draft.analysis?.materials ?? []
+  const accepted = estimate.approval?.snapshot
   const job: Job = {
     id: typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `${Date.now()}`,
     jobNumber: createJobNumber(jobs),
     estimateId: estimate.id,
-    customerId: estimate.customerId,
-    jobName: estimate.jobName,
-    serviceAddress: estimate.serviceAddress,
+    customerId: accepted?.customerId ?? estimate.customerId,
+    jobName: accepted?.jobName ?? estimate.jobName,
+    serviceAddress: accepted?.serviceAddress ?? estimate.serviceAddress,
     description: estimate.description,
-    scopeOfWork: estimate.scopeOfWork ?? estimate.description,
-    exclusions: estimate.exclusions ?? [],
-    lineItems: estimate.lineItems.map((item) => ({ ...item })),
-    quotedPrice: estimateTotal(estimate),
-    taxRate: estimate.taxRate,
-    discount: estimate.discount,
+    scopeOfWork: accepted?.scopeOfWork ?? estimate.scopeOfWork ?? estimate.description,
+    exclusions: accepted ? [...accepted.exclusions] : estimate.exclusions ?? [],
+    lineItems: (accepted?.lineItems ?? estimate.lineItems).map((item) => ({ ...item })),
+    quotedPrice: accepted?.acceptedAmount ?? estimateTotal(estimate),
+    taxRate: accepted?.taxRate ?? estimate.taxRate,
+    discount: accepted?.discount ?? estimate.discount,
     estimatedLaborHours: estimate.economics?.laborHours ?? estimate.aiEstimate?.draft.laborHours ?? 0,
     estimatedLaborCost: estimate.economics?.laborCost ?? estimate.aiEstimate?.draft.laborCost ?? 0,
     estimatedMaterialCost: estimate.economics?.materialCost ?? estimate.materialCost ?? 0,
     estimatedCost: estimate.economics?.totalEstimatedCost ?? 0,
-    materials: estimate.aiEstimate?.draft.analysis?.materials ?? [],
+    materials,
+    materialChecklist: materials.map((item, index) => ({
+      id: `${estimate.id}-material-${index}`,
+      item,
+      purchased: false,
+      loaded: false,
+      delivered: false,
+    })),
+    changeOrders: [],
     photoIds: [...(estimate.photoIds ?? [])],
     voiceNotes: [],
     internalNotes: '',

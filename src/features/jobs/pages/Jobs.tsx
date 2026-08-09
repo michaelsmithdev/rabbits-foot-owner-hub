@@ -18,7 +18,8 @@ import { queuePhotoFiles } from '../../photos/data/photoStore'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import VoiceCapture from '../../voice/components/VoiceCapture'
 import { actualJobHours, loadJobs, saveJobs } from '../data/jobStore'
-import type { Job, JobExpenseCategory } from '../types/Job'
+import { approvedChangeOrderTotal, jobRevenue } from '../utils/jobMath'
+import type { Job, JobChangeOrder, JobExpenseCategory, JobMaterialItem } from '../types/Job'
 import './Jobs.css'
 import './JobsEnhancements.css'
 
@@ -36,6 +37,9 @@ export default function Jobs() {
   const [clock, setClock] = useState(() => Date.now())
   const [message, setMessage] = useState('')
   const [expense, setExpense] = useState({ category: 'materials' as JobExpenseCategory, description: '', vendor: '', notes: '', amount: 0, billable: false })
+  const [changeOrder, setChangeOrder] = useState({ discoveredCondition: '', additionalWork: '', additionalMaterial: '', estimatedMaterialCost: 0, additionalLaborHours: 0, priceChange: 0, scheduleImpact: '' })
+  const [changeApprovalId, setChangeApprovalId] = useState<string | null>(null)
+  const [changeApprovalName, setChangeApprovalName] = useState('')
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const receiptInputRef = useRef<HTMLInputElement>(null)
@@ -57,6 +61,11 @@ export default function Jobs() {
 
   function startTimer(job: Job) {
     if (job.timeEntries.some((entry) => !entry.endedAt)) return
+    const otherRunningJob = jobs.find((item) => item.id !== job.id && item.timeEntries.some((entry) => !entry.endedAt))
+    if (otherRunningJob) {
+      setMessage(`Pause ${otherRunningJob.jobNumber} before starting another timer.`)
+      return
+    }
     updateJob(job.id, (current) => ({ ...current, status: 'in_progress', timeEntries: [...current.timeEntries, { id: createId(), startedAt: new Date().toISOString(), endedAt: null }] }))
     setMessage('Job timer started and saved.')
   }
@@ -117,6 +126,65 @@ export default function Jobs() {
     }
   }
 
+  function updateMaterial(job: Job, materialId: string, patch: Partial<JobMaterialItem>) {
+    updateJob(job.id, (current) => ({
+      ...current,
+      materialChecklist: current.materialChecklist.map((item) => item.id === materialId ? { ...item, ...patch } : item),
+    }))
+  }
+
+  function saveChangeOrder(job: Job) {
+    if (['completed', 'invoiced'].includes(job.status)) {
+      setMessage('This job is complete. Create a new revision before adding more work.')
+      return
+    }
+    if (!changeOrder.discoveredCondition.trim() || !changeOrder.additionalWork.trim() || changeOrder.priceChange <= 0) {
+      setMessage('Describe the discovered condition, added work, and positive customer price.')
+      return
+    }
+    const createdAt = new Date().toISOString()
+    const draft: JobChangeOrder = {
+      id: createId(),
+      discoveredCondition: changeOrder.discoveredCondition.trim(),
+      additionalWork: changeOrder.additionalWork.trim(),
+      additionalMaterial: changeOrder.additionalMaterial.trim(),
+      estimatedMaterialCost: Math.max(0, changeOrder.estimatedMaterialCost),
+      additionalLaborHours: Math.max(0, changeOrder.additionalLaborHours),
+      priceChange: Math.round(changeOrder.priceChange * 100) / 100,
+      scheduleImpact: changeOrder.scheduleImpact.trim(),
+      status: 'draft',
+      createdAt,
+    }
+    updateJob(job.id, (current) => ({ ...current, changeOrders: [...current.changeOrders, draft] }))
+    setChangeOrder({ discoveredCondition: '', additionalWork: '', additionalMaterial: '', estimatedMaterialCost: 0, additionalLaborHours: 0, priceChange: 0, scheduleImpact: '' })
+    setMessage('Change-order draft saved. Record customer approval before billing it.')
+  }
+
+  function approveChangeOrder(job: Job, changeOrderId: string) {
+    if (['completed', 'invoiced'].includes(job.status)) {
+      setMessage('Completed job economics are locked. Reopen through a new revision before approving changes.')
+      return
+    }
+    const approvedBy = changeApprovalName.trim()
+    if (!approvedBy) return
+    const approvedAt = new Date().toISOString()
+    updateJob(job.id, (current) => ({
+      ...current,
+      changeOrders: current.changeOrders.map((item) => item.id === changeOrderId ? { ...item, status: 'approved', approvedBy, approvedAt } : item),
+    }))
+    setChangeApprovalId(null)
+    setChangeApprovalName('')
+    setMessage('Customer approval recorded. The change will flow into profitability and the final invoice.')
+  }
+
+  function declineChangeOrder(job: Job, changeOrderId: string) {
+    updateJob(job.id, (current) => ({
+      ...current,
+      changeOrders: current.changeOrders.map((item) => item.id === changeOrderId ? { ...item, status: 'declined' } : item),
+    }))
+    setMessage('Change order marked declined and excluded from billing.')
+  }
+
   function completeJob(job: Job) {
     const endedAt = new Date().toISOString()
     updateJob(job.id, (current) => {
@@ -129,26 +197,34 @@ export default function Jobs() {
         .reduce((sum, item) => sum + item.amount, 0)
       const actualExpenseCost = current.expenses.reduce((sum, item) => sum + item.amount, 0)
       const actualCost = actualLaborCost + actualExpenseCost
-      const estimatedProfit = current.quotedPrice - current.estimatedCost
-      const actualProfit = current.quotedPrice - actualCost
+      const changeOrderTotal = approvedChangeOrderTotal(current.changeOrders)
+      const revenue = current.quotedPrice + changeOrderTotal
+      const approvedChanges = current.changeOrders.filter((item) => item.status === 'approved')
+      const changeLaborHours = approvedChanges.reduce((sum, item) => sum + item.additionalLaborHours, 0)
+      const changeLaborCost = changeLaborHours * settings.defaultLaborRate
+      const changeMaterialCost = approvedChanges.reduce((sum, item) => sum + item.estimatedMaterialCost, 0)
+      const updatedEstimatedCost = current.estimatedCost + changeLaborCost + changeMaterialCost
+      const estimatedProfit = revenue - updatedEstimatedCost
+      const actualProfit = revenue - actualCost
 
       return {
         ...completedJob,
         status: 'completed',
         completedAt: endedAt,
         profitability: {
-          estimatedLaborHours: current.estimatedLaborHours,
+          estimatedLaborHours: current.estimatedLaborHours + changeLaborHours,
           actualLaborHours,
-          estimatedLaborCost: current.estimatedLaborCost,
+          estimatedLaborCost: current.estimatedLaborCost + changeLaborCost,
           actualLaborCost,
-          estimatedMaterialCost: current.estimatedMaterialCost,
+          estimatedMaterialCost: current.estimatedMaterialCost + changeMaterialCost,
           actualMaterialCost,
-          estimatedCost: current.estimatedCost,
+          estimatedCost: updatedEstimatedCost,
           actualCost,
           estimatedProfit,
           actualProfit,
-          estimatedMargin: current.quotedPrice > 0 ? estimatedProfit / current.quotedPrice * 100 : 0,
-          actualMargin: current.quotedPrice > 0 ? actualProfit / current.quotedPrice * 100 : 0,
+          estimatedMargin: revenue > 0 ? estimatedProfit / revenue * 100 : 0,
+          actualMargin: revenue > 0 ? actualProfit / revenue * 100 : 0,
+          approvedChangeOrderTotal: changeOrderTotal,
           capturedAt: endedAt,
         },
       }
@@ -183,6 +259,7 @@ export default function Jobs() {
       dueDate: dueDate.toISOString().slice(0, 10),
       lineItems: [
         ...job.lineItems.map((item) => ({ ...item, id: createId() })),
+        ...job.changeOrders.filter((item) => item.status === 'approved').map((item) => ({ id: createId(), description: `Approved change order: ${item.additionalWork}`, quantity: 1, unit: 'change', unitPrice: item.priceChange })),
         ...job.expenses.filter((item) => item.billable).map((item) => ({ id: createId(), description: item.description, quantity: 1, unit: item.category, unitPrice: item.amount })),
       ],
       taxRate: job.taxRate,
@@ -208,8 +285,10 @@ export default function Jobs() {
   const hours = actualJobHours(selectedJob, clock)
   const expenseTotal = selectedJob.expenses.reduce((sum, item) => sum + item.amount, 0)
   const actualCost = hours * settings.defaultLaborRate + expenseTotal
-  const profit = selectedJob.quotedPrice - actualCost
-  const margin = selectedJob.quotedPrice > 0 ? profit / selectedJob.quotedPrice * 100 : 0
+  const revenue = jobRevenue(selectedJob)
+  const changeOrderTotal = approvedChangeOrderTotal(selectedJob.changeOrders)
+  const profit = revenue - actualCost
+  const margin = revenue > 0 ? profit / revenue * 100 : 0
 
   return (
     <div className="jobs-page">
@@ -220,7 +299,7 @@ export default function Jobs() {
         <main className="job-workspace">
           <header className="job-header"><div><span className={`job-status ${selectedJob.status}`}>{selectedJob.status.replace('_', ' ')}</span><h2>{selectedJob.jobName}</h2><p>{customer ? `${customer.firstName} ${customer.lastName} · ` : ''}{selectedJob.serviceAddress}</p></div><div className="job-timer"><span>Actual time</span><strong>{hours.toFixed(2)} hr</strong></div></header>
           <section className="job-brief">
-            <article><span>Approved job price</span><strong>{currency.format(selectedJob.quotedPrice)}</strong></article>
+            <article><span>Approved job price</span><strong>{currency.format(revenue)}</strong>{changeOrderTotal > 0 && <small>Includes {currency.format(changeOrderTotal)} approved changes</small>}</article>
             <article className="job-brief-wide"><span>Scope of work</span><p>{selectedJob.scopeOfWork || selectedJob.description}</p></article>
             {selectedJob.materials.length > 0 && <article className="job-brief-wide"><span>Planned materials</span><p>{selectedJob.materials.join(' · ')}</p></article>}
             {selectedJob.exclusions.length > 0 && <article className="job-brief-wide"><span>Exclusions</span><p>{selectedJob.exclusions.join(' · ')}</p></article>}
@@ -239,7 +318,11 @@ export default function Jobs() {
 
           <section className="job-section"><h3>Field voice notes</h3><VoiceCapture label="Record job note" notes={selectedJob.voiceNotes} onChange={(voiceNotes) => updateJob(selectedJob.id, (current) => ({ ...current, voiceNotes }))} /></section>
 
+          <section className="job-section"><h3>Material checklist</h3>{selectedJob.materialChecklist.length === 0 ? <p className="job-section-help">No AI materials were attached to the accepted estimate. Add details in internal notes as needed.</p> : <div className="material-checklist"><header><span>Item</span><span>Purchased</span><span>Loaded</span><span>Delivered</span></header>{selectedJob.materialChecklist.map((material) => <div key={material.id}><strong>{material.item}</strong><label><input checked={material.purchased} onChange={(event) => updateMaterial(selectedJob, material.id, { purchased: event.target.checked })} type="checkbox" /><span>Purchased</span></label><label><input checked={material.loaded} onChange={(event) => updateMaterial(selectedJob, material.id, { loaded: event.target.checked })} type="checkbox" /><span>Loaded</span></label><label><input checked={material.delivered} onChange={(event) => updateMaterial(selectedJob, material.id, { delivered: event.target.checked })} type="checkbox" /><span>Delivered</span></label></div>)}</div>}</section>
+
           <section className="job-section"><h3>Add expense</h3><div className="expense-form"><select onChange={(event) => setExpense({ ...expense, category: event.target.value as JobExpenseCategory })} value={expense.category}>{['materials','delivery','disposal','equipment','subcontractor','other'].map((category) => <option key={category}>{category}</option>)}</select><input onChange={(event) => setExpense({ ...expense, description: event.target.value })} placeholder="What was purchased?" value={expense.description} /><input onChange={(event) => setExpense({ ...expense, vendor: event.target.value })} placeholder="Vendor" value={expense.vendor} /><input min="0" onChange={(event) => setExpense({ ...expense, amount: Number(event.target.value) })} step="0.01" type="number" value={expense.amount} /><input className="expense-notes" onChange={(event) => setExpense({ ...expense, notes: event.target.value })} placeholder="Expense notes (optional)" value={expense.notes} /><label><input checked={expense.billable} onChange={(event) => setExpense({ ...expense, billable: event.target.checked })} type="checkbox" /> Add to invoice</label><input accept="image/*" capture="environment" onChange={(event) => setReceiptFile(event.target.files?.[0] ?? null)} ref={receiptInputRef} type="file" /><button onClick={() => void addExpense(selectedJob)} type="button"><Plus size={17} /> Save expense</button></div><div className="expense-list">{selectedJob.expenses.map((item) => <div key={item.id}><span>{item.category} · {item.description}{item.vendor ? ` · ${item.vendor}` : ''}{item.billable ? ' · billable' : ''}{item.notes ? <small>{item.notes}</small> : null}</span><strong>{currency.format(item.amount)}</strong></div>)}</div></section>
+
+          <section className="job-section"><h3>Change orders</h3><p className="job-section-help">Document newly discovered work, then record customer approval before it affects the final bill.</p>{!['completed','invoiced'].includes(selectedJob.status) && <div className="change-order-form"><textarea onChange={(event) => setChangeOrder({ ...changeOrder, discoveredCondition: event.target.value })} placeholder="Discovered condition" value={changeOrder.discoveredCondition} /><textarea onChange={(event) => setChangeOrder({ ...changeOrder, additionalWork: event.target.value })} placeholder="Additional work" value={changeOrder.additionalWork} /><input onChange={(event) => setChangeOrder({ ...changeOrder, additionalMaterial: event.target.value })} placeholder="Additional materials" value={changeOrder.additionalMaterial} /><input min="0" onChange={(event) => setChangeOrder({ ...changeOrder, estimatedMaterialCost: Number(event.target.value) })} placeholder="Estimated material cost" step="0.01" type="number" value={changeOrder.estimatedMaterialCost} /><input min="0" onChange={(event) => setChangeOrder({ ...changeOrder, additionalLaborHours: Number(event.target.value) })} placeholder="Additional labor hours" step="0.25" type="number" value={changeOrder.additionalLaborHours} /><input min="0" onChange={(event) => setChangeOrder({ ...changeOrder, priceChange: Number(event.target.value) })} placeholder="Customer price change" step="0.01" type="number" value={changeOrder.priceChange} /><input onChange={(event) => setChangeOrder({ ...changeOrder, scheduleImpact: event.target.value })} placeholder="Schedule impact" value={changeOrder.scheduleImpact} /><button onClick={() => saveChangeOrder(selectedJob)} type="button"><Plus size={17} /> Save change-order draft</button></div>}<div className="change-order-list">{selectedJob.changeOrders.map((item) => <article className={item.status} key={item.id}><header><strong>{currency.format(item.priceChange)}</strong><span>{item.status}</span></header><p><b>Condition:</b> {item.discoveredCondition}</p><p><b>Added work:</b> {item.additionalWork}</p>{item.additionalMaterial && <p><b>Materials:</b> {item.additionalMaterial} · est. {currency.format(item.estimatedMaterialCost)}</p>}{item.additionalLaborHours > 0 && <p><b>Added labor:</b> {item.additionalLaborHours.toFixed(2)} hr</p>}{item.scheduleImpact && <p><b>Schedule:</b> {item.scheduleImpact}</p>}{item.approvedBy && <small>Approved by {item.approvedBy} · {new Date(item.approvedAt ?? '').toLocaleString()}</small>}{item.status === 'draft' && !['completed','invoiced'].includes(selectedJob.status) && <footer><button onClick={() => { setChangeApprovalId(item.id); setChangeApprovalName('') }} type="button">Record approval</button><button className="secondary" onClick={() => declineChangeOrder(selectedJob, item.id)} type="button">Decline</button></footer>}{changeApprovalId === item.id && <div className="change-approval"><label><span>Approving customer name / signature</span><input autoFocus onChange={(event) => setChangeApprovalName(event.target.value)} value={changeApprovalName} /></label><button disabled={!changeApprovalName.trim()} onClick={() => approveChangeOrder(selectedJob, item.id)} type="button">Save customer approval</button><button className="secondary" onClick={() => { setChangeApprovalId(null); setChangeApprovalName('') }} type="button">Cancel</button></div>}</article>)}</div></section>
 
           {['completed','invoiced'].includes(selectedJob.status) && <section className="job-invoice-callout"><div><span className="eyebrow">PAID WORKFLOW</span><h3>{selectedJob.invoiceId ? 'Final invoice created' : 'Job complete and ready to bill'}</h3><p>Actual costs remain internal. The customer invoice uses the approved scope plus marked billable expenses.</p></div><button disabled={Boolean(selectedJob.invoiceId)} onClick={() => createInvoice(selectedJob)} type="button"><FileText size={19} /> {selectedJob.invoiceId ? 'Invoice created' : 'Create final invoice'}</button></section>}
         </main>

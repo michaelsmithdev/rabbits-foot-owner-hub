@@ -37,4 +37,9 @@ export type PdfDocumentInput = {
   discount: number
   notes: string
   terms: string
+  approval?: {
+    customerName: string
+    acceptedAt: string
+    method: string
+  }
 }

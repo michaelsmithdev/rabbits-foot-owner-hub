@@ -199,7 +199,14 @@ export async function synchronizePendingPhotos(
         upsert: false,
       })
 
-    if (uploadError) {
+    const alreadyUploaded = Boolean(
+      uploadError && (
+        (uploadError as { statusCode?: string }).statusCode === '409' ||
+        /already exists|duplicate/i.test(uploadError.message)
+      ),
+    )
+
+    if (uploadError && !alreadyUploaded) {
       nextPhotos.push({ ...photo, uploadStatus: 'error' })
       hasChanges = true
       continue

@@ -26,7 +26,17 @@ function toPdfInput(props: Props): PdfDocumentInput {
   const common = { id: props.document.id, kind: props.kind, customerName: customerName(props.customer), customerEmail: props.customer?.email, customerPhone: props.customer?.phone, customerAddress: customerAddress(props.customer), jobName: props.document.jobName, serviceAddress: props.document.serviceAddress, description: props.document.description, scopeOfWork: props.document.scopeOfWork, exclusions: props.document.exclusions, issueDate: props.document.issueDate, lineItems: props.document.lineItems, taxRate: props.document.taxRate, discount: props.document.discount, notes: props.document.notes }
   return props.kind === 'invoice'
     ? { ...common, number: props.document.invoiceNumber, dueDate: props.document.dueDate, terms: settings.invoiceTerms }
-    : { ...common, number: props.document.estimateNumber, dueDate: props.document.expirationDate, terms: settings.estimateTerms }
+    : {
+        ...common,
+        number: props.document.estimateNumber,
+        dueDate: props.document.expirationDate,
+        terms: settings.estimateTerms,
+        approval: props.document.approval ? {
+          customerName: props.document.approval.customerName,
+          acceptedAt: props.document.approval.acceptedAt,
+          method: props.document.approval.method,
+        } : undefined,
+      }
 }
 
 export default function DocumentPdfActions(props: Props) {

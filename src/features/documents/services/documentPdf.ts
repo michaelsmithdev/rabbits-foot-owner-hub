@@ -174,6 +174,15 @@ export async function generateBusinessDocumentPdf(input: PdfDocumentInput) {
 
   if (input.notes) { text('NOTES', MARGIN, 9, bold, GREEN); y -= 15; wrapped(input.notes, MARGIN, PAGE_WIDTH - MARGIN * 2, 9, regular, GRAY); y -= 8 }
   if (input.terms && !input.notes.toLowerCase().includes(input.terms.toLowerCase())) { text('TERMS', MARGIN, 9, bold, GREEN); y -= 15; wrapped(input.terms, MARGIN, PAGE_WIDTH - MARGIN * 2, 8, regular, GRAY) }
+  if (input.approval) {
+    ensure(70)
+    y -= 14
+    page.drawRectangle({ x: MARGIN, y: y - 40, width: PAGE_WIDTH - MARGIN * 2, height: 52, color: LIGHT })
+    page.drawText('CUSTOMER APPROVAL RECORDED', { x: MARGIN + 12, y: y - 4, size: 9, font: bold, color: GREEN })
+    page.drawText(input.approval.customerName, { x: MARGIN + 12, y: y - 22, size: 11, font: bold, color: BLACK })
+    page.drawText(`${new Date(input.approval.acceptedAt).toLocaleString()}  /  ${input.approval.method.replaceAll('_', ' ')}`, { x: 250, y: y - 22, size: 8, font: regular, color: GRAY })
+    y -= 58
+  }
 
   const pages = pdf.getPages()
   pages.forEach((currentPage: PDFPage, index: number) => {

@@ -27,12 +27,14 @@ import { createJobFromEstimate, loadJobs } from '../../jobs/data/jobStore'
 
 import {
   createEstimateNumber,
+  createRevisionNumber,
   loadEstimates,
   saveEstimates,
 } from '../data/estimateStore'
 
 import type {
   Estimate,
+  EstimateApprovalMethod,
   EstimateLineItem,
 } from '../types/Estimate'
 
@@ -384,6 +386,12 @@ function Estimates({
 
   const [saveMessage, setSaveMessage] =
     useState('')
+
+  const [approvalEstimateId, setApprovalEstimateId] = useState<string | null>(null)
+  const [approvalCustomerName, setApprovalCustomerName] = useState('')
+  const [approvalMethod, setApprovalMethod] = useState<EstimateApprovalMethod>('signed_in_person')
+  const [approvalNote, setApprovalNote] = useState('')
+  const [approvalError, setApprovalError] = useState('')
 
   useEffect(() => {
     saveEstimates(estimates)
@@ -854,17 +862,39 @@ function Estimates({
         updatedAt: currentTimestamp,
       }
 
-      setEstimates((currentEstimates) =>
-        currentEstimates.map((estimate) =>
-          estimate.id === editingEstimateId
-            ? updatedEstimate
-            : estimate,
-        ),
-      )
+      const mustCreateRevision =
+        existingEstimate.status === 'approved' ||
+        Boolean(existingEstimate.approval) ||
+        Boolean(existingEstimate.jobId)
 
-      setSaveMessage(
-        `${updatedEstimate.estimateNumber} was updated.`,
-      )
+      if (mustCreateRevision) {
+        const revision = createRevisionNumber(existingEstimate, estimates)
+        const revisedEstimate: Estimate = {
+          ...updatedEstimate,
+          id: createId(),
+          estimateNumber: revision.estimateNumber,
+          revisionOfId: existingEstimate.revisionOfId ?? existingEstimate.id,
+          revisionNumber: revision.revisionNumber,
+          approval: undefined,
+          jobId: undefined,
+          status: 'draft',
+          createdAt: currentTimestamp,
+        }
+        setEstimates((currentEstimates) => [revisedEstimate, ...currentEstimates])
+        setSaveMessage(`${revisedEstimate.estimateNumber} was created. The approved agreement remains unchanged.`)
+      } else {
+        setEstimates((currentEstimates) =>
+          currentEstimates.map((estimate) =>
+            estimate.id === editingEstimateId
+              ? updatedEstimate
+              : estimate,
+          ),
+        )
+
+        setSaveMessage(
+          `${updatedEstimate.estimateNumber} was updated.`,
+        )
+      }
     } else {
       const newEstimate: Estimate = {
         id: createId(),
@@ -1043,7 +1073,63 @@ function Estimates({
     setActiveDocumentTab('invoices')
   }
 
+  function requestApproval(estimate: Estimate) {
+    const approvalCustomer = customers.find((customer) => customer.id === estimate.customerId)
+    setApprovalEstimateId(estimate.id)
+    setApprovalCustomerName(
+      approvalCustomer ? `${approvalCustomer.firstName} ${approvalCustomer.lastName}`.trim() : '',
+    )
+    setApprovalMethod('signed_in_person')
+    setApprovalNote('')
+    setApprovalError('')
+  }
+
+  function recordApproval() {
+    const estimate = estimates.find((item) => item.id === approvalEstimateId)
+    const customerName = approvalCustomerName.trim()
+    if (!estimate || !customerName) {
+      setApprovalError('Enter the approving customer name before saving.')
+      return
+    }
+
+    const acceptedAt = new Date().toISOString()
+    const acceptedAmount = calculateEstimateTotal(estimate)
+    setEstimates((current) => current.map((item) => item.id === estimate.id ? {
+      ...item,
+      status: 'approved',
+      approval: {
+        customerName,
+        method: approvalMethod,
+        note: approvalNote.trim(),
+        acceptedAt,
+        snapshot: {
+          estimateNumber: estimate.estimateNumber,
+          revisionNumber: estimate.revisionNumber ?? 0,
+          customerId: estimate.customerId,
+          jobName: estimate.jobName,
+          serviceAddress: estimate.serviceAddress,
+          scopeOfWork: estimate.scopeOfWork ?? estimate.description,
+          exclusions: [...(estimate.exclusions ?? [])],
+          lineItems: estimate.lineItems.map((lineItem) => ({ ...lineItem })),
+          taxRate: estimate.taxRate,
+          discount: estimate.discount,
+          acceptedAmount,
+        },
+      },
+      updatedAt: acceptedAt,
+    } : item))
+    setApprovalEstimateId(null)
+    setSaveMessage(`${estimate.estimateNumber} approval was recorded and locked as an immutable snapshot.`)
+  }
+
   function updateEstimateStatus(estimateId: string, status: Estimate['status']) {
+    const estimate = estimates.find((item) => item.id === estimateId)
+    if (!estimate) return
+    if (status === 'approved') {
+      requestApproval(estimate)
+      return
+    }
+    if (estimate.approval) return
     const updatedAt = new Date().toISOString()
     setEstimates((current) => current.map((estimate) =>
       estimate.id === estimateId ? { ...estimate, status, updatedAt } : estimate,
@@ -1463,6 +1549,7 @@ function Estimates({
                   <select
                     aria-label={`Status for ${estimate.estimateNumber}`}
                     className="estimate-status-select"
+                    disabled={Boolean(estimate.approval)}
                     onChange={(event) => updateEstimateStatus(estimate.id, event.target.value as Estimate['status'])}
                     value={estimate.status}
                   >
@@ -1471,6 +1558,14 @@ function Estimates({
                     <option value="approved">Approved</option>
                     <option value="declined">Declined</option>
                   </select>
+
+                  {estimate.approval && (
+                    <div className="estimate-approval-record">
+                      <strong>Approved by {estimate.approval.customerName}</strong>
+                      <span>{new Date(estimate.approval.acceptedAt).toLocaleString()} · {estimate.approval.method.replaceAll('_', ' ')}</span>
+                      <small>{formatCurrency(estimate.approval.snapshot.acceptedAmount)} locked agreement</small>
+                    </div>
+                  )}
 
                   <button
                     className="customer-primary-action"
@@ -1508,6 +1603,7 @@ function Estimates({
 
                   <button
                     className="customer-secondary-action"
+                    disabled={Boolean(estimate.jobId)}
                     onClick={() =>
                       convertEstimateToInvoice(
                         estimate,
@@ -1515,7 +1611,7 @@ function Estimates({
                     }
                     type="button"
                   >
-                    Convert to invoice
+                    {estimate.jobId ? 'Final invoice in Job Mode' : 'Convert to invoice'}
                   </button>
                 </div>
               </article>
@@ -1523,6 +1619,25 @@ function Estimates({
           </div>
         )}
       </section>
+
+      {approvalEstimateId && (
+        <div className="estimate-modal-backdrop" role="presentation">
+          <section aria-labelledby="approval-modal-title" aria-modal="true" className="estimate-modal estimate-approval-modal" role="dialog">
+            <header className="estimate-modal-header">
+              <div><p className="estimate-brand">CUSTOMER APPROVAL</p><h2 id="approval-modal-title">Record accepted estimate</h2></div>
+              <button aria-label="Close approval" className="estimate-close-button" onClick={() => setApprovalEstimateId(null)} type="button">×</button>
+            </header>
+            <p className="approval-warning">Saving locks the accepted scope, line items, and price. Future edits create a revision instead of changing this agreement.</p>
+            {approvalError && <div className="estimate-form-error" role="alert">{approvalError}</div>}
+            <div className="estimate-top-grid">
+              <label className="estimate-field"><span>Customer approval name / signature *</span><input autoFocus onChange={(event) => setApprovalCustomerName(event.target.value)} value={approvalCustomerName} /></label>
+              <label className="estimate-field"><span>Approval method</span><select onChange={(event) => setApprovalMethod(event.target.value as EstimateApprovalMethod)} value={approvalMethod}><option value="signed_in_person">Signed in person</option><option value="email">Email</option><option value="text">Text message</option><option value="verbal">Verbal</option></select></label>
+              <label className="estimate-field estimate-field-wide"><span>Approval note</span><textarea onChange={(event) => setApprovalNote(event.target.value)} rows={3} value={approvalNote} /></label>
+            </div>
+            <footer className="estimate-modal-footer"><button className="button-secondary" onClick={() => setApprovalEstimateId(null)} type="button">Cancel</button><button className="button-dark" onClick={recordApproval} type="button">Save approval snapshot</button></footer>
+          </section>
+        </div>
+      )}
 
       {isBuilderOpen && (
         <div
