@@ -1,9 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { customerInvoiceBalance, customerInvoiceCanPay } from '../api/customer-portal.ts'
 import { calculateInvoiceBalance, calculateInvoiceTotal } from '../src/features/invoices/utils/invoiceMath.ts'
-import { invoiceNeedsSquarePaymentLink } from '../src/features/invoices/utils/squarePaymentLink.ts'
-import type { Invoice } from '../src/features/invoices/types/Invoice.ts'
 import { approvedChangeOrderTotal, jobRevenue } from '../src/features/jobs/utils/jobMath.ts'
 import type { Job } from '../src/features/jobs/types/Job.ts'
 import { appointmentConflicts } from '../src/features/schedule/data/appointmentStore.ts'
@@ -22,67 +21,28 @@ test('invoice math applies tax and discount and never returns a negative balance
   assert.equal(calculateInvoiceBalance(invoice as never), 0)
 })
 
-test('Square checkout is automatic only for finalized invoices with a balance', () => {
+test('Customer Hub allows on-demand Square checkout only for payable invoices', () => {
   const invoice = {
-    id: 'invoice-1',
-    invoiceNumber: 'INV-2026-0001',
-    customerId: 'customer-1',
-    estimateId: null,
-    jobName: 'Repair',
-    serviceAddress: '123 Main St',
-    description: 'Repair',
-    issueDate: '2026-08-08',
-    dueDate: '2026-08-22',
-    lineItems: [
-      { id: 'line-1', description: 'Repair', quantity: 1, unitPrice: 100 },
-    ],
+    status: 'sent',
+    lineItems: [{ quantity: 1, unitPrice: 295 }],
     taxRate: 0,
     discount: 0,
-    notes: '',
-    status: 'sent',
     payments: [],
-    createdAt: '2026-08-08T00:00:00.000Z',
-    updatedAt: '2026-08-08T00:00:00.000Z',
-    paidAt: null,
-  } as Invoice
+  }
 
-  assert.equal(invoiceNeedsSquarePaymentLink(invoice), true)
+  assert.equal(customerInvoiceBalance(invoice as never), 295)
+  assert.equal(customerInvoiceCanPay(invoice as never), true)
   assert.equal(
-    invoiceNeedsSquarePaymentLink({ ...invoice, status: 'draft' }),
+    customerInvoiceCanPay({ ...invoice, status: 'draft' } as never),
     false,
   )
   assert.equal(
-    invoiceNeedsSquarePaymentLink({
+    customerInvoiceCanPay({
       ...invoice,
-      squarePaymentLink: {
-        url: 'https://square.link/example',
-        amount: 100,
-        createdAt: '2026-08-08T00:01:00.000Z',
-      },
-    }),
+      status: 'paid',
+      payments: [{ amount: 295 }],
+    } as never),
     false,
-  )
-  assert.equal(
-    invoiceNeedsSquarePaymentLink({
-      ...invoice,
-      payments: [
-        {
-          id: 'payment-1',
-          date: '2026-08-08',
-          amount: 25,
-          method: 'online',
-          referenceNumber: '',
-          notes: '',
-          createdAt: '2026-08-08T00:02:00.000Z',
-        },
-      ],
-      squarePaymentLink: {
-        url: 'https://square.link/example',
-        amount: 100,
-        createdAt: '2026-08-08T00:01:00.000Z',
-      },
-    }),
-    true,
   )
 })
 

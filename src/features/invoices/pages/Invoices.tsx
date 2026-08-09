@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   Banknote,
   CalendarDays,
@@ -17,7 +17,6 @@ import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import type { BusinessSettings } from '../../settings/types/BusinessSettings'
 import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
 import { useAuth } from '../../auth/authContext'
-import { useCloudSync } from '../../cloud/cloudSyncContext'
 import PricingInsightPanel from '../../pricing/components/PricingInsightPanel'
 import {
   createInvoiceNumber,
@@ -38,7 +37,6 @@ import {
   calculatePaymentsTotal,
   getPaymentAdjustedStatus,
 } from '../utils/invoiceMath'
-import { invoiceNeedsSquarePaymentLink } from '../utils/squarePaymentLink'
 
 import '../styles/Invoices.css'
 
@@ -203,7 +201,6 @@ async function requestSquarePaymentLink(
 
 function Invoices() {
   const { session } = useAuth()
-  const { lastSyncedAt, status: cloudStatus } = useCloudSync()
   const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const [customers] = useState<Customer[]>(() => loadCustomers())
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoices())
@@ -228,72 +225,10 @@ function Invoices() {
   const [printInvoiceId] = useState<string | null>(null)
   const [squareLinkInvoiceId, setSquareLinkInvoiceId] = useState<string | null>(null)
   const [squareMessage, setSquareMessage] = useState('')
-  const automaticSquareLinks = useRef(new Set<string>())
 
   useEffect(() => {
     saveInvoices(invoices)
   }, [invoices])
-
-  useEffect(() => {
-    const accessToken = session?.access_token
-
-    if (
-      !accessToken ||
-      cloudStatus !== 'synced' ||
-      !lastSyncedAt ||
-      !navigator.onLine
-    ) {
-      return
-    }
-
-    const lastSyncTime = new Date(lastSyncedAt).getTime()
-    const invoice = invoices.find(
-      (item) =>
-        invoiceNeedsSquarePaymentLink(item) &&
-        new Date(item.updatedAt).getTime() <= lastSyncTime &&
-        !automaticSquareLinks.current.has(item.id),
-    )
-
-    if (!invoice) return
-
-    automaticSquareLinks.current.add(invoice.id)
-    const invoiceId = invoice.id
-
-    void requestSquarePaymentLink(accessToken, invoiceId)
-      .then((link) => {
-        const createdAt = new Date().toISOString()
-
-        setInvoices((current) =>
-          current.map((item) => {
-            if (
-              item.id !== invoiceId ||
-              !invoiceNeedsSquarePaymentLink(item) ||
-              Math.abs(calculateInvoiceBalance(item) - link.amount) > 0.005
-            ) {
-              return item
-            }
-
-            return {
-              ...item,
-              squarePaymentLink: { ...link, createdAt },
-              updatedAt: createdAt,
-            }
-          }),
-        )
-        setSquareMessage(
-          `${invoice.invoiceNumber} is ready for secure Square payment in the Customer Hub.`,
-        )
-      })
-      .catch((error) => {
-        console.warn(
-          `Automatic Square link failed for ${invoice.invoiceNumber}.`,
-          error,
-        )
-      })
-      .finally(() => {
-        automaticSquareLinks.current.delete(invoiceId)
-      })
-  }, [cloudStatus, invoices, lastSyncedAt, session?.access_token])
 
   useEffect(() => {
     if (!isBuilderOpen && !paymentInvoiceId) return

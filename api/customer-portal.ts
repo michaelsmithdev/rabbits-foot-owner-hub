@@ -66,6 +66,25 @@ function total(record: Json) {
   return Math.max(0, Math.round((subtotal + subtotal * (typeof record.taxRate === 'number' ? record.taxRate : 0) / 100 - (typeof record.discount === 'number' ? record.discount : 0)) * 100) / 100)
 }
 
+export function customerInvoiceBalance(record: Json) {
+  const paid = (Array.isArray(record.payments) ? record.payments : []).reduce(
+    (sum, raw) => {
+      const payment = raw && typeof raw === 'object' ? (raw as Json) : {}
+      return sum + (typeof payment.amount === 'number' ? payment.amount : 0)
+    },
+    0,
+  )
+
+  return Math.max(0, Math.round((total(record) - paid) * 100) / 100)
+}
+
+export function customerInvoiceCanPay(record: Json) {
+  return (
+    ['sent', 'partial', 'overdue'].includes(String(record.status)) &&
+    customerInvoiceBalance(record) >= 0.5
+  )
+}
+
 async function portalLink(token: string) {
   if (!/^[a-f0-9]{64}$/.test(token)) return null
   const response = await database(`/rest/v1/customer_portal_links?token_hash=eq.${tokenHash(token)}&revoked_at=is.null&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=id,organization_id,customer_id,expires_at&limit=1`)
@@ -110,6 +129,119 @@ async function loadPortal(token: string) {
   return { link, all, data: safePortalData(all, link.customer_id, link.expires_at) }
 }
 
+async function createCustomerSquareCheckout(
+  request: ApiRequest,
+  portal: NonNullable<Awaited<ReturnType<typeof loadPortal>>>,
+  rawToken: string,
+  invoiceId: string,
+) {
+  const record = portal.all.find(
+    (item) =>
+      item.record_type === 'invoice' &&
+      item.record_id === invoiceId &&
+      item.payload.customerId === portal.link.customer_id,
+  )
+
+  if (!record) throw new Error('invoice_not_found')
+  if (!customerInvoiceCanPay(record.payload)) {
+    if (['sent', 'partial', 'overdue'].includes(String(record.payload.status))) {
+      throw new Error('invoice_paid')
+    }
+    throw new Error('invoice_not_payable')
+  }
+
+  const amount = customerInvoiceBalance(record.payload)
+
+  const existingLink =
+    record.payload.squarePaymentLink &&
+    typeof record.payload.squarePaymentLink === 'object'
+      ? (record.payload.squarePaymentLink as Json)
+      : null
+
+  if (
+    existingLink &&
+    existingLink.source === 'customer_portal' &&
+    typeof existingLink.url === 'string' &&
+    typeof existingLink.amount === 'number' &&
+    Math.abs(existingLink.amount - amount) <= 0.005
+  ) {
+    return { url: existingLink.url, amount }
+  }
+
+  const squareToken = process.env.SQUARE_ACCESS_TOKEN?.trim()
+  const locationId = process.env.SQUARE_LOCATION_ID?.trim()
+  if (!squareToken || !locationId) throw new Error('square_not_configured')
+
+  const sandbox = process.env.SQUARE_ENVIRONMENT?.trim().toLowerCase() === 'sandbox'
+  const squareOrigin = sandbox
+    ? 'https://connect.squareupsandbox.com'
+    : 'https://connect.squareup.com'
+  const invoiceNumber = clean(record.payload.invoiceNumber, 80) || 'Invoice'
+  const jobName = clean(record.payload.jobName, 80) || 'Handyman services'
+  const idempotencyKey = createHash('sha256')
+    .update(
+      `${portal.link.organization_id}:${invoiceId}:${amount}:${String(record.payload.updatedAt ?? '')}`,
+    )
+    .digest('hex')
+  const origin = request.headers.origin ?? 'https://rabbits-foot-owner-hub.vercel.app'
+  const squareResponse = await fetch(`${squareOrigin}/v2/online-checkout/payment-links`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${squareToken}`,
+      'Square-Version': '2026-07-15',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      idempotency_key: idempotencyKey,
+      description: `Owner Hub ${invoiceNumber}`,
+      quick_pay: {
+        name: `${invoiceNumber} - ${jobName}`,
+        price_money: { amount: Math.round(amount * 100), currency: 'USD' },
+        location_id: locationId,
+      },
+      checkout_options: {
+        redirect_url: `${origin}/?payment=return#portal/${rawToken}`,
+      },
+    }),
+    signal: AbortSignal.timeout(15_000),
+  })
+  const squarePayload = await squareResponse.json() as {
+    payment_link?: { id?: string; order_id?: string; url?: string }
+    errors?: Array<{ detail?: string }>
+  }
+  const paymentLink = squarePayload.payment_link
+
+  if (!squareResponse.ok || !paymentLink?.url) {
+    console.error('Customer Square checkout failed.', squarePayload.errors?.map((item) => item.detail))
+    throw new Error('square_checkout_failed')
+  }
+
+  const now = new Date().toISOString()
+  const nextPayload = {
+    ...record.payload,
+    squarePaymentLink: {
+      url: paymentLink.url,
+      paymentLinkId: paymentLink.id,
+      orderId: paymentLink.order_id,
+      amount,
+      createdAt: now,
+      source: 'customer_portal',
+    },
+    updatedAt: now,
+  }
+  const update = await database(
+    `/rest/v1/business_records?organization_id=eq.${encodeURIComponent(portal.link.organization_id)}&record_type=eq.invoice&record_id=eq.${encodeURIComponent(invoiceId)}`,
+    {
+      method: 'PATCH',
+      headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ payload: nextPayload, client_updated_at: now, is_deleted: false }),
+    },
+  )
+
+  if (!update.ok) throw new Error('checkout_tracking_failed')
+  return { url: paymentLink.url, amount }
+}
+
 export default async function handler(request: ApiRequest, response: ApiResponse) {
   if (!cors(request, response)) return send(response, 403, { error: 'This request origin is not allowed.' })
   if (request.method === 'OPTIONS') { response.statusCode = 204; response.end(); return }
@@ -141,6 +273,23 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const rawToken = clean(payload.token, 80)
     const portal = await loadPortal(rawToken)
     if (!portal?.data) return send(response, 404, { error: 'This secure customer link is invalid or expired.' })
+    if (action === 'create_payment') {
+      const invoiceId = clean(payload.invoiceId, 80)
+
+      try {
+        const checkout = await createCustomerSquareCheckout(request, portal, rawToken, invoiceId)
+        return send(response, 200, checkout)
+      } catch (error) {
+        const code = error instanceof Error ? error.message : ''
+
+        if (code === 'invoice_not_found') return send(response, 404, { error: 'This invoice is not available.' })
+        if (code === 'invoice_not_payable') return send(response, 400, { error: 'This invoice is not ready for payment.' })
+        if (code === 'invoice_paid') return send(response, 409, { error: 'This invoice has already been paid.' })
+        if (code === 'square_not_configured') return send(response, 503, { error: 'Square payment is temporarily unavailable.' })
+
+        return send(response, 502, { error: 'Square checkout could not be opened. Please try again.' })
+      }
+    }
     if (action === 'request_change') {
       const estimateId = clean(payload.estimateId, 80)
       const estimate = portal.all.find((item) => item.record_type === 'estimate' && item.record_id === estimateId && item.payload.customerId === portal.link.customer_id)
