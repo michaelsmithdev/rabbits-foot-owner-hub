@@ -984,7 +984,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                         }
                         step="0.25"
                         type="number"
-                        value={lineItem.quantity}
+                        value={lineItem.quantity || ''}
                       />
                     </label>
                     <label>
@@ -1000,7 +1000,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                         }
                         step="0.01"
                         type="number"
-                        value={lineItem.unitPrice}
+                        value={lineItem.unitPrice || ''}
                       />
                     </label>
                     <strong>
@@ -1025,7 +1025,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
               <div className="invoice-form-full-width"><PricingInsightPanel category={draft.jobCategory} customerId={draft.customerId} description={`${draft.jobName} ${draft.description} ${draft.lineItems.map((item) => item.description).join(' ')}`} onUsePrice={(price) => setDraft((current) => ({ ...current, lineItems: current.lineItems.length ? current.lineItems.map((item, index) => index === 0 ? { ...item, unitPrice: price, quantity: 1 } : item) : [{ ...createEmptyLineItem(), description: current.jobName || 'Handyman service', unitPrice: price }] }))} propertyType={draft.propertyType} /></div>
               <label><span>Job category</span><input onChange={(event) => updateDraft('jobCategory', event.target.value)} value={draft.jobCategory} /></label>
               <label><span>Property type</span><select onChange={(event) => updateDraft('propertyType', event.target.value as 'residential' | 'commercial')} value={draft.propertyType}><option value="residential">Residential</option><option value="commercial">Commercial</option></select></label>
-              <label><span>Material cost $</span><input min="0" onChange={(event) => updateDraft('materialCost', Number(event.target.value))} step="0.01" type="number" value={draft.materialCost} /></label>
+              <label><span>Material cost $</span><input min="0" onChange={(event) => updateDraft('materialCost', Number(event.target.value))} step="0.01" type="number" value={draft.materialCost || ''} /></label>
               <label>
                 <span>Tax rate %</span>
                 <input
@@ -1035,7 +1035,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                   }
                   step="0.01"
                   type="number"
-                  value={draft.taxRate}
+                  value={draft.taxRate || ''}
                 />
               </label>
               <label>
@@ -1047,7 +1047,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                   }
                   step="0.01"
                   type="number"
-                  value={draft.discount}
+                  value={draft.discount || ''}
                 />
               </label>
               <label className="invoice-form-full-width">

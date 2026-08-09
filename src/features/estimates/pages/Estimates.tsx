@@ -2013,7 +2013,7 @@ function Estimates({
                         }
                         step="0.25"
                         type="number"
-                        value={item.quantity}
+                        value={item.quantity || ''}
                       />
 
                       <input
@@ -2042,7 +2042,7 @@ function Estimates({
                         }
                         step="0.01"
                         type="number"
-                        value={item.unitPrice}
+                        value={item.unitPrice || ''}
                       />
 
                       <strong className="estimate-item-total">
@@ -2119,7 +2119,7 @@ function Estimates({
                       }
                       step="0.01"
                       type="number"
-                      value={taxRate}
+                      value={taxRate || ''}
                     />
 
                     <span>%</span>
@@ -2141,7 +2141,7 @@ function Estimates({
                       }
                       step="0.01"
                       type="number"
-                      value={discount}
+                      value={discount || ''}
                     />
 
                     <span>$</span>
@@ -2152,7 +2152,7 @@ function Estimates({
 
                 <label><span>Property type</span><select onChange={(event) => setPropertyType(event.target.value as 'residential' | 'commercial')} value={propertyType}><option value="residential">Residential</option><option value="commercial">Commercial</option></select></label>
 
-                <label><span>Material cost</span><div className="estimate-number-suffix"><input min="0" onChange={(event) => setMaterialCost(Number(event.target.value))} step="0.01" type="number" value={materialCost} /><span>$</span></div></label>
+                <label><span>Material cost</span><div className="estimate-number-suffix"><input min="0" onChange={(event) => setMaterialCost(Number(event.target.value))} step="0.01" type="number" value={materialCost || ''} /><span>$</span></div></label>
 
                 <label className="tax-reserve-control"><span>Tax reserve: {taxReservePercent}%</span><input aria-label="Estimate tax reserve percentage" max="35" min="25" onChange={(event) => setTaxReservePercent(Number(event.target.value))} step="1" type="range" value={taxReservePercent} /><small>Reserve {formatCurrency(grandTotal * taxReservePercent / 100)} · Safe to spend {formatCurrency(grandTotal * (1 - taxReservePercent / 100))}</small></label>
 
