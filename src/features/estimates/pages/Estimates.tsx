@@ -26,6 +26,7 @@ import type { Customer } from '../../customers/types/Customer'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import { createJobFromEstimate, loadJobs, saveJobs } from '../../jobs/data/jobStore'
 import { applyPaymentOverheadToLineItems } from '../../pricing/utils/paymentOverhead'
+import { useSaas } from '../../saas/saasContext'
 
 import {
   createEstimateNumber,
@@ -331,6 +332,8 @@ function Estimates({
   initialDocumentKind = null,
   openBuilderOnMount = false,
 }: EstimatesProps) {
+  const { role } = useSaas()
+  const canDeleteRecords = role === 'owner' || role === 'admin'
   const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const [
     activeDocumentTab,
@@ -1268,6 +1271,7 @@ function Estimates({
   function deleteEstimate(
     estimateId: string,
   ): void {
+    if (!canDeleteRecords) return
     const estimate = estimates.find(
       (currentEstimate) =>
         currentEstimate.id === estimateId,
@@ -1680,15 +1684,17 @@ function Estimates({
                     {estimate.jobId ? 'Final invoice in Job Mode' : 'Convert to invoice'}
                   </button>
 
-                  <button
-                    aria-label={`Delete ${estimate.estimateNumber}`}
-                    className="customer-secondary-action estimate-delete-button"
-                    onClick={() => deleteEstimate(estimate.id)}
-                    type="button"
-                  >
-                    <Trash2 aria-hidden="true" size={16} />
-                    Delete estimate
-                  </button>
+                  {canDeleteRecords && (
+                    <button
+                      aria-label={`Delete ${estimate.estimateNumber}`}
+                      className="customer-secondary-action estimate-delete-button"
+                      onClick={() => deleteEstimate(estimate.id)}
+                      type="button"
+                    >
+                      <Trash2 aria-hidden="true" size={16} />
+                      Delete estimate
+                    </button>
+                  )}
                 </div>
               </article>
             ))}

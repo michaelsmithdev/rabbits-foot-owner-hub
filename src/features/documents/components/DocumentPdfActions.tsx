@@ -6,6 +6,7 @@ import type { Estimate } from '../../estimates/types/Estimate'
 import type { Invoice } from '../../invoices/types/Invoice'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import { actOnDocument, createAndArchiveDocument } from '../services/documentPdf'
+import { isNativePlatform } from '../services/nativeDocumentManager'
 import type { BusinessDocumentRecord, PdfDocumentInput } from '../types/BusinessDocument'
 
 type Props =
@@ -54,13 +55,20 @@ export default function DocumentPdfActions(props: Props) {
   }
 
   async function run(action: 'preview' | 'save' | 'share' | 'print') {
+    // Open the browser window while the click still has user activation.
+    // Waiting for PDF generation first causes mobile browsers to block it.
+    const preparedWindow =
+      !isNativePlatform() && (action === 'preview' || action === 'print' || action === 'share')
+        ? window.open('', '_blank')
+        : null
     setBusy(true)
     setMessage('')
     try {
       const generated = await getReadyDocument()
-      await actOnDocument(generated.record, generated.blob, action)
+      await actOnDocument(generated.record, generated.blob, action, preparedWindow)
       setMessage(action === 'save' ? 'Saved' : 'Ready')
     } catch (error) {
+      preparedWindow?.close()
       setMessage(error instanceof Error ? error.message : 'Try again')
     } finally {
       setBusy(false)

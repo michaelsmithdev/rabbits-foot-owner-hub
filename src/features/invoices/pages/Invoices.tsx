@@ -18,6 +18,7 @@ import type { BusinessSettings } from '../../settings/types/BusinessSettings'
 import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
 import { useAuth } from '../../auth/authContext'
 import PricingInsightPanel from '../../pricing/components/PricingInsightPanel'
+import { useSaas } from '../../saas/saasContext'
 import {
   createInvoiceNumber,
   loadInvoices,
@@ -210,6 +211,7 @@ async function requestSquarePaymentLink(
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'application/json',
+      'X-Owner-Hub-Organization': localStorage.getItem('owner-hub-active-organization') ?? '',
     },
     body: JSON.stringify({ invoiceId }),
   })
@@ -229,6 +231,8 @@ async function requestSquarePaymentLink(
 
 function Invoices({ initialInvoiceId = null }: InvoicesProps) {
   const { session } = useAuth()
+  const { role } = useSaas()
+  const canDeleteRecords = role === 'owner' || role === 'admin'
   const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const [customers] = useState<Customer[]>(() => loadCustomers())
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoices())
@@ -502,6 +506,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
   }
 
   function deleteInvoice(invoice: Invoice) {
+    if (!canDeleteRecords) return
     const confirmed = window.confirm(
       `Delete ${invoice.invoiceNumber}? This cannot be undone.`,
     )
@@ -810,14 +815,16 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                         Payment history ({invoice.payments.length})
                       </button>
                     )}
-                    <button
-                      aria-label={`Delete ${invoice.invoiceNumber}`}
-                      className="invoice-delete-button"
-                      onClick={() => deleteInvoice(invoice)}
-                      type="button"
-                    >
-                      <Trash2 aria-hidden="true" size={16} />
-                    </button>
+                    {canDeleteRecords && (
+                      <button
+                        aria-label={`Delete ${invoice.invoiceNumber}`}
+                        className="invoice-delete-button"
+                        onClick={() => deleteInvoice(invoice)}
+                        type="button"
+                      >
+                        <Trash2 aria-hidden="true" size={16} />
+                      </button>
+                    )}
                   </div>
                 </article>
               )

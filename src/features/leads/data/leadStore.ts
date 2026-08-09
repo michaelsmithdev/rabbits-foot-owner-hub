@@ -3,6 +3,7 @@ import {
   DATA_REFRESHED_EVENT,
   SYNC_REQUESTED_EVENT,
 } from '../../cloud/syncQueue'
+import { mergeRemoteLeadSnapshot } from './leadMerge'
 
 const LEADS_STORAGE_KEY = 'rabbits-foot-leads'
 const LEAD_QUEUE_STORAGE_KEY = 'rabbits-foot-lead-sync-queue'
@@ -139,22 +140,22 @@ export function clearQueuedLeadDeletions(deletions: LeadDeletion[]) {
 }
 
 export function applyRemoteLeads(leads: Lead[]) {
-  const localLeads = loadLeads()
-  const queuedIds = new Set(loadQueuedLeads().map((lead) => lead.id))
-  const leadsById = new Map(localLeads.map((lead) => [lead.id, lead]))
-  const metadata = readJson<LeadMetadata>(LEAD_METADATA_STORAGE_KEY, {})
+  const queuedLeads = loadQueuedLeads()
+  const nextLeads = mergeRemoteLeadSnapshot(
+    leads,
+    queuedLeads,
+    loadQueuedLeadDeletions(),
+  )
+  const queuedIds = new Set(queuedLeads.map((lead) => lead.id))
+  const metadata: LeadMetadata = {}
 
-  leads.forEach((lead) => {
+  nextLeads.forEach((lead) => {
     if (queuedIds.has(lead.id)) return
-
-    leadsById.set(lead.id, lead)
     metadata[lead.id] = {
       fingerprint: JSON.stringify(lead),
       updatedAt: lead.updatedAt,
     }
   })
-
-  const nextLeads = Array.from(leadsById.values())
   const serializedLeads = JSON.stringify(nextLeads)
   const hasLeadChanges =
     localStorage.getItem(LEADS_STORAGE_KEY) !== serializedLeads

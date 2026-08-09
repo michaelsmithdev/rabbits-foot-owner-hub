@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getSquareMerchantCredentials } from './_square-merchant.ts'
+import { applyCors, requestedOrganizationId } from './_http-security.ts'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -20,19 +21,7 @@ async function readBody(request: ApiRequest) {
 }
 
 function allowedOrigin(request: ApiRequest, response: ApiResponse) {
-  const origin = request.headers.origin
-  if (!origin) return true
-  try {
-    const url = new URL(origin)
-    const allowed = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname.endsWith('.vercel.app') ||
-      (process.env.OWNER_HUB_ALLOWED_ORIGINS ?? '').split(',').map((item) => item.trim()).includes(origin)
-    if (!allowed) return false
-    response.setHeader('Access-Control-Allow-Origin', origin)
-    response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-    response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-    response.setHeader('Vary', 'Origin')
-    return true
-  } catch { return false }
+  return applyCors(request, response, 'POST, OPTIONS')
 }
 
 async function supabaseRequest(path: string, init: RequestInit = {}) {
@@ -87,7 +76,11 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const body = await readBody(request) as { invoiceId?: unknown; amount?: unknown }
     if (typeof body.invoiceId !== 'string') return sendJson(response, 400, { error: 'Choose an invoice.' })
 
-    const membership = await supabaseRequest(`/rest/v1/organization_members?user_id=eq.${encodeURIComponent(userId)}&select=organization_id&limit=1`)
+    const organizationIdHint = requestedOrganizationId(request)
+    const organizationFilter = organizationIdHint
+      ? `&organization_id=eq.${encodeURIComponent(organizationIdHint)}`
+      : ''
+    const membership = await supabaseRequest(`/rest/v1/organization_members?user_id=eq.${encodeURIComponent(userId)}${organizationFilter}&select=organization_id&limit=1`)
     const memberships = await membership.json() as Array<{ organization_id?: string }>
     const organizationId = memberships[0]?.organization_id
     if (!membership.ok || !organizationId) return sendJson(response, 403, { error: 'No business workspace is connected.' })

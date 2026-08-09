@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import { applyCors, requestedOrganizationId } from './_http-security.ts'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -14,18 +15,7 @@ function send(response: ApiResponse, status: number, body: unknown) {
 }
 
 function setCors(request: ApiRequest, response: ApiResponse) {
-  const origin = request.headers.origin
-  const allowed = (process.env.OWNER_HUB_ALLOWED_ORIGINS ?? '').split(',').map((item) => item.trim()).filter(Boolean)
-  if (origin) {
-    let valid = allowed.includes(origin)
-    try { valid = valid || new URL(origin).hostname.endsWith('.vercel.app') } catch { valid = false }
-    if (!valid) return false
-    response.setHeader('Access-Control-Allow-Origin', origin)
-  }
-  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-  response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  response.setHeader('Vary', 'Origin')
-  return true
+  return applyCors(request, response, 'POST, OPTIONS')
 }
 
 async function body(request: ApiRequest) {
@@ -62,8 +52,11 @@ async function authenticatedUser(request: ApiRequest) {
   return user.id ? { id: user.id, email: user.email ?? '' } : null
 }
 
-async function workspace(userId: string) {
-  const response = await database(`/rest/v1/organization_members?user_id=eq.${encodeURIComponent(userId)}&select=organization_id,role&limit=1`)
+async function workspace(userId: string, organizationIdHint: string | null) {
+  const organizationFilter = organizationIdHint
+    ? `&organization_id=eq.${encodeURIComponent(organizationIdHint)}`
+    : ''
+  const response = await database(`/rest/v1/organization_members?user_id=eq.${encodeURIComponent(userId)}${organizationFilter}&select=organization_id,role&limit=1`)
   if (!response.ok) throw new Error('Workspace membership could not be verified.')
   const memberships = await response.json() as Array<{ organization_id: string; role: string }>
   return memberships[0] ?? null
@@ -123,7 +116,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   try {
     const user = await authenticatedUser(request)
     if (!user) return send(response, 401, { error: 'Your secure session expired. Sign in and retry.' })
-    const membership = await workspace(user.id)
+    const membership = await workspace(user.id, requestedOrganizationId(request))
     if (!membership) return send(response, 403, { error: 'No business workspace is connected.' })
     const payload = await body(request) as Json
     const action = typeof payload.action === 'string' ? payload.action : ''

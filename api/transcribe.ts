@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import OpenAI, { toFile } from 'openai'
+import { applyCors, requestedOrganizationId } from './_http-security.ts'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -20,33 +21,7 @@ const allowedMimeTypes = new Set([
 ])
 
 function setCors(request: ApiRequest, response: ApiResponse): boolean {
-  const origin = request.headers.origin
-  const configuredOrigins = (process.env.OWNER_HUB_ALLOWED_ORIGINS ?? '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
-  const allowedOrigins = new Set([
-    'http://localhost',
-    'https://localhost',
-    'capacitor://localhost',
-    ...configuredOrigins,
-  ])
-  let allowed = !origin || allowedOrigins.has(origin)
-
-  if (origin) {
-    try {
-      allowed = allowed || new URL(origin).hostname.endsWith('.vercel.app')
-    } catch {
-      allowed = false
-    }
-  }
-  if (!allowed) return false
-
-  if (origin) response.setHeader('Access-Control-Allow-Origin', origin)
-  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-  response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  response.setHeader('Vary', 'Origin')
-  return true
+  return applyCors(request, response, 'POST, OPTIONS')
 }
 
 function sendJson(response: ApiResponse, status: number, value: unknown) {
@@ -98,8 +73,11 @@ async function serviceDatabase(path: string, init: RequestInit = {}) {
   return fetch(`${url.replace(/\/$/, '')}${path}`, { ...init, headers: { apikey: key, Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', ...(init.headers ?? {}) }, signal: AbortSignal.timeout(10_000) })
 }
 
-async function checkTranscriptionEntitlement(userId: string) {
-  const membershipResponse = await serviceDatabase(`/rest/v1/organization_members?user_id=eq.${encodeURIComponent(userId)}&select=organization_id&limit=1`)
+async function checkTranscriptionEntitlement(userId: string, organizationIdHint: string | null) {
+  const organizationFilter = organizationIdHint
+    ? `&organization_id=eq.${encodeURIComponent(organizationIdHint)}`
+    : ''
+  const membershipResponse = await serviceDatabase(`/rest/v1/organization_members?user_id=eq.${encodeURIComponent(userId)}${organizationFilter}&select=organization_id&limit=1`)
   const organizationId = ((await membershipResponse.json() as Array<{ organization_id?: string }>)[0]?.organization_id)
   if (!membershipResponse.ok || !organizationId) throw new Error('workspace_not_found')
   const subscriptionResponse = await serviceDatabase(`/rest/v1/organization_subscriptions?organization_id=eq.${organizationId}&select=plan,status,trial_ends_at&limit=1`)
@@ -181,7 +159,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   }
   let organizationId: string
   try {
-    organizationId = await checkTranscriptionEntitlement(userId)
+    organizationId = await checkTranscriptionEntitlement(userId, requestedOrganizationId(request))
   } catch (error) {
     const code = error instanceof Error ? error.message : ''
     console.error('Voice transcription entitlement check failed.', { code })

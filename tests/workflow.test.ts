@@ -15,6 +15,10 @@ import {
   isExactScopeLineItemAllowed,
   isUpsellRequested,
 } from '../src/features/estimates/ai/scopePolicy.ts'
+import { mergeRemoteLeadSnapshot } from '../src/features/leads/data/leadMerge.ts'
+import type { Lead } from '../src/features/leads/types/Lead.ts'
+import { nextEstimateNumber } from '../src/features/estimates/data/estimateNumber.ts'
+import { isAllowedOrigin, requestedOrganizationId } from '../api/_http-security.ts'
 
 test('AI estimate scope stays exact unless upsells are explicitly requested', () => {
   assert.equal(isUpsellRequested('Replace 2 storm doors'), false)
@@ -103,4 +107,61 @@ test('schedule rejects overlapping active appointments but ignores canceled work
   const overlap = { ...base, id: 'second', startAt: '2026-08-10T14:00:00.000Z', endAt: '2026-08-10T16:00:00.000Z' }
   assert.equal(appointmentConflicts([base], overlap).length, 1)
   assert.equal(appointmentConflicts([{ ...base, status: 'canceled' }], overlap).length, 0)
+})
+
+test('lead sync removes remote deletions while preserving unsynced local work', () => {
+  const makeLead = (id: string, updatedAt: string): Lead => ({
+    id,
+    organizationId: 'organization',
+    source: 'website',
+    status: 'unread',
+    name: id,
+    phone: '',
+    email: '',
+    service: '',
+    address: '',
+    description: '',
+    photoPaths: [],
+    activity: [],
+    convertedCustomerId: null,
+    estimateId: null,
+    submittedAt: updatedAt,
+    updatedAt,
+  })
+
+  const remoteLead = makeLead('remote', '2026-08-09T12:00:00.000Z')
+  const unsyncedLead = makeLead('unsynced', '2026-08-09T13:00:00.000Z')
+  const deletedLead = makeLead('deleting', '2026-08-09T14:00:00.000Z')
+
+  assert.deepEqual(
+    mergeRemoteLeadSnapshot(
+      [remoteLead, deletedLead],
+      [unsyncedLead],
+      [{ id: deletedLead.id, photoPaths: [] }],
+    ).map((lead) => lead.id),
+    ['unsynced', 'remote'],
+  )
+})
+
+test('estimate numbers never collide after an older estimate is deleted', () => {
+  const estimates = ['EST-0001', 'EST-0003', 'EST-0003-R1']
+
+  assert.equal(nextEstimateNumber(estimates), 'EST-0004')
+})
+
+test('API requests reject unrelated Vercel deployments', () => {
+  assert.equal(isAllowedOrigin('https://rabbits-foot-owner-hub.vercel.app'), true)
+  assert.equal(isAllowedOrigin('http://localhost:5173'), true)
+  assert.equal(isAllowedOrigin('capacitor://localhost'), true)
+  assert.equal(isAllowedOrigin('https://unrelated-project.vercel.app'), false)
+  assert.equal(
+    requestedOrganizationId({
+      headers: { 'x-owner-hub-organization': '4ef5a752-9fb6-43e4-97bb-fbf6d2095ccb' },
+    } as never),
+    '4ef5a752-9fb6-43e4-97bb-fbf6d2095ccb',
+  )
+  assert.equal(
+    requestedOrganizationId({ headers: { 'x-owner-hub-organization': 'not-a-workspace' } } as never),
+    null,
+  )
 })

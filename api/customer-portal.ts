@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getSquareMerchantCredentials } from './_square-merchant.ts'
+import { applyCors, requestedOrganizationId } from './_http-security.ts'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -14,19 +15,7 @@ function send(response: ApiResponse, status: number, value: unknown) {
 }
 
 function cors(request: ApiRequest, response: ApiResponse) {
-  const origin = request.headers.origin
-  if (!origin) return true
-  try {
-    const hostname = new URL(origin).hostname
-    const allowed = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.vercel.app') ||
-      (process.env.OWNER_HUB_ALLOWED_ORIGINS ?? '').split(',').map((item) => item.trim()).includes(origin)
-    if (!allowed) return false
-    response.setHeader('Access-Control-Allow-Origin', origin)
-    response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-    response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-    response.setHeader('Vary', 'Origin')
-    return true
-  } catch { return false }
+  return applyCors(request, response, 'GET, POST, OPTIONS')
 }
 
 async function body(request: ApiRequest) {
@@ -253,7 +242,11 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       const ownerId = accessToken ? await userId(accessToken) : null
       if (!ownerId) return send(response, 401, { error: 'Sign in before creating a customer link.' })
       const customerId = clean(payload.customerId, 80)
-      const membershipResponse = await database(`/rest/v1/organization_members?user_id=eq.${ownerId}&select=organization_id&limit=1`)
+      const organizationIdHint = requestedOrganizationId(request)
+      const organizationFilter = organizationIdHint
+        ? `&organization_id=eq.${encodeURIComponent(organizationIdHint)}`
+        : ''
+      const membershipResponse = await database(`/rest/v1/organization_members?user_id=eq.${ownerId}${organizationFilter}&select=organization_id&limit=1`)
       const memberships = await membershipResponse.json() as Array<{ organization_id?: string }>
       const organizationId = memberships[0]?.organization_id
       if (!organizationId || !customerId) return send(response, 400, { error: 'Choose a customer in the connected workspace.' })

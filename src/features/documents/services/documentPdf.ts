@@ -272,7 +272,12 @@ function downloadBlob(blob: Blob, fileName: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 30_000)
 }
 
-export async function actOnDocument(record: BusinessDocumentRecord, blob: Blob, action: 'preview' | 'save' | 'share' | 'print') {
+export async function actOnDocument(
+  record: BusinessDocumentRecord,
+  blob: Blob,
+  action: 'preview' | 'save' | 'share' | 'print',
+  preparedWindow?: Window | null,
+) {
   if (isNativePlatform() && record.nativePath) {
     if (action === 'preview') return NativeDocumentManager.openPdf({ path: record.nativePath })
     if (action === 'save') return NativeDocumentManager.exportPdf({ path: record.nativePath, fileName: record.fileName })
@@ -281,10 +286,18 @@ export async function actOnDocument(record: BusinessDocumentRecord, blob: Blob, 
   }
   if (action === 'save') return downloadBlob(blob, record.fileName)
   if (action === 'share' && navigator.share && navigator.canShare?.({ files: [new File([blob], record.fileName, { type: 'application/pdf' })] })) {
+    preparedWindow?.close()
     return navigator.share({ title: record.fileName, files: [new File([blob], record.fileName, { type: 'application/pdf' })] })
   }
   const url = URL.createObjectURL(blob)
-  const preview = window.open(url, '_blank', 'noopener,noreferrer')
-  if (action === 'print' && preview) preview.addEventListener('load', () => preview.print())
+  const preview = preparedWindow ?? window.open('', '_blank')
+  if (!preview) {
+    URL.revokeObjectURL(url)
+    throw new Error('Allow pop-ups for Owner Hub, then retry the PDF action.')
+  }
+  if (action === 'print') {
+    preview.addEventListener('load', () => preview.print(), { once: true })
+  }
+  preview.location.href = url
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }

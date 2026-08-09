@@ -102,7 +102,7 @@ export default function Schedule() {
     setPortalMessage('Creating secure Customer Hub link...')
     try {
       const apiOrigin = import.meta.env.VITE_OWNER_HUB_API_URL?.trim().replace(/\/$/, '') ?? ''
-      const response = await fetch(`${apiOrigin}/api/customer-portal`, { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', customerId }) })
+      const response = await fetch(`${apiOrigin}/api/customer-portal`, { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json', 'X-Owner-Hub-Organization': localStorage.getItem('owner-hub-active-organization') ?? '' }, body: JSON.stringify({ action: 'create', customerId }) })
       const payload = await response.json() as { url?: string; error?: string }
       if (!response.ok || !payload.url) throw new Error(payload.error || 'Customer Hub link failed.')
       await navigator.clipboard.writeText(payload.url).catch(() => undefined)

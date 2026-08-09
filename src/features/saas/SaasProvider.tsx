@@ -12,7 +12,7 @@ import type {
   WorkspaceSubscription,
 } from './types'
 import { activateOrganizationStorage } from '../../storage/workspaceStorage'
-import { defaultBusinessSettings, saveBusinessSettings } from '../settings/data/businessSettingsStore'
+import { defaultBusinessSettings, loadBusinessSettings, saveBusinessSettings } from '../settings/data/businessSettingsStore'
 
 const emptyUsage: UsageSummary = { aiEstimates: 0, transcriptions: 0, photos: 0, sms: 0, emails: 0 }
 
@@ -67,8 +67,22 @@ export function SaasProvider({ children }: { children: ReactNode }) {
 
       const org = organizationResult.data
       activateOrganizationStorage(org.id)
-      if (!localStorage.getItem('rabbits-foot-business-settings')) {
-        saveBusinessSettings({ ...defaultBusinessSettings, businessName: org.name, email: session.user.email ?? '', updatedAt: new Date().toISOString() })
+      const currentSettings = loadBusinessSettings()
+      const hasUntouchedIdentity =
+        currentSettings.businessName === defaultBusinessSettings.businessName &&
+        !currentSettings.phone &&
+        !currentSettings.email &&
+        !currentSettings.website &&
+        !currentSettings.streetAddress &&
+        !currentSettings.city &&
+        !currentSettings.zipCode
+      if (hasUntouchedIdentity) {
+        saveBusinessSettings({
+          ...currentSettings,
+          businessName: org.name,
+          email: session.user.email ?? '',
+          updatedAt: new Date().toISOString(),
+        })
       }
       setOrganization({
         id: org.id, name: org.name, slug: org.slug, logoUrl: org.logo_url,
@@ -126,6 +140,17 @@ export function SaasProvider({ children }: { children: ReactNode }) {
       onboarding_completed_at: updates.onboardingCompletedAt, updated_at: new Date().toISOString(),
     }).eq('id', organization.id)
     if (result.error) throw result.error
+    const currentSettings = loadBusinessSettings()
+    if (
+      currentSettings.businessName === organization.name ||
+      currentSettings.businessName === defaultBusinessSettings.businessName
+    ) {
+      saveBusinessSettings({
+        ...currentSettings,
+        businessName: updates.name.trim(),
+        updatedAt: new Date().toISOString(),
+      })
+    }
     await refresh()
   }, [organization, refresh])
 

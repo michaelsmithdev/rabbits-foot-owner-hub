@@ -1,5 +1,6 @@
 import type { Estimate } from '../types/Estimate'
 import { queueCollectionSync } from '../../cloud/syncQueue'
+import { nextEstimateNumber } from './estimateNumber'
 
 const STORAGE_KEY = 'rabbits-foot-estimates'
 
@@ -111,12 +112,10 @@ export function createEstimateNumber(
   estimates: Estimate[],
   prefix = 'EST',
 ): string {
-  const nextNumber = estimates.length + 1
-
-  return `${prefix}-${String(nextNumber).padStart(
-    4,
-    '0',
-  )}`
+  return nextEstimateNumber(
+    estimates.map((estimate) => estimate.estimateNumber),
+    prefix,
+  )
 }
 
 export function createRevisionNumber(

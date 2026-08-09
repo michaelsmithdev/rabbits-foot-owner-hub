@@ -16,7 +16,7 @@ const apiOrigin = (import.meta.env.VITE_OWNER_HUB_API_URL ?? '').replace(/\/$/, 
 async function apiAction(accessToken: string, body: Record<string, unknown>) {
   const response = await fetch(`${apiOrigin}/api/saas`, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json', 'X-Owner-Hub-Organization': localStorage.getItem('owner-hub-active-organization') ?? '' },
     body: JSON.stringify(body),
   })
   const payload = await response.json() as { error?: string; [key: string]: unknown }

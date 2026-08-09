@@ -35,6 +35,7 @@ import type {
 import { cloudClient } from '../../features/cloud/cloudClient'
 import { DATA_REFRESHED_EVENT } from '../../features/cloud/syncQueue'
 import { loadBusinessSettings } from '../../features/settings/data/businessSettingsStore'
+import { useSaas } from '../../features/saas/saasContext'
 import './Inbox.css'
 
 type InboxFilter = 'inbox' | 'unread' | 'flagged' | 'archived' | 'all'
@@ -132,6 +133,8 @@ function LeadPhotos({ lead }: { lead: Lead }) {
 }
 
 function Inbox({ onOpenDocuments }: InboxProps) {
+  const { role } = useSaas()
+  const canDeleteRecords = role === 'owner' || role === 'admin'
   const [leads, setLeads] = useState<Lead[]>(() => loadLeads())
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [filter, setFilter] = useState<InboxFilter>('inbox')
@@ -242,6 +245,7 @@ function Inbox({ onOpenDocuments }: InboxProps) {
   }
 
   function removeLead(lead: Lead) {
+    if (!canDeleteRecords) return
     const confirmed = window.confirm(
       `Permanently delete the lead from ${lead.name}? This cannot be undone.`,
     )
@@ -512,9 +516,11 @@ function Inbox({ onOpenDocuments }: InboxProps) {
                   {selectedLead.status === 'archived' ? <ArchiveRestore size={17} /> : <Archive size={17} />}
                   {selectedLead.status === 'archived' ? 'Restore' : 'Archive'}
                 </button>
-                <button className="lead-delete-button" onClick={() => removeLead(selectedLead)} type="button">
-                  <Trash2 size={17} />Delete lead
-                </button>
+                {canDeleteRecords && (
+                  <button className="lead-delete-button" onClick={() => removeLead(selectedLead)} type="button">
+                    <Trash2 size={17} />Delete lead
+                  </button>
+                )}
               </div>
               <div className="lead-primary-actions">
                 <button

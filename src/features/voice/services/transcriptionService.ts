@@ -50,6 +50,7 @@ export async function transcribeAudio(blob: Blob, fileName: string): Promise<str
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
+        'X-Owner-Hub-Organization': localStorage.getItem('owner-hub-active-organization') ?? '',
       },
       body: JSON.stringify({
         audioBase64: await blobToBase64(blob),

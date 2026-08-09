@@ -315,6 +315,7 @@ function Customers({
         headers: {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
+          'X-Owner-Hub-Organization': localStorage.getItem('owner-hub-active-organization') ?? '',
         },
         body: JSON.stringify({ action: 'create', customerId: customer.id }),
       })

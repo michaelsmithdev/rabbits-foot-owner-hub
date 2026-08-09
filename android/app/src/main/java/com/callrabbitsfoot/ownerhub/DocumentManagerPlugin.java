@@ -1,5 +1,6 @@
 package com.callrabbitsfoot.ownerhub;
 
+import android.Manifest;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
@@ -25,7 +26,10 @@ import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
+import com.getcapacitor.PermissionState;
 import com.getcapacitor.annotation.CapacitorPlugin;
+import com.getcapacitor.annotation.Permission;
+import com.getcapacitor.annotation.PermissionCallback;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -34,7 +38,12 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Locale;
 
-@CapacitorPlugin(name = "DocumentManager")
+@CapacitorPlugin(
+    name = "DocumentManager",
+    permissions = {
+        @Permission(alias = "legacyStorage", strings = { Manifest.permission.WRITE_EXTERNAL_STORAGE })
+    }
+)
 public class DocumentManagerPlugin extends Plugin {
     private File documentDirectory() {
         File base = getContext().getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS);
@@ -48,10 +57,14 @@ public class DocumentManagerPlugin extends Plugin {
         File file = new File(path).getCanonicalFile();
         File internal = getContext().getFilesDir().getCanonicalFile();
         File external = getContext().getExternalFilesDir(null);
-        boolean allowed = file.getPath().startsWith(internal.getPath()) ||
-            (external != null && file.getPath().startsWith(external.getCanonicalPath()));
+        boolean allowed = isInside(file, internal) ||
+            (external != null && isInside(file, external.getCanonicalFile()));
         if (!allowed || !file.exists()) throw new Exception("Document file is unavailable.");
         return file;
+    }
+
+    private boolean isInside(File file, File directory) {
+        return file.equals(directory) || file.getPath().startsWith(directory.getPath() + File.separator);
     }
 
     private String safeName(String value) {
@@ -78,6 +91,24 @@ public class DocumentManagerPlugin extends Plugin {
 
     @PluginMethod
     public void exportPdf(PluginCall call) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            getPermissionState("legacyStorage") != PermissionState.GRANTED) {
+            requestPermissionForAlias("legacyStorage", call, "legacyStoragePermissionResult");
+            return;
+        }
+        exportPdfAfterPermission(call);
+    }
+
+    @PermissionCallback
+    private void legacyStoragePermissionResult(PluginCall call) {
+        if (getPermissionState("legacyStorage") == PermissionState.GRANTED) {
+            exportPdfAfterPermission(call);
+        } else {
+            call.reject("Storage permission is required to save PDFs on Android 9 and older.");
+        }
+    }
+
+    private void exportPdfAfterPermission(PluginCall call) {
         try {
             File source = safeFile(call.getString("path"));
             String fileName = safeName(call.getString("fileName"));

@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import OpenAI from 'openai'
+import { applyCors, requestedOrganizationId } from './_http-security.ts'
 
 import {
   aiEstimateJsonSchema,
@@ -94,35 +95,7 @@ For a complete estimate:
 `.trim()
 
 function setCors(request: ApiRequest, response: ApiResponse): boolean {
-  const origin = request.headers.origin
-  const configuredOrigins = (process.env.OWNER_HUB_ALLOWED_ORIGINS ?? '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
-  const localOrigins = new Set([
-    'http://localhost',
-    'https://localhost',
-    'capacitor://localhost',
-    ...configuredOrigins,
-  ])
-  let allowed = !origin || localOrigins.has(origin)
-
-  if (origin) {
-    try {
-      const hostname = new URL(origin).hostname
-      allowed = allowed || hostname.endsWith('.vercel.app')
-    } catch {
-      allowed = false
-    }
-  }
-
-  if (!allowed) return false
-
-  if (origin) response.setHeader('Access-Control-Allow-Origin', origin)
-  response.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-  response.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  response.setHeader('Vary', 'Origin')
-  return true
+  return applyCors(request, response, 'POST, OPTIONS')
 }
 
 function sendJson(response: ApiResponse, status: number, value: unknown): void {
@@ -351,8 +324,11 @@ async function serviceDatabase(path: string, init: RequestInit = {}) {
   })
 }
 
-async function checkAiEntitlement(userId: string) {
-  const membershipResponse = await serviceDatabase(`/rest/v1/organization_members?user_id=eq.${encodeURIComponent(userId)}&select=organization_id&limit=1`)
+async function checkAiEntitlement(userId: string, organizationIdHint: string | null) {
+  const organizationFilter = organizationIdHint
+    ? `&organization_id=eq.${encodeURIComponent(organizationIdHint)}`
+    : ''
+  const membershipResponse = await serviceDatabase(`/rest/v1/organization_members?user_id=eq.${encodeURIComponent(userId)}${organizationFilter}&select=organization_id&limit=1`)
   const memberships = await membershipResponse.json() as Array<{ organization_id?: string }>
   const organizationId = memberships[0]?.organization_id
   if (!membershipResponse.ok || !organizationId) throw new Error('workspace_not_found')
@@ -613,7 +589,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   }
   let entitlement: { organizationId: string; used: number; limit: number }
   try {
-    entitlement = await checkAiEntitlement(userId)
+    entitlement = await checkAiEntitlement(userId, requestedOrganizationId(request))
   } catch (error) {
     const code = error instanceof Error ? error.message : ''
     console.error('AI estimate entitlement check failed.', { code })

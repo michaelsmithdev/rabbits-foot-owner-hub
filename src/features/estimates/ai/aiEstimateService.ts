@@ -105,6 +105,7 @@ export async function generateAiEstimate(input: {
       headers: {
         Authorization: `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
+        'X-Owner-Hub-Organization': localStorage.getItem('owner-hub-active-organization') ?? '',
       },
       body: JSON.stringify(request),
       signal: controller.signal,
