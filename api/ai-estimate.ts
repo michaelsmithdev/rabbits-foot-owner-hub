@@ -593,6 +593,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     entitlement = await checkAiEntitlement(userId)
   } catch (error) {
     const code = error instanceof Error ? error.message : ''
+    console.error('AI estimate entitlement check failed.', { code })
     if (code === 'subscription_inactive') {
       sendJson(response, 402, { error: 'Choose an active plan in Business & billing to use AI estimates.' })
       return

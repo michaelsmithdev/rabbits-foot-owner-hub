@@ -184,6 +184,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     organizationId = await checkTranscriptionEntitlement(userId)
   } catch (error) {
     const code = error instanceof Error ? error.message : ''
+    console.error('Voice transcription entitlement check failed.', { code })
     sendJson(response, code === 'transcription_limit_reached' ? 429 : code === 'subscription_inactive' ? 402 : 503, {
       error: code === 'transcription_limit_reached'
         ? 'This month’s voice transcription allowance has been used. Upgrade the plan or type the note.'
