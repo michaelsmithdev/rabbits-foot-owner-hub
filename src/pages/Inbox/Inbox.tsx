@@ -12,6 +12,7 @@ import {
   MessageSquareText,
   Phone,
   Search,
+  Trash2,
   UserPlus,
   X,
 } from 'lucide-react'
@@ -25,7 +26,7 @@ import {
   saveEstimates,
 } from '../../features/estimates/data/estimateStore'
 import type { Estimate } from '../../features/estimates/types/Estimate'
-import { loadLeads, saveLeads } from '../../features/leads/data/leadStore'
+import { deleteLead, loadLeads, saveLeads } from '../../features/leads/data/leadStore'
 import type {
   Lead,
   LeadActivity,
@@ -238,6 +239,18 @@ function Inbox({ onOpenDocuments }: InboxProps) {
     if (nextStatus === 'archived' && filter !== 'archived' && filter !== 'all') {
       setSelectedLeadId(null)
     }
+  }
+
+  function removeLead(lead: Lead) {
+    const confirmed = window.confirm(
+      `Permanently delete the lead from ${lead.name}? This cannot be undone.`,
+    )
+    if (!confirmed) return
+
+    deleteLead(lead)
+    setLeads(loadLeads())
+    setSelectedLeadId(null)
+    setNotice(`${lead.name}'s lead was deleted.`)
   }
 
   function findOrCreateCustomer(lead: Lead) {
@@ -498,6 +511,9 @@ function Inbox({ onOpenDocuments }: InboxProps) {
                 <button onClick={() => toggleArchive(selectedLead)} type="button">
                   {selectedLead.status === 'archived' ? <ArchiveRestore size={17} /> : <Archive size={17} />}
                   {selectedLead.status === 'archived' ? 'Restore' : 'Archive'}
+                </button>
+                <button className="lead-delete-button" onClick={() => removeLead(selectedLead)} type="button">
+                  <Trash2 size={17} />Delete lead
                 </button>
               </div>
               <div className="lead-primary-actions">

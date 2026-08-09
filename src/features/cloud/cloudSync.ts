@@ -8,7 +8,9 @@ import {
 } from './syncQueue'
 import {
   applyRemoteLeads,
+  clearQueuedLeadDeletions,
   clearQueuedLeads,
+  loadQueuedLeadDeletions,
   loadQueuedLeads,
 } from '../leads/data/leadStore'
 import type { Lead, LeadActivity, LeadStatus } from '../leads/types/Lead'
@@ -180,6 +182,30 @@ export async function synchronizeBusinessRecords(
   )
 
   const queuedLeads = loadQueuedLeads()
+
+  const queuedLeadDeletions = loadQueuedLeadDeletions()
+  if (queuedLeadDeletions.length > 0) {
+    const { error: leadDeleteError } = await client
+      .from('leads')
+      .delete()
+      .in('id', queuedLeadDeletions.map((item) => item.id))
+
+    if (leadDeleteError) throw leadDeleteError
+
+    const attachmentPaths = Array.from(new Set(
+      queuedLeadDeletions.flatMap((item) => item.photoPaths),
+    ))
+    if (attachmentPaths.length > 0) {
+      const { error: attachmentDeleteError } = await client.storage
+        .from('lead-attachments')
+        .remove(attachmentPaths)
+      if (attachmentDeleteError) {
+        console.error('Deleted lead attachments could not be removed.', attachmentDeleteError.message)
+      }
+    }
+
+    clearQueuedLeadDeletions(queuedLeadDeletions)
+  }
 
   if (queuedLeads.length > 0) {
     const { error: leadUploadError } = await client

@@ -12,6 +12,7 @@ const JSON_STORAGE_KEYS = [
   'rabbits-foot-leads',
   'rabbits-foot-lead-sync-queue',
   'rabbits-foot-lead-sync-metadata',
+  'rabbits-foot-lead-delete-queue',
   'rabbits-foot-photos',
   'rabbits-foot-photo-delete-queue',
   'rabbits-foot-document-archive',

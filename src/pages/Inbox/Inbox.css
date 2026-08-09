@@ -397,6 +397,7 @@
 .lead-management-actions button,
 .lead-primary-actions button { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 14px; padding: 0 15px; font: inherit; font-size: 0.82rem; font-weight: 850; cursor: pointer; }
 .lead-management-actions button { border: 1px solid #dfe2da; background: #fff; color: #535a52; }
+.lead-management-actions .lead-delete-button { border-color: #efc4bd; background: #fff4f1; color: #a92f28; }
 .lead-primary-actions button { flex: 1; }
 .lead-customer-button { border: 1px solid #cdd4c8; background: #f5f6f3; color: #333933; }
 .lead-customer-button:disabled { cursor: default; opacity: 0.62; }

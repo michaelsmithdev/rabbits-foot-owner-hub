@@ -7,6 +7,12 @@ import {
 const LEADS_STORAGE_KEY = 'rabbits-foot-leads'
 const LEAD_QUEUE_STORAGE_KEY = 'rabbits-foot-lead-sync-queue'
 const LEAD_METADATA_STORAGE_KEY = 'rabbits-foot-lead-sync-metadata'
+const LEAD_DELETE_QUEUE_KEY = 'rabbits-foot-lead-delete-queue'
+
+export type LeadDeletion = {
+  id: string
+  photoPaths: string[]
+}
 
 type LeadMetadata = Record<string, { fingerprint: string; updatedAt: string }>
 
@@ -100,6 +106,36 @@ export function clearQueuedLeads(leads: Lead[]) {
   )
 
   localStorage.setItem(LEAD_QUEUE_STORAGE_KEY, JSON.stringify(remainingLeads))
+}
+
+export function deleteLead(lead: Lead) {
+  const remainingLeads = loadLeads().filter((item) => item.id !== lead.id)
+  const remainingQueuedLeads = loadQueuedLeads().filter((item) => item.id !== lead.id)
+  const metadata = readJson<LeadMetadata>(LEAD_METADATA_STORAGE_KEY, {})
+  const deletions = readJson<LeadDeletion[]>(LEAD_DELETE_QUEUE_KEY, [])
+    .filter((item) => item.id !== lead.id)
+
+  delete metadata[lead.id]
+  deletions.push({ id: lead.id, photoPaths: lead.photoPaths })
+
+  localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(remainingLeads))
+  localStorage.setItem(LEAD_QUEUE_STORAGE_KEY, JSON.stringify(remainingQueuedLeads))
+  localStorage.setItem(LEAD_METADATA_STORAGE_KEY, JSON.stringify(metadata))
+  localStorage.setItem(LEAD_DELETE_QUEUE_KEY, JSON.stringify(deletions))
+  window.dispatchEvent(new Event(SYNC_REQUESTED_EVENT))
+}
+
+export function loadQueuedLeadDeletions(): LeadDeletion[] {
+  return readJson<LeadDeletion[]>(LEAD_DELETE_QUEUE_KEY, [])
+}
+
+export function clearQueuedLeadDeletions(deletions: LeadDeletion[]) {
+  const completedIds = new Set(deletions.map((item) => item.id))
+  const remaining = loadQueuedLeadDeletions().filter(
+    (item) => !completedIds.has(item.id),
+  )
+
+  localStorage.setItem(LEAD_DELETE_QUEUE_KEY, JSON.stringify(remaining))
 }
 
 export function applyRemoteLeads(leads: Lead[]) {

@@ -6,6 +6,7 @@ const BUSINESS_STORAGE_KEYS = [
   'rabbits-foot-business-settings', 'rabbits-foot-cloud-sync-queue',
   'rabbits-foot-cloud-sync-metadata', 'rabbits-foot-leads',
   'rabbits-foot-lead-sync-queue', 'rabbits-foot-lead-sync-metadata',
+  'rabbits-foot-lead-delete-queue',
   'rabbits-foot-photos', 'rabbits-foot-photo-delete-queue',
   'rabbits-foot-document-archive', 'rabbits-foot-walkthroughs',
   'rabbits-foot-pricebook', 'rabbits-foot-jobs', 'rabbits-foot-appointments',
