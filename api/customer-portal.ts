@@ -87,14 +87,14 @@ function safePortalData(all: Array<{ record_type: string; record_id: string; pay
   return {
     expiresAt,
     customer: { id: customerId, firstName: clean(customer.firstName, 80), lastName: clean(customer.lastName, 80), email: clean(customer.email, 200), phone: clean(customer.phone, 40) },
-    estimates: all.filter((item) => item.record_type === 'estimate' && belongs(item)).map(({ payload }) => ({
+    estimates: all.filter((item) => item.record_type === 'estimate' && belongs(item) && item.payload.status !== 'draft').map(({ payload }) => ({
       id: payload.id, estimateNumber: payload.estimateNumber, jobName: payload.jobName, serviceAddress: payload.serviceAddress,
       scopeOfWork: payload.scopeOfWork, exclusions: payload.exclusions, lineItems: payload.lineItems, taxRate: payload.taxRate, discount: payload.discount,
       issueDate: payload.issueDate, expirationDate: payload.expirationDate, status: payload.status,
       approval: payload.approval && typeof payload.approval === 'object' ? { customerName: (payload.approval as Json).customerName, acceptedAt: (payload.approval as Json).acceptedAt } : undefined,
       total: total(payload),
     })),
-    invoices: all.filter((item) => item.record_type === 'invoice' && belongs(item)).map(({ payload }) => {
+    invoices: all.filter((item) => item.record_type === 'invoice' && belongs(item) && !['draft', 'void'].includes(String(item.payload.status))).map(({ payload }) => {
       const paid = (Array.isArray(payload.payments) ? payload.payments : []).reduce((sum, raw) => sum + (raw && typeof raw === 'object' && typeof (raw as Json).amount === 'number' ? (raw as Json).amount as number : 0), 0)
       return { id: payload.id, invoiceNumber: payload.invoiceNumber, jobName: payload.jobName, serviceAddress: payload.serviceAddress, description: payload.description, lineItems: payload.lineItems, issueDate: payload.issueDate, dueDate: payload.dueDate, status: payload.status, total: total(payload), balance: Math.max(0, total(payload) - paid), squarePaymentLink: payload.squarePaymentLink && typeof payload.squarePaymentLink === 'object' ? { url: (payload.squarePaymentLink as Json).url, amount: (payload.squarePaymentLink as Json).amount } : undefined }
     }),

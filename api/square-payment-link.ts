@@ -95,6 +95,9 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const records = await recordResponse.json() as Array<{ payload?: Record<string, unknown> }>
     const invoice = records[0]?.payload
     if (!recordResponse.ok || !invoice) return sendJson(response, 404, { error: 'Invoice not found in the secure workspace. Sync and retry.' })
+    if (!['sent', 'partial', 'overdue'].includes(String(invoice.status))) {
+      return sendJson(response, 400, { error: 'Mark the invoice Sent before accepting payment.' })
+    }
     const balance = invoiceBalance(invoice)
     const requested = typeof body.amount === 'number' && Number.isFinite(body.amount) ? body.amount : balance
     const amount = Math.min(balance, Math.max(0, Math.round(requested * 100) / 100))

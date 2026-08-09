@@ -1164,6 +1164,28 @@ textarea:focus-visible {
   font-size: 16px;
 }
 
+.customer-profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.customer-profile-actions button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.customer-portal-message {
+  margin-top: 18px;
+  border: 1px solid #cfe6a8;
+  border-radius: 14px;
+  background: #eef8dc;
+  padding: 13px 16px;
+  color: #315c05;
+  font-weight: 700;
+}
+
 .customer-search {
   display: flex;
   width: min(600px, 100%);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Banknote,
   CalendarDays,
@@ -17,6 +17,7 @@ import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import type { BusinessSettings } from '../../settings/types/BusinessSettings'
 import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
 import { useAuth } from '../../auth/authContext'
+import { useCloudSync } from '../../cloud/cloudSyncContext'
 import PricingInsightPanel from '../../pricing/components/PricingInsightPanel'
 import {
   createInvoiceNumber,
@@ -37,6 +38,7 @@ import {
   calculatePaymentsTotal,
   getPaymentAdjustedStatus,
 } from '../utils/invoiceMath'
+import { invoiceNeedsSquarePaymentLink } from '../utils/squarePaymentLink'
 
 import '../styles/Invoices.css'
 
@@ -163,8 +165,45 @@ function formatCustomerAddress(customer: Customer) {
     .join(' ')
 }
 
+type SquarePaymentLinkResponse = {
+  error?: string
+  url?: string
+  paymentLinkId?: string
+  orderId?: string
+  amount?: number
+}
+
+async function requestSquarePaymentLink(
+  accessToken: string,
+  invoiceId: string,
+) {
+  const apiOrigin =
+    import.meta.env.VITE_OWNER_HUB_API_URL?.trim().replace(/\/$/, '') ?? ''
+  const response = await fetch(`${apiOrigin}/api/square-payment-link`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ invoiceId }),
+  })
+  const payload = (await response.json()) as SquarePaymentLinkResponse
+
+  if (!response.ok || !payload.url || typeof payload.amount !== 'number') {
+    throw new Error(payload.error || 'Square did not return a payment link.')
+  }
+
+  return {
+    url: payload.url,
+    paymentLinkId: payload.paymentLinkId,
+    orderId: payload.orderId,
+    amount: payload.amount,
+  }
+}
+
 function Invoices() {
   const { session } = useAuth()
+  const { lastSyncedAt, status: cloudStatus } = useCloudSync()
   const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const [customers] = useState<Customer[]>(() => loadCustomers())
   const [invoices, setInvoices] = useState<Invoice[]>(() => loadInvoices())
@@ -189,10 +228,72 @@ function Invoices() {
   const [printInvoiceId] = useState<string | null>(null)
   const [squareLinkInvoiceId, setSquareLinkInvoiceId] = useState<string | null>(null)
   const [squareMessage, setSquareMessage] = useState('')
+  const automaticSquareLinks = useRef(new Set<string>())
 
   useEffect(() => {
     saveInvoices(invoices)
   }, [invoices])
+
+  useEffect(() => {
+    const accessToken = session?.access_token
+
+    if (
+      !accessToken ||
+      cloudStatus !== 'synced' ||
+      !lastSyncedAt ||
+      !navigator.onLine
+    ) {
+      return
+    }
+
+    const lastSyncTime = new Date(lastSyncedAt).getTime()
+    const invoice = invoices.find(
+      (item) =>
+        invoiceNeedsSquarePaymentLink(item) &&
+        new Date(item.updatedAt).getTime() <= lastSyncTime &&
+        !automaticSquareLinks.current.has(item.id),
+    )
+
+    if (!invoice) return
+
+    automaticSquareLinks.current.add(invoice.id)
+    const invoiceId = invoice.id
+
+    void requestSquarePaymentLink(accessToken, invoiceId)
+      .then((link) => {
+        const createdAt = new Date().toISOString()
+
+        setInvoices((current) =>
+          current.map((item) => {
+            if (
+              item.id !== invoiceId ||
+              !invoiceNeedsSquarePaymentLink(item) ||
+              Math.abs(calculateInvoiceBalance(item) - link.amount) > 0.005
+            ) {
+              return item
+            }
+
+            return {
+              ...item,
+              squarePaymentLink: { ...link, createdAt },
+              updatedAt: createdAt,
+            }
+          }),
+        )
+        setSquareMessage(
+          `${invoice.invoiceNumber} is ready for secure Square payment in the Customer Hub.`,
+        )
+      })
+      .catch((error) => {
+        console.warn(
+          `Automatic Square link failed for ${invoice.invoiceNumber}.`,
+          error,
+        )
+      })
+      .finally(() => {
+        automaticSquareLinks.current.delete(invoiceId)
+      })
+  }, [cloudStatus, invoices, lastSyncedAt, session?.access_token])
 
   useEffect(() => {
     if (!isBuilderOpen && !paymentInvoiceId) return
@@ -240,18 +341,14 @@ function Invoices() {
     setSquareLinkInvoiceId(invoice.id)
     setSquareMessage('')
     try {
-      const apiOrigin = import.meta.env.VITE_OWNER_HUB_API_URL?.trim().replace(/\/$/, '') ?? ''
-      const response = await fetch(`${apiOrigin}/api/square-payment-link`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId: invoice.id }),
-      })
-      const payload = await response.json() as { error?: string; url?: string; paymentLinkId?: string; orderId?: string; amount?: number }
-      if (!response.ok || !payload.url || typeof payload.amount !== 'number') throw new Error(payload.error || 'Square did not return a payment link.')
+      const payload = await requestSquarePaymentLink(
+        session.access_token,
+        invoice.id,
+      )
       const createdAt = new Date().toISOString()
       setInvoices((current) => current.map((item) => item.id === invoice.id ? {
         ...item,
-        squarePaymentLink: { url: payload.url!, paymentLinkId: payload.paymentLinkId, orderId: payload.orderId, amount: payload.amount!, createdAt },
+        squarePaymentLink: { ...payload, createdAt },
         updatedAt: createdAt,
       } : item))
       setSquareMessage(`Square checkout created for ${formatCurrency(payload.amount)}.`)
@@ -691,7 +788,10 @@ function Invoices() {
                       Edit
                     </button>
                     <DocumentPdfActions kind="invoice" document={invoice} customer={customer} />
-                    {balance > 0 && invoice.status !== 'void' && (
+                    {balance > 0 &&
+                      ['sent', 'partial', 'overdue'].includes(
+                        invoice.status,
+                      ) && (
                       <button
                         disabled={squareLinkInvoiceId === invoice.id}
                         onClick={() => void createSquarePaymentLink(invoice)}
@@ -701,7 +801,7 @@ function Invoices() {
                         {squareLinkInvoiceId === invoice.id ? 'Connecting Square…' : invoice.squarePaymentLink ? 'Refresh Square link' : 'Pay with Square'}
                       </button>
                     )}
-                    {invoice.squarePaymentLink && balance > 0 && invoice.status !== 'void' && (
+                    {invoice.squarePaymentLink && balance > 0 && !['draft', 'void'].includes(invoice.status) && (
                       <button onClick={() => window.open(invoice.squarePaymentLink?.url, '_blank', 'noopener,noreferrer')} type="button">
                         Open payment page
                       </button>

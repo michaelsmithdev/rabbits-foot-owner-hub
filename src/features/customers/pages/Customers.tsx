@@ -12,6 +12,7 @@ import type { Customer } from '../types/Customer'
 import { loadEstimates } from '../../estimates/data/estimateStore'
 import { loadInvoices } from '../../invoices/data/invoiceStore'
 import { loadPhotos } from '../../photos/data/photoStore'
+import { useAuth } from '../../auth/authContext'
 
 type CustomersProps = {
   onStartEstimate: (customerId: string) => void
@@ -37,6 +38,7 @@ const emptyCustomerForm: CustomerFormData = {
 function Customers({
   onStartEstimate,
 }: CustomersProps) {
+  const { session } = useAuth()
   const [customers, setCustomers] = useState<Customer[]>(
     () => loadCustomers(),
   )
@@ -54,6 +56,8 @@ function Customers({
     useState<CustomerFormData>(emptyCustomerForm)
 
   const [formError, setFormError] = useState('')
+  const [portalMessage, setPortalMessage] = useState('')
+  const [portalCustomerId, setPortalCustomerId] = useState<string | null>(null)
 
   useEffect(() => {
     saveCustomers(customers)
@@ -224,6 +228,57 @@ function Customers({
     onStartEstimate(customer.id)
   }
 
+  async function textCustomerHub(customer: Customer) {
+    if (!customer.phone.trim()) {
+      setPortalMessage('Add a phone number before texting the Customer Hub.')
+      return
+    }
+
+    if (!session?.access_token) {
+      setPortalMessage('Sign in before creating a secure Customer Hub link.')
+      return
+    }
+
+    setPortalCustomerId(customer.id)
+    setPortalMessage('Preparing a secure Customer Hub text…')
+
+    try {
+      const apiOrigin =
+        import.meta.env.VITE_OWNER_HUB_API_URL?.trim().replace(/\/$/, '') ?? ''
+      const response = await fetch(`${apiOrigin}/api/customer-portal`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ action: 'create', customerId: customer.id }),
+      })
+      const payload = (await response.json()) as {
+        url?: string
+        error?: string
+      }
+
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.error || 'Customer Hub link failed.')
+      }
+
+      const message =
+        `Hi ${customer.firstName}, here is your secure Rabbit's Foot Customer Hub. ` +
+        `You can review appointments, estimates, invoices, and pay securely: ${payload.url}`
+      const phone = formatPhoneLink(customer.phone)
+
+      await navigator.clipboard.writeText(message).catch(() => undefined)
+      setPortalMessage('Customer Hub text is ready. Review it, then tap Send.')
+      window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`
+    } catch (error) {
+      setPortalMessage(
+        error instanceof Error ? error.message : 'Customer Hub link failed.',
+      )
+    } finally {
+      setPortalCustomerId(null)
+    }
+  }
+
   function getInitials(customer: Customer) {
     return `${customer.firstName.charAt(
       0,
@@ -302,16 +357,34 @@ function Customers({
             </p>
           </div>
 
-          <button
-            className="button-dark"
-            onClick={() =>
-              startEstimate(selectedCustomer)
-            }
-            type="button"
-          >
-            + New estimate
-          </button>
+          <div className="customer-profile-actions">
+            <button
+              className="button-light"
+              disabled={portalCustomerId === selectedCustomer.id}
+              onClick={() => void textCustomerHub(selectedCustomer)}
+              type="button"
+            >
+              {portalCustomerId === selectedCustomer.id
+                ? 'Preparing text…'
+                : 'Text Customer Hub'}
+            </button>
+            <button
+              className="button-dark"
+              onClick={() =>
+                startEstimate(selectedCustomer)
+              }
+              type="button"
+            >
+              + New estimate
+            </button>
+          </div>
         </div>
+
+        {portalMessage && (
+          <div className="customer-portal-message" role="status">
+            {portalMessage}
+          </div>
+        )}
 
         <div className="customer-grid">
           <article className="customer-card">
