@@ -43,3 +43,9 @@ create table if not exists public.square_webhook_events (
 );
 
 alter table public.square_webhook_events enable row level security;
+
+-- Server routes use the service role for verified customer approvals and Square events.
+grant select on table public.organization_members to service_role;
+grant select, insert, update on table public.business_records to service_role;
+grant select, insert, update, delete on table public.customer_portal_links to service_role;
+grant select, insert on table public.square_webhook_events to service_role;
