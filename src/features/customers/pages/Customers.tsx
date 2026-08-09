@@ -13,6 +13,7 @@ import { loadEstimates } from '../../estimates/data/estimateStore'
 import { loadInvoices } from '../../invoices/data/invoiceStore'
 import { loadPhotos } from '../../photos/data/photoStore'
 import { useAuth } from '../../auth/authContext'
+import { buildCustomerDocumentStats } from '../data/customerDocumentStats'
 
 type CustomersProps = {
   onStartEstimate: (customerId: string) => void
@@ -91,6 +92,11 @@ function Customers({
     ].sort((a, b) => b.date.localeCompare(a.date))
     return { estimates, invoices, photos, timeline, billed }
   }, [selectedCustomerId])
+
+  const customerDocumentStats = buildCustomerDocumentStats(
+    loadEstimates(),
+    loadInvoices(),
+  )
 
   const filteredCustomers = useMemo(() => {
     const normalizedSearch = searchTerm
@@ -741,12 +747,12 @@ function Customers({
 
                   <div className="customer-card-stats">
                     <div>
-                      <strong>0</strong>
+                      <strong>{customerDocumentStats.get(customer.id)?.documents ?? 0}</strong>
                       <span>documents</span>
                     </div>
 
                     <div>
-                      <strong>$0.00</strong>
+                      <strong>{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(customerDocumentStats.get(customer.id)?.billed ?? 0)}</strong>
                       <span>billed</span>
                     </div>
                   </div>

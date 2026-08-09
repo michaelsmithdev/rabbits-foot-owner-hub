@@ -144,7 +144,7 @@ export default function BusinessWorkspace() {
   return (
     <section className="business-workspace-page">
       <header className="business-hero">
-        <div><p className="eyebrow">SUBSCRIPTION WORKSPACE</p><h1>{organization?.name ?? 'Your business'}</h1><p>Manage setup, team access, integrations, usage, and subscription billing.</p></div>
+        <div><p className="eyebrow">SUBSCRIPTION WORKSPACE</p><h1>{organization?.name ?? 'Your business'}</h1><p>{isNativeApp ? 'Manage setup, team access, integrations, usage, and your current subscription status.' : 'Manage setup, team access, integrations, usage, and subscription billing.'}</p></div>
         <div className={`subscription-status ${subscriptionIsUsable(subscription?.status ?? '', subscription?.trialEndsAt ?? null) ? 'active' : 'attention'}`}>
           <BadgeCheck size={20}/><div><strong>{currentPlan.name}</strong><span>{subscription?.status === 'trialing' ? 'Free trial' : subscription?.status ?? 'Setup required'}</span></div>
         </div>
@@ -188,10 +188,20 @@ export default function BusinessWorkspace() {
         </article>
       </div>
 
-      <section className="plans-section"><header><div><p className="eyebrow">SIMPLE PRICING</p><h2>Choose the plan that fits the crew</h2></div><p>Annual billing includes two months free. AI and storage limits protect the business from surprise costs.</p></header>{isNativeApp && <div className="native-billing-note"><ShieldCheck size={20}/><p>Plan purchases and changes are managed in the secure web dashboard. Your Android app will reflect the updated plan after you sign in or refresh.</p></div>}<div className="plan-grid">{Object.values(planCatalog).map((plan) => <article className={`plan-card ${plan.id === subscription?.plan ? 'current' : ''}`} key={plan.id}><p className="eyebrow">{plan.name}</p><h3>${plan.monthlyPrice}<span>/month</span></h3><p>{plan.seats} seat{plan.seats === 1 ? '' : 's'} · {plan.aiEstimates} AI estimates/month</p><ul>{plan.features.map((feature) => <li key={feature}><Check size={17}/>{feature}</li>)}</ul><button disabled={isNativeApp || !canManage || plan.id === subscription?.plan || busyAction === `plan-${plan.id}`} onClick={() => void choosePlan(plan.id)} type="button">{plan.id === subscription?.plan ? <><ShieldCheck/>Current plan</> : <>Choose {plan.name}</>}</button></article>)}</div></section>
+      {isNativeApp ? (
+        <section className="business-panel native-subscription-panel">
+          <header><span><ShieldCheck size={22}/></span><div><p className="eyebrow">CURRENT SUBSCRIPTION</p><h2>{currentPlan.name}</h2><p>Billing is managed separately by the account owner.</p></div></header>
+          <div className="native-subscription-summary">
+            <span><strong>Status</strong><small>{subscription?.status === 'trialing' ? 'Trial active' : subscription?.status ?? 'Setup required'}</small></span>
+            <span><strong>Team access</strong><small>{members.length} of {currentPlan.seats} seats in use</small></span>
+          </div>
+        </section>
+      ) : (
+        <section className="plans-section"><header><div><p className="eyebrow">SIMPLE PRICING</p><h2>Choose the plan that fits the crew</h2></div><p>Annual billing includes two months free. AI and storage limits protect the business from surprise costs.</p></header><div className="plan-grid">{Object.values(planCatalog).map((plan) => <article className={`plan-card ${plan.id === subscription?.plan ? 'current' : ''}`} key={plan.id}><p className="eyebrow">{plan.name}</p><h3>${plan.monthlyPrice}<span>/month</span></h3><p>{plan.seats} seat{plan.seats === 1 ? '' : 's'} · {plan.aiEstimates} AI estimates/month</p><ul>{plan.features.map((feature) => <li key={feature}><Check size={17}/>{feature}</li>)}</ul><button disabled={!canManage || plan.id === subscription?.plan || busyAction === `plan-${plan.id}`} onClick={() => void choosePlan(plan.id)} type="button">{plan.id === subscription?.plan ? <><ShieldCheck/>Current plan</> : <>Choose {plan.name}</>}</button></article>)}</div></section>
+      )}
 
       <section className="business-panel account-control">
-        <header><span><ShieldCheck size={22}/></span><div><p className="eyebrow">ACCOUNT CONTROL</p><h2>Renewal, support, and privacy</h2><p>Clear controls for billing, legal information, support, and account deletion.</p></div></header>
+        <header><span><ShieldCheck size={22}/></span><div><p className="eyebrow">ACCOUNT CONTROL</p><h2>{isNativeApp ? 'Support and privacy' : 'Renewal, support, and privacy'}</h2><p>{isNativeApp ? 'Account assistance, legal information, and deletion controls.' : 'Clear controls for billing, legal information, support, and account deletion.'}</p></div></header>
         <div className="account-control-grid">
           <a href="#privacy"><FileText size={19}/><span><strong>Privacy policy</strong><small>How information is stored and protected</small></span></a>
           <a href="#terms"><FileText size={19}/><span><strong>Terms of service</strong><small>Subscription and acceptable-use terms</small></span></a>
