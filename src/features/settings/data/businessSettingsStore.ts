@@ -25,6 +25,7 @@ export const defaultBusinessSettings: BusinessSettings = {
   emergencyRatePercent: 50,
   defaultMaterialMarkupPercent: 25,
   defaultOverheadPercent: 12,
+  paymentProcessingOverheadPercent: 3.5,
   targetGrossMarginPercent: 35,
   defaultDeliveryCost: 0,
   defaultDisposalCost: 0,
@@ -127,6 +128,10 @@ export function loadBusinessSettings(): BusinessSettings {
             typeof settingsRecord.defaultOverheadPercent === 'number'
               ? settingsRecord.defaultOverheadPercent
               : defaultBusinessSettings.defaultOverheadPercent,
+          paymentProcessingOverheadPercent:
+            typeof settingsRecord.paymentProcessingOverheadPercent === 'number'
+              ? settingsRecord.paymentProcessingOverheadPercent
+              : defaultBusinessSettings.paymentProcessingOverheadPercent,
           targetGrossMarginPercent:
             typeof settingsRecord.targetGrossMarginPercent === 'number'
               ? settingsRecord.targetGrossMarginPercent

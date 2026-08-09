@@ -61,6 +61,7 @@ export interface Estimate {
   jobCategory?: string
   materialCost?: number
   taxReservePercent?: number
+  paymentProcessingOverheadPercent?: number
   completionDate?: string
   photoIds?: string[]
   aiEstimate?: AiEstimateGeneration

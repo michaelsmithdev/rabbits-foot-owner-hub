@@ -8,10 +8,12 @@ import {
   Play,
   Plus,
   Receipt,
+  Trash2,
 } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { loadCustomers } from '../../customers/data/customerStore'
+import { loadEstimates, saveEstimates } from '../../estimates/data/estimateStore'
 import { createInvoiceNumber, loadInvoices, saveInvoices } from '../../invoices/data/invoiceStore'
 import type { Invoice } from '../../invoices/types/Invoice'
 import { queuePhotoFiles } from '../../photos/data/photoStore'
@@ -22,6 +24,7 @@ import { approvedChangeOrderTotal, jobRevenue } from '../utils/jobMath'
 import type { Job, JobChangeOrder, JobExpenseCategory, JobMaterialItem } from '../types/Job'
 import './Jobs.css'
 import './JobsEnhancements.css'
+import './JobDeletion.css'
 
 const currency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
 
@@ -232,6 +235,38 @@ export default function Jobs() {
     setMessage('Job marked complete. Review actual profit, then create the final invoice.')
   }
 
+  function deleteJob(job: Job) {
+    const linkedInvoice = loadInvoices().find(
+      (invoice) => invoice.jobId === job.id || invoice.id === job.invoiceId,
+    )
+
+    if (linkedInvoice) {
+      window.alert(
+        `${job.jobNumber} cannot be deleted while ${linkedInvoice.invoiceNumber} exists. Delete the invoice first, then remove the test work.`,
+      )
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${job.jobNumber} - ${job.jobName}? Time, expenses, photos, and completion details for this work record will be removed.`,
+    )
+    if (!confirmed) return
+
+    const nextJobs = jobs.filter((item) => item.id !== job.id)
+    const timestamp = new Date().toISOString()
+    const nextEstimates = loadEstimates().map((estimate) =>
+      estimate.id === job.estimateId
+        ? { ...estimate, jobId: undefined, updatedAt: timestamp }
+        : estimate,
+    )
+
+    setJobs(nextJobs)
+    setSelectedId(nextJobs[0]?.id ?? '')
+    saveJobs(nextJobs)
+    saveEstimates(nextEstimates)
+    setMessage(`${job.jobNumber} was deleted. The accepted estimate was kept and unlinked.`)
+  }
+
   function createInvoice(job: Job) {
     const invoices = loadInvoices()
     const existing = invoices.find((invoice) => invoice.jobId === job.id || invoice.estimateId === job.estimateId)
@@ -310,6 +345,7 @@ export default function Jobs() {
             <input accept="image/*" capture="environment" hidden multiple onChange={(event) => void addJobPhotos(selectedJob, Array.from(event.target.files ?? []))} ref={photoInputRef} type="file" />
             <button className="secondary" onClick={() => photoInputRef.current?.click()} type="button"><Camera /> Job photo</button>
             {!['completed','invoiced'].includes(selectedJob.status) && <button className="complete" onClick={() => completeJob(selectedJob)} type="button"><CheckCircle2 /> Complete</button>}
+            <button className="danger" onClick={() => deleteJob(selectedJob)} type="button"><Trash2 /> Delete work</button>
           </div>
 
           <section className="job-profit-grid"><article><Clock3 /><span>Estimated / actual hours</span><strong>{selectedJob.estimatedLaborHours.toFixed(1)} / {hours.toFixed(2)}</strong></article><article><Receipt /><span>Job expenses</span><strong>{currency.format(expenseTotal)}</strong></article><article><DollarSign /><span>Actual cost</span><strong>{currency.format(actualCost)}</strong></article><article className={margin < settings.targetGrossMarginPercent ? 'warning' : ''}><strong>{margin.toFixed(1)}%</strong><span>Actual margin · {currency.format(profit)} profit</span></article></section>

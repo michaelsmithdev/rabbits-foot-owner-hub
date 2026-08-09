@@ -97,6 +97,8 @@ function Settings() {
       || settings.emergencyRatePercent < 0
       || settings.defaultMaterialMarkupPercent < 0
       || settings.defaultOverheadPercent < 0
+      || settings.paymentProcessingOverheadPercent < 0
+      || settings.paymentProcessingOverheadPercent > 15
       || settings.targetGrossMarginPercent < 5
       || settings.targetGrossMarginPercent > 80
       || settings.defaultDeliveryCost < 0
@@ -354,7 +356,7 @@ function Settings() {
             <div>
               <p className="eyebrow">PROFIT GUARD DEFAULTS</p>
               <h2>Cost and pricing rules</h2>
-              <p>New AI estimates use these contractor-only defaults. Existing documents stay unchanged.</p>
+              <p>New estimates use these contractor-only defaults. Existing documents stay unchanged.</p>
             </div>
           </header>
           <div className="settings-fields-grid">
@@ -369,6 +371,7 @@ function Settings() {
               ['emergencyRatePercent', 'Emergency premium', '%'],
               ['defaultMaterialMarkupPercent', 'Material markup', '%'],
               ['defaultOverheadPercent', 'Overhead allowance', '%'],
+              ['paymentProcessingOverheadPercent', 'Payment processing overhead', '%'],
               ['targetGrossMarginPercent', 'Target gross margin', '%'],
               ['defaultDeliveryCost', 'Default delivery cost', '$'],
               ['defaultDisposalCost', 'Default disposal cost', '$'],
@@ -376,7 +379,7 @@ function Settings() {
               <label className="settings-field" key={field}>
                 <span>{label}</span>
                 <div className="settings-number-field">
-                  <input min="0" max={field === 'targetGrossMarginPercent' ? 80 : undefined} onChange={(event) => updateSetting(field, Number(event.target.value))} step="0.01" type="number" value={settings[field]} />
+                  <input min="0" max={field === 'targetGrossMarginPercent' ? 80 : field === 'paymentProcessingOverheadPercent' ? 15 : undefined} onChange={(event) => updateSetting(field, Number(event.target.value))} step="0.01" type="number" value={settings[field]} />
                   <b>{suffix}</b>
                 </div>
               </label>

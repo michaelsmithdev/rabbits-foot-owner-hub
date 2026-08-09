@@ -7,6 +7,19 @@ import { approvedChangeOrderTotal, jobRevenue } from '../src/features/jobs/utils
 import type { Job } from '../src/features/jobs/types/Job.ts'
 import { appointmentConflicts } from '../src/features/schedule/data/appointmentStore.ts'
 import type { Appointment } from '../src/features/schedule/types/Appointment.ts'
+import {
+  applyPaymentOverheadToAmount,
+  applyPaymentOverheadToLineItems,
+} from '../src/features/pricing/utils/paymentOverhead.ts'
+
+test('payment overhead is folded into customer pricing without mutating base prices', () => {
+  const baseLineItems = [{ id: 'line-1', quantity: 1, unitPrice: 500 }]
+  const customerLineItems = applyPaymentOverheadToLineItems(baseLineItems, 3.5)
+
+  assert.equal(applyPaymentOverheadToAmount(500, 3.5), 517.5)
+  assert.equal(customerLineItems[0].unitPrice, 517.5)
+  assert.equal(baseLineItems[0].unitPrice, 500)
+})
 
 test('invoice math applies tax and discount and never returns a negative balance', () => {
   const invoice = {

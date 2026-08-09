@@ -23,7 +23,8 @@ import { loadCustomers } from '../../customers/data/customerStore'
 
 import type { Customer } from '../../customers/types/Customer'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
-import { createJobFromEstimate, loadJobs } from '../../jobs/data/jobStore'
+import { createJobFromEstimate, loadJobs, saveJobs } from '../../jobs/data/jobStore'
+import { applyPaymentOverheadToLineItems } from '../../pricing/utils/paymentOverhead'
 
 import {
   createEstimateNumber,
@@ -455,16 +456,31 @@ function Estimates({
     )
   }, [lineItems])
 
+  const customerSubtotal = useMemo(() => {
+    if (editingEstimateId) return subtotal
+
+    return applyPaymentOverheadToLineItems(
+      lineItems,
+      businessSettings.paymentProcessingOverheadPercent,
+    ).reduce(
+      (total, item) =>
+        total +
+        Number(item.quantity || 0) *
+          Number(item.unitPrice || 0),
+      0,
+    )
+  }, [businessSettings.paymentProcessingOverheadPercent, editingEstimateId, lineItems, subtotal])
+
   const taxAmount = useMemo(() => {
-    return subtotal * (taxRate / 100)
-  }, [subtotal, taxRate])
+    return customerSubtotal * (taxRate / 100)
+  }, [customerSubtotal, taxRate])
 
   const grandTotal = useMemo(() => {
     return Math.max(
       0,
-      subtotal + taxAmount - discount,
+      customerSubtotal + taxAmount - discount,
     )
-  }, [subtotal, taxAmount, discount])
+  }, [customerSubtotal, taxAmount, discount])
 
   function formatCurrency(
     value: number,
@@ -815,6 +831,12 @@ function Estimates({
             item.description.trim(),
         }))
 
+    const newEstimateLineItems =
+      applyPaymentOverheadToLineItems(
+        completedLineItems,
+        businessSettings.paymentProcessingOverheadPercent,
+      )
+
     const currentTimestamp =
       new Date().toISOString()
 
@@ -851,6 +873,7 @@ function Estimates({
         jobCategory: jobCategory.trim(),
         materialCost,
         taxReservePercent,
+
         photoIds: Array.from(
           new Set([
             ...(existingEstimate.photoIds ?? []),
@@ -919,7 +942,7 @@ function Estimates({
 
         expirationDate,
 
-        lineItems: completedLineItems,
+        lineItems: newEstimateLineItems,
 
         taxRate,
 
@@ -934,6 +957,9 @@ function Estimates({
         materialCost,
 
         taxReservePercent,
+
+        paymentProcessingOverheadPercent:
+          businessSettings.paymentProcessingOverheadPercent,
 
         photoIds: aiGeneration?.photoIds ? [...aiGeneration.photoIds] : [],
 
@@ -1217,20 +1243,21 @@ function Estimates({
       return
     }
 
-    const existingJob = loadJobs().find((job) => job.estimateId === estimateId)
-    if (existingJob) {
-      window.alert(
-        `${estimate.estimateNumber} cannot be deleted because it is linked to ${existingJob.jobNumber}.`,
-      )
-      return
-    }
+    const currentJobs = loadJobs()
+    const existingJob = currentJobs.find((job) => job.estimateId === estimateId)
 
     const confirmed = window.confirm(
-      `Delete ${estimate.estimateNumber}?`,
+      existingJob
+        ? `Delete ${estimate.estimateNumber} and its linked ${existingJob.jobNumber}? This removes the accepted/completed work record and cannot be undone.`
+        : `Delete ${estimate.estimateNumber}? This cannot be undone.`,
     )
 
     if (!confirmed) {
       return
+    }
+
+    if (existingJob) {
+      saveJobs(currentJobs.filter((job) => job.id !== existingJob.id))
     }
 
     setEstimates((currentEstimates) =>
@@ -2085,12 +2112,19 @@ function Estimates({
                 <ProfitGuard economics={economics} currentPrice={subtotal} onUsePrice={applyProtectedPrice} targetMargin={businessSettings.targetGrossMarginPercent} />
 
                 <div className="estimate-summary-row">
-                  <span>Subtotal</span>
+                  <span>Customer subtotal</span>
 
                   <strong>
-                    {formatCurrency(subtotal)}
+                    {formatCurrency(customerSubtotal)}
                   </strong>
                 </div>
+
+                {!editingEstimateId &&
+                  businessSettings.paymentProcessingOverheadPercent > 0 && (
+                    <p className="estimate-payment-overhead-note">
+                      Includes {businessSettings.paymentProcessingOverheadPercent}% payment overhead in the all-in customer price.
+                    </p>
+                  )}
 
                 <div className="estimate-summary-row">
                   <span>Tax</span>

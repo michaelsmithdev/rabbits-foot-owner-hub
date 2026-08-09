@@ -20,6 +20,7 @@ export interface BusinessSettings {
   emergencyRatePercent: number
   defaultMaterialMarkupPercent: number
   defaultOverheadPercent: number
+  paymentProcessingOverheadPercent: number
   targetGrossMarginPercent: number
   defaultDeliveryCost: number
   defaultDisposalCost: number
