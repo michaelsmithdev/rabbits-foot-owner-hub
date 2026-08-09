@@ -56,6 +56,7 @@ function Customers({
     useState<CustomerFormData>(emptyCustomerForm)
 
   const [formError, setFormError] = useState('')
+  const [isEditingCustomer, setIsEditingCustomer] = useState(false)
   const [portalMessage, setPortalMessage] = useState('')
   const [portalCustomerId, setPortalCustomerId] = useState<string | null>(null)
 
@@ -221,7 +222,71 @@ function Customers({
   }
 
   function closeCustomerDetails() {
+    setIsEditingCustomer(false)
+    setFormError('')
     setSelectedCustomerId(null)
+  }
+
+  function beginEditingCustomer(customer: Customer) {
+    setFormData({
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      phone: customer.phone,
+      email: customer.email,
+      streetAddress: customer.streetAddress,
+      city: customer.city,
+      state: customer.state,
+      zipCode: customer.zipCode,
+      notes: customer.notes,
+    })
+    setFormError('')
+    setPortalMessage('')
+    setIsEditingCustomer(true)
+  }
+
+  function cancelEditingCustomer() {
+    setIsEditingCustomer(false)
+    setFormData(emptyCustomerForm)
+    setFormError('')
+  }
+
+  function saveCustomerChanges() {
+    if (!selectedCustomer) return
+
+    const firstName = formData.firstName.trim()
+    const lastName = formData.lastName.trim()
+
+    if (!firstName || !lastName) {
+      setFormError('First name and last name are required.')
+      return
+    }
+
+    if (formData.email.trim() && !formData.email.includes('@')) {
+      setFormError('Enter a valid email address or leave it blank.')
+      return
+    }
+
+    setCustomers((currentCustomers) =>
+      currentCustomers.map((customer) =>
+        customer.id === selectedCustomer.id
+          ? {
+              ...customer,
+              firstName,
+              lastName,
+              phone: formData.phone.trim(),
+              email: formData.email.trim(),
+              streetAddress: formData.streetAddress.trim(),
+              city: formData.city.trim(),
+              state: formData.state.trim().toUpperCase(),
+              zipCode: formData.zipCode.trim(),
+              notes: formData.notes.trim(),
+            }
+          : customer,
+      ),
+    )
+    setIsEditingCustomer(false)
+    setFormError('')
+    setPortalMessage('Customer information updated and queued for cloud sync.')
   }
 
   function startEstimate(customer: Customer) {
@@ -360,6 +425,13 @@ function Customers({
           <div className="customer-profile-actions">
             <button
               className="button-light"
+              onClick={() => beginEditingCustomer(selectedCustomer)}
+              type="button"
+            >
+              Edit customer
+            </button>
+            <button
+              className="button-light"
               disabled={portalCustomerId === selectedCustomer.id}
               onClick={() => void textCustomerHub(selectedCustomer)}
               type="button"
@@ -387,7 +459,7 @@ function Customers({
         )}
 
         <div className="customer-grid">
-          <article className="customer-card">
+          <article className={`customer-card${isEditingCustomer ? ' customer-card-editing' : ''}`}>
             <div className="customer-card-header">
               <div className="customer-avatar">
                 {getInitials(selectedCustomer)}
@@ -399,6 +471,24 @@ function Customers({
               </div>
             </div>
 
+            {isEditingCustomer ? (
+              <div className="customer-form-grid customer-profile-edit-form">
+                <label><span>First name *</span><input autoFocus onChange={(event) => updateFormField('firstName', event.target.value)} value={formData.firstName} /></label>
+                <label><span>Last name *</span><input onChange={(event) => updateFormField('lastName', event.target.value)} value={formData.lastName} /></label>
+                <label><span>Phone</span><input inputMode="tel" onChange={(event) => updateFormField('phone', event.target.value)} type="tel" value={formData.phone} /></label>
+                <label><span>Email</span><input onChange={(event) => updateFormField('email', event.target.value)} type="email" value={formData.email} /></label>
+                <label className="customer-form-full-width"><span>Street address</span><input onChange={(event) => updateFormField('streetAddress', event.target.value)} value={formData.streetAddress} /></label>
+                <label><span>City</span><input onChange={(event) => updateFormField('city', event.target.value)} value={formData.city} /></label>
+                <label><span>State</span><input maxLength={2} onChange={(event) => updateFormField('state', event.target.value)} value={formData.state} /></label>
+                <label><span>ZIP code</span><input inputMode="numeric" onChange={(event) => updateFormField('zipCode', event.target.value)} value={formData.zipCode} /></label>
+                <label className="customer-form-full-width"><span>Customer notes</span><textarea onChange={(event) => updateFormField('notes', event.target.value)} rows={4} value={formData.notes} /></label>
+                {formError && <p className="customer-form-error customer-form-full-width">{formError}</p>}
+                <div className="customer-modal-actions customer-form-full-width">
+                  <button className="button-light" onClick={cancelEditingCustomer} type="button">Cancel</button>
+                  <button className="button-dark" onClick={saveCustomerChanges} type="button">Save changes</button>
+                </div>
+              </div>
+            ) : (
             <div className="customer-contact-details">
               {selectedCustomer.phone ? (
                 <p>
@@ -437,6 +527,7 @@ function Customers({
                 ) || 'No address saved.'}
               </p>
             </div>
+            )}
           </article>
 
           <article className="customer-card">
