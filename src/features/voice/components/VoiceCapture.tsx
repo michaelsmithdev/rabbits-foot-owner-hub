@@ -1,5 +1,6 @@
 import { Mic, RotateCcw, Square, Trash2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { Capacitor, registerPlugin } from '@capacitor/core'
 
 import { deleteAudioBlob, loadAudioBlob, saveAudioBlob } from '../data/audioBlobStore'
 import { transcribeAudio } from '../services/transcriptionService'
@@ -13,6 +14,14 @@ type Props = {
 }
 
 const MAX_RECORDING_SECONDS = 90
+
+type MicrophonePermissionPlugin = {
+  requestMicrophone: () => Promise<{ granted: boolean }>
+}
+
+const nativeMicrophone = registerPlugin<MicrophonePermissionPlugin>(
+  'MicrophonePermission',
+)
 
 function createId() {
   return typeof crypto.randomUUID === 'function'
@@ -48,6 +57,13 @@ function describeRecordingError(error: unknown) {
 }
 
 async function openMicrophone() {
+  if (Capacitor.isNativePlatform()) {
+    const permission = await nativeMicrophone.requestMicrophone()
+    if (!permission.granted) {
+      throw new DOMException('Microphone permission was not granted.', 'NotAllowedError')
+    }
+  }
+
   try {
     return await navigator.mediaDevices.getUserMedia({
       audio: {

@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         Log.i(STARTUP_LOG_TAG, "MainActivity onCreate started");
         registerPlugin(DocumentManagerPlugin.class);
+        registerPlugin(MicrophonePermissionPlugin.class);
         super.onCreate(savedInstanceState);
         Log.i(STARTUP_LOG_TAG, "Capacitor bridge initialized");
     }

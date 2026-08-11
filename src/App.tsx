@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { ClipboardList, Plus } from 'lucide-react'
 
 import Sidebar from './components/Sidebar/Sidebar'
@@ -6,23 +6,26 @@ import {
   navigationItems,
   type PageName,
 } from './components/Sidebar/navigation'
-import Customers from './features/customers/pages/Customers'
-import Estimates from './features/estimates/pages/Estimates'
 import CloudSyncStatus from './features/cloud/CloudSyncStatus'
 import { DATA_REFRESHED_EVENT } from './features/cloud/syncQueue'
 import ConnectionStatus from './features/pwa/components/ConnectionStatus'
-import Dashboard from './pages/Dashboard/Dashboard'
-import Inbox from './pages/Inbox/Inbox'
-import Photos from './pages/Photos/Photos'
-import Settings from './pages/Settings/Settings'
-import DocumentsArchive from './features/documents/pages/DocumentsArchive'
-import PriceHistory from './features/pricing/pages/PriceHistory'
-import Walkthroughs from './features/walkthroughs/pages/Walkthroughs'
-import Jobs from './features/jobs/pages/Jobs'
 import { loadBusinessSettings } from './features/settings/data/businessSettingsStore'
-import Schedule from './features/schedule/pages/Schedule'
-import BusinessWorkspace from './features/saas/pages/BusinessWorkspace'
 import { useSaas } from './features/saas/saasContext'
+import { useAuth } from './features/auth/authContext'
+import ProductTour from './features/onboarding/ProductTour'
+
+const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'))
+const Customers = lazy(() => import('./features/customers/pages/Customers'))
+const Estimates = lazy(() => import('./features/estimates/pages/Estimates'))
+const Inbox = lazy(() => import('./pages/Inbox/Inbox'))
+const Photos = lazy(() => import('./pages/Photos/Photos'))
+const Settings = lazy(() => import('./pages/Settings/Settings'))
+const DocumentsArchive = lazy(() => import('./features/documents/pages/DocumentsArchive'))
+const PriceHistory = lazy(() => import('./features/pricing/pages/PriceHistory'))
+const Walkthroughs = lazy(() => import('./features/walkthroughs/pages/Walkthroughs'))
+const Jobs = lazy(() => import('./features/jobs/pages/Jobs'))
+const Schedule = lazy(() => import('./features/schedule/pages/Schedule'))
+const BusinessWorkspace = lazy(() => import('./features/saas/pages/BusinessWorkspace'))
 
 type DocumentLaunch = {
   requestId: number
@@ -46,6 +49,7 @@ function getPageFromHash(): PageName {
 
 function App() {
   const { organization } = useSaas()
+  const { mode, session } = useAuth()
   const [activePage, setActivePage] = useState<PageName>(getPageFromHash)
   const [documentLaunch, setDocumentLaunch] = useState<DocumentLaunch>({
     requestId: 0,
@@ -54,7 +58,24 @@ function App() {
     documentKind: null,
     documentId: null,
   })
+  const [customerLaunch, setCustomerLaunch] = useState({
+    requestId: 0,
+    customerId: null as string | null,
+  })
   const [dataRevision, setDataRevision] = useState(0)
+  const [tourState, setTourState] = useState<'welcome' | 'running' | null>(null)
+
+  const onboardingStorageKey = session?.user.id
+    ? `rabbits-foot-onboarding-${session.user.id}`
+    : mode === 'local'
+      ? 'rabbits-foot-onboarding-local'
+      : ''
+
+  useEffect(() => {
+    if (!onboardingStorageKey || localStorage.getItem(onboardingStorageKey)) return
+    const timeout = window.setTimeout(() => setTourState('welcome'), 0)
+    return () => window.clearTimeout(timeout)
+  }, [onboardingStorageKey])
 
   useEffect(() => {
     function handleHashChange() {
@@ -125,6 +146,14 @@ function App() {
     navigateTo('documents')
   }
 
+  function openCustomer(customerId: string) {
+    setCustomerLaunch((currentLaunch) => ({
+      requestId: currentLaunch.requestId + 1,
+      customerId,
+    }))
+    navigateTo('customers')
+  }
+
   function handlePageChange(page: PageName) {
     if (page === 'documents') {
       setDocumentLaunch((currentLaunch) => ({
@@ -136,13 +165,26 @@ function App() {
       }))
     }
 
+    if (page === 'customers') {
+      setCustomerLaunch((currentLaunch) => ({
+        requestId: currentLaunch.requestId + 1,
+        customerId: null,
+      }))
+    }
+
     navigateTo(page)
   }
 
   function renderCurrentPage() {
     switch (activePage) {
       case 'customers':
-        return <Customers onStartEstimate={openEstimateBuilder} />
+        return (
+          <Customers
+            initialCustomerId={customerLaunch.customerId}
+            key={customerLaunch.requestId}
+            onStartEstimate={openEstimateBuilder}
+          />
+        )
 
       case 'walkthrough':
         return <Walkthroughs />
@@ -177,7 +219,7 @@ function App() {
         return <Photos />
 
       case 'settings':
-        return <Settings />
+        return <Settings onStartTour={() => setTourState('running')} />
 
       case 'business':
         return <BusinessWorkspace />
@@ -186,6 +228,7 @@ function App() {
       default:
         return (
           <Dashboard
+            onOpenCustomer={openCustomer}
             onOpenCustomers={() => handlePageChange('customers')}
             onOpenDocument={openDocument}
             onOpenDocuments={() => handlePageChange('documents')}
@@ -218,6 +261,7 @@ function App() {
             <CloudSyncStatus />
             <button
               className="new-estimate-button walkthrough-launch-button"
+              data-tour="ai-estimate"
               onClick={() => handlePageChange('walkthrough')}
               type="button"
             >
@@ -246,9 +290,34 @@ function App() {
               : `${activePage}-${dataRevision}`
           }
         >
-          {renderCurrentPage()}
+          <Suspense
+            fallback={
+              <div className="route-loading" role="status">
+                <span />
+                Opening {currentPageLabel}…
+              </div>
+            }
+          >
+            {renderCurrentPage()}
+          </Suspense>
         </section>
       </main>
+
+      {tourState ? (
+        <ProductTour
+          initialWelcome={tourState === 'welcome'}
+          onClose={(completed) => {
+            if (onboardingStorageKey) {
+              localStorage.setItem(
+                onboardingStorageKey,
+                JSON.stringify({ completed, dismissedAt: new Date().toISOString() }),
+              )
+            }
+            setTourState(null)
+          }}
+          onNavigate={navigateTo}
+        />
+      ) : null}
     </div>
   )
 }

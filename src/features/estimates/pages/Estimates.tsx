@@ -3,7 +3,7 @@ import {
   useMemo,
   useState,
 } from 'react'
-import { Trash2 } from 'lucide-react'
+import { MessageSquareText, Trash2 } from 'lucide-react'
 
 import Invoices from '../../invoices/pages/Invoices'
 import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
@@ -27,6 +27,8 @@ import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import { createJobFromEstimate, loadJobs, saveJobs } from '../../jobs/data/jobStore'
 import { applyPaymentOverheadToLineItems } from '../../pricing/utils/paymentOverhead'
 import { useSaas } from '../../saas/saasContext'
+import { useAuth } from '../../auth/authContext'
+import { textCustomerDocument } from '../../communications/customerDocumentShare'
 
 import {
   createEstimateNumber,
@@ -332,6 +334,7 @@ function Estimates({
   initialDocumentKind = null,
   openBuilderOnMount = false,
 }: EstimatesProps) {
+  const { session } = useAuth()
   const { role } = useSaas()
   const canDeleteRecords = role === 'owner' || role === 'admin'
   const businessSettings = useMemo(() => loadBusinessSettings(), [])
@@ -433,6 +436,8 @@ function Estimates({
 
   const [saveMessage, setSaveMessage] =
     useState('')
+  const [shareMessage, setShareMessage] = useState('')
+  const [sharingEstimateId, setSharingEstimateId] = useState<string | null>(null)
 
   const [approvalEstimateId, setApprovalEstimateId] = useState<string | null>(null)
   const [approvalCustomerName, setApprovalCustomerName] = useState('')
@@ -1212,6 +1217,49 @@ function Estimates({
     ))
   }
 
+  async function textEstimate(estimate: Estimate) {
+    const customer = customers.find((item) => item.id === estimate.customerId)
+    if (!customer) {
+      setShareMessage('The customer attached to this estimate could not be found.')
+      return
+    }
+    if (!customer.phone.trim()) {
+      setShareMessage('No phone number is saved for this customer. Edit the customer before texting.')
+      return
+    }
+    if (!session?.access_token) {
+      setShareMessage('Sign in and connect cloud sync before sending this estimate.')
+      return
+    }
+
+    const sentEstimate: Estimate = {
+      ...estimate,
+      status: estimate.status === 'draft' ? 'sent' : estimate.status,
+      updatedAt: new Date().toISOString(),
+    }
+    setSharingEstimateId(estimate.id)
+    setShareMessage('Saving the estimate before opening your text message...')
+
+    try {
+      await textCustomerDocument({
+        accessToken: session.access_token,
+        kind: 'estimate',
+        document: sentEstimate,
+        customer,
+      })
+      const nextEstimates = estimates.map((item) =>
+        item.id === estimate.id ? sentEstimate : item,
+      )
+      setEstimates(nextEstimates)
+      saveEstimates(nextEstimates)
+      setShareMessage('Estimate saved and the customer text is ready to send.')
+    } catch (error) {
+      setShareMessage(error instanceof Error ? error.message : 'The estimate could not be sent.')
+    } finally {
+      setSharingEstimateId(null)
+    }
+  }
+
   function createJob(estimate: Estimate) {
     if (estimate.status !== 'approved') {
       window.alert('Mark the estimate Approved before creating the job.')
@@ -1437,6 +1485,7 @@ function Estimates({
 
           <button
             className="active"
+            data-tour="invoices"
             onClick={() =>
               setActiveDocumentTab(
                 'invoices',
@@ -1474,6 +1523,7 @@ function Estimates({
           </button>
 
           <button
+            data-tour="invoices"
             onClick={() =>
               setActiveDocumentTab(
                 'invoices',
@@ -1510,6 +1560,10 @@ function Estimates({
             + New estimate
           </button>
         </div>
+
+        {shareMessage && (
+          <aside className="invoice-guidance" role="status">{shareMessage}</aside>
+        )}
 
         {estimates.length === 0 ? (
           <div className="customers-empty-state">
@@ -1660,6 +1714,17 @@ function Estimates({
                   </button>
 
                   <DocumentPdfActions kind="estimate" document={estimate} customer={customers.find((item) => item.id === estimate.customerId)} />
+
+                  <button
+                    className="customer-secondary-action"
+                    data-tour="send-estimate"
+                    disabled={sharingEstimateId === estimate.id}
+                    onClick={() => void textEstimate(estimate)}
+                    type="button"
+                  >
+                    <MessageSquareText aria-hidden="true" size={16} />
+                    {sharingEstimateId === estimate.id ? 'Saving…' : 'Text estimate'}
+                  </button>
 
                   <button
                     className="customer-secondary-action"

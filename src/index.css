@@ -36,15 +36,24 @@ html[data-theme="dark"] :is(input, textarea, select) { background: #101310; colo
 
 html {
   min-height: 100%;
+  overflow-x: hidden;
   background: var(--color-canvas);
   color-scheme: light;
 }
 
 body,
 #root {
-  min-width: 320px;
+  width: 100%;
+  min-width: 0;
   min-height: 100vh;
   margin: 0;
+  overflow-x: hidden;
+}
+
+img,
+video,
+canvas {
+  max-width: 100%;
 }
 
 h1,
@@ -122,8 +131,6 @@ button {
   .archive-actions { display: grid; grid-template-columns: repeat(2, 1fr); width: 100%; }
   .archive-actions button { justify-content: center; }
   .history-numbers { text-align: left; }
-  .mobile-navigation { overflow-x: auto; justify-content: flex-start; }
-  .mobile-nav-button { min-width: 72px; flex: 0 0 72px; }
 }
 
 @media (max-width: 520px) { .analytics-grid.compact, .pricing-search-panel { grid-template-columns: 1fr; } }
@@ -387,6 +394,25 @@ textarea:focus-visible {
   text-decoration: underline;
 }
 
+.route-loading {
+  display: grid;
+  min-height: 52vh;
+  place-items: center;
+  align-content: center;
+  gap: 12px;
+  color: var(--color-muted);
+  font-weight: 850;
+}
+
+.route-loading span {
+  width: 34px;
+  height: 34px;
+  border: 4px solid #dce3d5;
+  border-top-color: var(--color-brand);
+  border-radius: 50%;
+  animation: spin .8s linear infinite;
+}
+
 .page-heading {
   margin-top: 30px;
 }
@@ -458,12 +484,7 @@ textarea:focus-visible {
     bottom: 0;
     left: 0;
     display: grid;
-    grid-auto-columns: minmax(76px, 1fr);
-    grid-auto-flow: column;
-    grid-template-columns: none;
-    overflow-x: auto;
-    overscroll-behavior-x: contain;
-    scrollbar-width: none;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     min-height: calc(68px + env(safe-area-inset-bottom));
     border-top: 1px solid #d9dbd4;
     background: rgb(255 255 255 / 96%);
@@ -502,6 +523,96 @@ textarea:focus-visible {
     display: grid;
     min-height: 24px;
     place-items: center;
+  }
+
+  .mobile-menu-is-open {
+    overflow: hidden;
+  }
+
+  .mobile-more-backdrop {
+    position: fixed;
+    z-index: 90;
+    inset: 0;
+    display: flex;
+    align-items: flex-end;
+    background: rgb(16 19 15 / 58%);
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .mobile-more-drawer {
+    width: 100%;
+    max-height: min(76dvh, 680px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border-radius: 26px 26px 0 0;
+    background: var(--color-surface);
+    padding: 22px 18px calc(92px + env(safe-area-inset-bottom));
+    box-shadow: 0 -24px 60px rgb(0 0 0 / 22%);
+  }
+
+  .mobile-more-header {
+    position: sticky;
+    z-index: 1;
+    top: -22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0 16px;
+    background: var(--color-surface);
+  }
+
+  .mobile-more-header p {
+    color: #5f9900;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 1.8px;
+  }
+
+  .mobile-more-header h2 {
+    margin-top: 4px;
+    font-size: 25px;
+  }
+
+  .mobile-more-header button {
+    display: grid;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--color-border);
+    border-radius: 50%;
+    place-items: center;
+    background: var(--color-surface);
+    color: var(--color-ink);
+  }
+
+  .mobile-more-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .mobile-more-item {
+    display: flex;
+    min-height: 64px;
+    min-width: 0;
+    align-items: center;
+    gap: 11px;
+    border: 1px solid var(--color-border);
+    border-radius: 16px;
+    background: var(--color-surface);
+    padding: 12px;
+    color: var(--color-ink);
+    text-align: left;
+    font-weight: 800;
+  }
+
+  .mobile-more-item.active {
+    border-color: var(--color-brand);
+    background: #eef6de;
+    color: #34540d;
+  }
+
+  :is(input, textarea, select) {
+    font-size: 16px;
   }
 
   .workspace {
@@ -1045,7 +1156,7 @@ textarea:focus-visible {
 .attention-row {
   display: grid;
   width: 100%;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 12px;
   border: 0;
@@ -1054,6 +1165,13 @@ textarea:focus-visible {
   padding: 16px 4px;
   color: #10130f;
   text-align: left;
+}
+
+.action-center-label {
+  color: #4f760f;
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .attention-dot {
@@ -1145,6 +1263,14 @@ textarea:focus-visible {
   .draft-badge,
   .document-price,
   .document-arrow {
+    display: none;
+  }
+
+  .attention-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .action-center-label {
     display: none;
   }
 }
@@ -1426,6 +1552,8 @@ textarea:focus-visible {
 
 .customer-modal {
   width: min(920px, 100%);
+  max-height: calc(100dvh - 60px);
+  overflow-y: auto;
   border-radius: 24px;
   background: white;
   padding: 30px;
@@ -1554,7 +1682,8 @@ textarea:focus-visible {
   }
 
   .customer-modal {
-    margin: 12px 0;
+    max-height: calc(100dvh - 24px);
+    margin: 0;
     padding: 20px;
   }
 

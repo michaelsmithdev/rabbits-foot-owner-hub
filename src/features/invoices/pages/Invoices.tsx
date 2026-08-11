@@ -4,6 +4,7 @@ import {
   CalendarDays,
   CircleDollarSign,
   FilePenLine,
+  MessageSquareText,
   Plus,
   ReceiptText,
   Trash2,
@@ -19,6 +20,7 @@ import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
 import { useAuth } from '../../auth/authContext'
 import PricingInsightPanel from '../../pricing/components/PricingInsightPanel'
 import { useSaas } from '../../saas/saasContext'
+import { textCustomerDocument } from '../../communications/customerDocumentShare'
 import {
   createInvoiceNumber,
   loadInvoices,
@@ -262,6 +264,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
   const [printInvoiceId] = useState<string | null>(null)
   const [squareLinkInvoiceId, setSquareLinkInvoiceId] = useState<string | null>(null)
   const [squareMessage, setSquareMessage] = useState('')
+  const [sharingInvoiceId, setSharingInvoiceId] = useState<string | null>(null)
 
   useEffect(() => {
     saveInvoices(invoices)
@@ -329,6 +332,49 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
       setSquareMessage(error instanceof Error ? error.message : 'Square payment link failed.')
     } finally {
       setSquareLinkInvoiceId(null)
+    }
+  }
+
+  async function textInvoice(invoice: Invoice) {
+    const customer = customers.find((item) => item.id === invoice.customerId)
+    if (!customer) {
+      setSquareMessage('The customer attached to this invoice could not be found.')
+      return
+    }
+    if (!customer.phone.trim()) {
+      setSquareMessage('No phone number is saved for this customer. Edit the customer before texting.')
+      return
+    }
+    if (!session?.access_token) {
+      setSquareMessage('Sign in and connect cloud sync before sending this invoice.')
+      return
+    }
+
+    const sentInvoice: Invoice = {
+      ...invoice,
+      status: invoice.status === 'draft' ? 'sent' : invoice.status,
+      updatedAt: new Date().toISOString(),
+    }
+    setSharingInvoiceId(invoice.id)
+    setSquareMessage('Saving the invoice before opening your text message...')
+
+    try {
+      await textCustomerDocument({
+        accessToken: session.access_token,
+        kind: 'invoice',
+        document: sentInvoice,
+        customer,
+      })
+      const nextInvoices = invoices.map((item) =>
+        item.id === invoice.id ? sentInvoice : item,
+      )
+      setInvoices(nextInvoices)
+      saveInvoices(nextInvoices)
+      setSquareMessage('Invoice saved and the customer text is ready to send.')
+    } catch (error) {
+      setSquareMessage(error instanceof Error ? error.message : 'The invoice could not be sent.')
+    } finally {
+      setSharingInvoiceId(null)
     }
   }
 
@@ -779,6 +825,15 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                       Edit
                     </button>
                     <DocumentPdfActions kind="invoice" document={invoice} customer={customer} />
+                    <button
+                      data-tour="send-invoice"
+                      disabled={sharingInvoiceId === invoice.id}
+                      onClick={() => void textInvoice(invoice)}
+                      type="button"
+                    >
+                      <MessageSquareText aria-hidden="true" size={16} />
+                      {sharingInvoiceId === invoice.id ? 'Saving…' : 'Text invoice'}
+                    </button>
                     {balance > 0 &&
                       ['sent', 'partial', 'overdue'].includes(
                         invoice.status,

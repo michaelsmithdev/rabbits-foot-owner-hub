@@ -1,5 +1,5 @@
 export type CommunicationChannel = 'email' | 'sms' | 'system'
-export type CommunicationStatus = 'drafted' | 'copied' | 'sent' | 'delivered' | 'failed'
+export type CommunicationStatus = 'drafted' | 'copied' | 'sent' | 'delivered' | 'handled' | 'failed'
 
 export type Communication = {
   id: string

@@ -14,8 +14,14 @@ import { loadInvoices } from '../../features/invoices/data/invoiceStore'
 import type { Invoice } from '../../features/invoices/types/Invoice'
 import { loadBusinessSettings } from '../../features/settings/data/businessSettingsStore'
 import { loadAppointments } from '../../features/schedule/data/appointmentStore'
+import {
+  loadCommunications,
+  saveCommunications,
+} from '../../features/communications/data/communicationStore'
+import { buildActionCenterItems } from '../../features/communications/actionCenter'
 
 type DashboardProps = {
+  onOpenCustomer: (customerId: string) => void
   onOpenCustomers: () => void
   onOpenDocument: (
     documentKind: 'estimate' | 'invoice',
@@ -53,6 +59,7 @@ function getGreeting() {
 }
 
 function Dashboard({
+  onOpenCustomer,
   onOpenCustomers,
   onOpenDocument,
   onOpenDocuments,
@@ -63,6 +70,7 @@ function Dashboard({
   const invoices = loadInvoices()
   const settings = loadBusinessSettings()
   const appointments = loadAppointments()
+  const communications = loadCommunications()
   const customerNames = new Map(
     customers.map((customer) => [
       customer.id,
@@ -89,9 +97,6 @@ function Dashboard({
   const openEstimates = estimates.filter(
     (estimate) =>
       estimate.status === 'draft' || estimate.status === 'sent',
-  )
-  const sentEstimates = estimates.filter(
-    (estimate) => estimate.status === 'sent',
   )
   const now = new Date()
   const todayKey = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10)
@@ -131,6 +136,43 @@ function Dashboard({
         new Date(first.updatedAt).getTime(),
     )
     .slice(0, 4)
+
+  const actionItems = buildActionCenterItems({
+    customers,
+    estimates,
+    invoices,
+    appointments,
+    communications,
+  })
+
+  function openAction(item: (typeof actionItems)[number]) {
+    if (item.communicationId) {
+      saveCommunications(
+        communications.map((communication) =>
+          communication.id === item.communicationId
+            ? { ...communication, status: 'handled' }
+            : communication,
+        ),
+      )
+    }
+
+    if (item.kind === 'overdue_invoice' && item.documentId) {
+      onOpenDocument('invoice', item.documentId)
+      return
+    }
+
+    if (item.kind === 'estimate_follow_up' && item.documentId) {
+      onOpenDocument('estimate', item.documentId)
+      return
+    }
+
+    if (item.kind === 'appointment_reminder') {
+      onOpenSchedule()
+      return
+    }
+
+    onOpenCustomer(item.customerId)
+  }
 
   const dashboardStats = [
     {
@@ -179,7 +221,7 @@ function Dashboard({
 
   return (
     <>
-      <section className="dashboard-header">
+      <section className="dashboard-header" data-tour="dashboard">
         <div>
           <p className="eyebrow">OWNER OVERVIEW</p>
           <h1>{getGreeting()}</h1>
@@ -304,29 +346,26 @@ function Dashboard({
         <article className="dashboard-panel attention-panel">
           <div className="panel-heading">
             <div>
-              <p className="eyebrow">FOLLOW UP</p>
-              <h2>Needs attention</h2>
+              <p className="eyebrow">ACTION CENTER</p>
+              <h2>Your next best actions</h2>
             </div>
-            <span className="attention-count">{sentEstimates.length}</span>
+            <span className="attention-count">{actionItems.length}</span>
           </div>
 
-          {sentEstimates.length > 0 ? (
-            sentEstimates.slice(0, 3).map((estimate) => (
+          {actionItems.length > 0 ? (
+            actionItems.slice(0, 5).map((item) => (
               <button
                 className="attention-row"
-                key={estimate.id}
-                onClick={() => onOpenDocument('estimate', estimate.id)}
+                key={item.id}
+                onClick={() => openAction(item)}
                 type="button"
               >
                 <span className="attention-dot" />
                 <span>
-                  <strong>{estimate.jobName || 'Untitled estimate'}</strong>
-                  <span>
-                    {customerNames.get(estimate.customerId) ??
-                      'Customer not found'}{' '}
-                    · {estimate.estimateNumber}
-                  </span>
+                  <strong>{item.title}</strong>
+                  <span>{item.detail}</span>
                 </span>
+                <span className="action-center-label">{item.actionLabel}</span>
                 <ArrowRight aria-hidden="true" size={16} />
               </button>
             ))
@@ -335,7 +374,7 @@ function Dashboard({
               <CheckCircle2 aria-hidden="true" size={24} />
               <div>
                 <strong>You&apos;re caught up</strong>
-                <p>Sent estimates that need follow-up will appear here.</p>
+                <p>Customer requests and time-sensitive follow-ups will appear here.</p>
               </div>
             </div>
           )}

@@ -2,6 +2,8 @@ import { CalendarDays, Clock3, Link, Mail, MapPin, MessageSquareText, Plus, Tras
 import { useMemo, useState } from 'react'
 
 import { loadCommunications, saveCommunications } from '../../communications/data/communicationStore'
+import { createCustomerPortalLink } from '../../communications/customerDocumentShare'
+import { openSmsComposer } from '../../communications/customerContact'
 import type { Communication } from '../../communications/types/Communication'
 import { loadCustomers } from '../../customers/data/customerStore'
 import type { Customer } from '../../customers/types/Customer'
@@ -84,29 +86,39 @@ export default function Schedule() {
   function handOffMessage(item: Appointment, channel: 'sms' | 'email', kind: Communication['kind']) {
     const customer = customers.find((entry) => entry.id === item.customerId)
     const body = appointmentMessage(item, customer, kind)
+    const recipient = channel === 'sms' ? customer?.phone : customer?.email
+    if (!recipient?.trim()) {
+      setPortalMessage(
+        channel === 'sms'
+          ? 'No phone number is saved for this customer.'
+          : 'No email address is saved for this customer.',
+      )
+      return
+    }
     const record: Communication = {
       id: crypto.randomUUID(), customerId: item.customerId, appointmentId: item.id, channel, kind,
       status: 'copied', subject: kind === 'on_my_way' ? 'On the way' : "Rabbit's Foot appointment", body, createdAt: new Date().toISOString(),
     }
     const next = [record, ...communications]; setCommunications(next); saveCommunications(next)
     if (kind === 'appointment_reminder') persist(appointments.map((entry) => entry.id === item.id ? { ...entry, reminderSentAt: record.createdAt, updatedAt: record.createdAt } : entry))
-    const recipient = channel === 'sms' ? customer?.phone : customer?.email
-    const handoffUrl = channel === 'sms'
-      ? `sms:${recipient ?? ''}?body=${encodeURIComponent(body)}`
-      : `mailto:${recipient ?? ''}?subject=${encodeURIComponent(record.subject)}&body=${encodeURIComponent(body)}`
-    window.open(handoffUrl, '_self')
+    setPortalMessage('Message prepared. Review it, then tap Send.')
+    if (channel === 'sms' && customer) {
+      openSmsComposer(customer, body)
+      return
+    }
+    window.open(
+      `mailto:${recipient}?subject=${encodeURIComponent(record.subject)}&body=${encodeURIComponent(body)}`,
+      '_self',
+    )
   }
 
   async function createCustomerHubLink(customerId: string) {
     if (!session?.access_token) { setPortalMessage('Sign in before creating a Customer Hub link.'); return }
     setPortalMessage('Creating secure Customer Hub link...')
     try {
-      const apiOrigin = import.meta.env.VITE_OWNER_HUB_API_URL?.trim().replace(/\/$/, '') ?? ''
-      const response = await fetch(`${apiOrigin}/api/customer-portal`, { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json', 'X-Owner-Hub-Organization': localStorage.getItem('owner-hub-active-organization') ?? '' }, body: JSON.stringify({ action: 'create', customerId }) })
-      const payload = await response.json() as { url?: string; error?: string }
-      if (!response.ok || !payload.url) throw new Error(payload.error || 'Customer Hub link failed.')
-      await navigator.clipboard.writeText(payload.url).catch(() => undefined)
-      setPortalMessage(`Customer Hub link copied: ${payload.url}`)
+      const portalUrl = await createCustomerPortalLink(session.access_token, customerId)
+      await navigator.clipboard.writeText(portalUrl).catch(() => undefined)
+      setPortalMessage(`Customer Hub link copied: ${portalUrl}`)
     } catch (reason) {
       setPortalMessage(reason instanceof Error ? reason.message : 'Customer Hub link failed.')
     }

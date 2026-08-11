@@ -9,6 +9,7 @@ import {
   RefreshCw,
   Save,
   ShieldCheck,
+  PlayCircle,
 } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 
@@ -32,7 +33,7 @@ import {
 import type { BusinessSettings } from '../../features/settings/types/BusinessSettings'
 import './Settings.css'
 
-function Settings() {
+function Settings({ onStartTour }: { onStartTour?: () => void }) {
   const { mode, session, signOut } = useAuth()
   const { errorMessage, lastSyncedAt, status, syncNow } = useCloudSync()
   const [settings, setSettings] = useState<BusinessSettings>(
@@ -425,6 +426,18 @@ function Settings() {
       </form>
 
       <div className="settings-grid">
+        <article className="settings-card" data-tour="settings">
+          <span className="settings-card-icon"><PlayCircle size={24} /></span>
+          <div>
+            <p className="eyebrow">HELP &amp; ONBOARDING</p>
+            <h2>Take the Owner Hub tour</h2>
+            <p>Revisit the guided walkthrough for customers, estimates, AI field capture, Customer Hub, invoices, and settings.</p>
+          </div>
+          <button className="settings-secondary-button" onClick={onStartTour} type="button">
+            <PlayCircle size={17} /> Start product tour
+          </button>
+        </article>
+
         <article className="settings-card settings-security-card">
           <span className="settings-card-icon"><ShieldCheck size={24} /></span>
           <div>

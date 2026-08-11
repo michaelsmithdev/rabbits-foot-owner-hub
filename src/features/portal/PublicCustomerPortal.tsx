@@ -4,9 +4,11 @@ import {
   CreditCard,
   FileText,
   Hammer,
+  MessageSquarePlus,
   RefreshCw,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { createClient, type RealtimeChannel } from '@supabase/supabase-js'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import './PublicCustomerPortal.css'
 
@@ -40,7 +42,14 @@ type PortalInvoice = {
 
 type PortalData = {
   expiresAt: string
-  customer: { firstName: string; lastName: string }
+  realtime?: { token: string; expiresAt: number } | null
+  customer: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string
+    phone: string
+  }
   estimates: PortalEstimate[]
   invoices: PortalInvoice[]
   appointments: Array<{
@@ -83,8 +92,16 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
   } | null>(null)
   const [message, setMessage] = useState('')
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null)
+  const [realtimeConfig, setRealtimeConfig] = useState<PortalData['realtime']>(null)
+  const [workRequest, setWorkRequest] = useState({
+    service: '',
+    preferredTiming: '',
+    details: '',
+  })
+  const [requestBusy, setRequestBusy] = useState(false)
+  const revalidationTimer = useRef<number | null>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (source: 'initial' | 'realtime' | 'resume' = 'initial') => {
     try {
       const response = await fetch(
         `${apiOrigin}/api/customer-portal?token=${encodeURIComponent(token)}`,
@@ -97,7 +114,12 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
       }
 
       setData(payload)
+      setRealtimeConfig((current) => {
+        const hasUsableToken = current && current.expiresAt * 1000 > Date.now() + 5 * 60_000
+        return hasUsableToken ? current : payload.realtime ?? null
+      })
       setError('')
+      if (source === 'realtime') setMessage('Customer Hub updated with the latest information.')
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -113,6 +135,76 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
     const timer = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(timer)
   }, [load])
+
+  useEffect(() => {
+    function refreshWhenActive() {
+      if (document.visibilityState === 'visible') void load('resume')
+    }
+
+    window.addEventListener('online', refreshWhenActive)
+    window.addEventListener('focus', refreshWhenActive)
+    document.addEventListener('visibilitychange', refreshWhenActive)
+    // Realtime is the primary path. This short, quiet revalidation is the
+    // production fallback when a browser or network blocks a socket.
+    const interval = window.setInterval(refreshWhenActive, 15_000)
+
+    return () => {
+      window.removeEventListener('online', refreshWhenActive)
+      window.removeEventListener('focus', refreshWhenActive)
+      document.removeEventListener('visibilitychange', refreshWhenActive)
+      window.clearInterval(interval)
+    }
+  }, [load])
+
+  useEffect(() => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim()
+    const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY?.trim()
+    if (!realtimeConfig?.token || !supabaseUrl || !publishableKey) return
+
+    const realtimeClient = createClient(supabaseUrl, publishableKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+      },
+    })
+    let channel: RealtimeChannel | null = null
+    let active = true
+
+    void realtimeClient.realtime.setAuth(realtimeConfig.token).then(() => {
+      if (!active) return
+      channel = realtimeClient
+        .channel(`customer-portal-${token.slice(0, 12)}`, {
+          config: { private: true },
+        })
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'business_records',
+          },
+          () => {
+            if (revalidationTimer.current) {
+              window.clearTimeout(revalidationTimer.current)
+            }
+            revalidationTimer.current = window.setTimeout(
+              () => void load('realtime'),
+              250,
+            )
+          },
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') void load('resume')
+        })
+    })
+
+    return () => {
+      active = false
+      if (revalidationTimer.current) window.clearTimeout(revalidationTimer.current)
+      if (channel) void realtimeClient.removeChannel(channel)
+    }
+  }, [load, realtimeConfig, token])
 
   async function action(payload: Record<string, unknown>) {
     setMessage('')
@@ -197,6 +289,29 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
     }
   }
 
+  async function requestMoreWork() {
+    if (!workRequest.service.trim() || !workRequest.details.trim()) {
+      setMessage('Tell us what kind of work you need and add a few details.')
+      return
+    }
+
+    setRequestBusy(true)
+    try {
+      await action({
+        action: 'request_work',
+        service: workRequest.service,
+        preferredTiming: workRequest.preferredTiming,
+        details: workRequest.details,
+      })
+      setWorkRequest({ service: '', preferredTiming: '', details: '' })
+      setMessage("Your request was sent to Rabbit's Foot. We'll follow up shortly.")
+    } catch (reason) {
+      setMessage(reason instanceof Error ? reason.message : 'Your request could not be sent.')
+    } finally {
+      setRequestBusy(false)
+    }
+  }
+
   if (busy) {
     return (
       <main className="portal-shell portal-loading">
@@ -236,6 +351,15 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
           </span>
         </div>
       </header>
+
+      <nav aria-label="Contact Rabbit's Foot" className="portal-contact-bar">
+        <span>Questions about your project?</span>
+        <div>
+          <a href="tel:+15747035978">Call 574-703-5978</a>
+          <a href="sms:+15747035978">Text Rabbit&apos;s Foot</a>
+          <a href="mailto:callrabbitsfoot@gmail.com">Email us</a>
+        </div>
+      </nav>
 
       {message && (
         <div className="portal-message" role="status">
@@ -414,6 +538,47 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
           ) : (
             <p className="portal-empty">No invoices are available.</p>
           )}
+        </article>
+
+        <article className="portal-section portal-request-work">
+          <header>
+            <MessageSquarePlus />
+            <div>
+              <p>REQUEST MORE WORK</p>
+              <h2>Need help with another project?</h2>
+            </div>
+          </header>
+          <p className="portal-empty">
+            Send the details here. Your contact information is already connected.
+          </p>
+          <label>
+            Service needed
+            <input
+              placeholder="Door repair, painting, drywall..."
+              value={workRequest.service}
+              onChange={(event) => setWorkRequest({ ...workRequest, service: event.target.value })}
+            />
+          </label>
+          <label>
+            Preferred timing (optional)
+            <input
+              placeholder="This week, before Friday, flexible..."
+              value={workRequest.preferredTiming}
+              onChange={(event) => setWorkRequest({ ...workRequest, preferredTiming: event.target.value })}
+            />
+          </label>
+          <label>
+            Project details
+            <textarea
+              placeholder="Describe the work, location, measurements, or anything we should know."
+              rows={4}
+              value={workRequest.details}
+              onChange={(event) => setWorkRequest({ ...workRequest, details: event.target.value })}
+            />
+          </label>
+          <button disabled={requestBusy} onClick={() => void requestMoreWork()} type="button">
+            {requestBusy ? 'Sending request...' : 'Request an estimate'}
+          </button>
         </article>
       </section>
 

@@ -20,6 +20,9 @@ import type { Lead } from '../src/features/leads/types/Lead.ts'
 import { nextEstimateNumber } from '../src/features/estimates/data/estimateNumber.ts'
 import { isAllowedOrigin, requestedOrganizationId } from '../api/_http-security.js'
 import { buildCustomerDocumentStats } from '../src/features/customers/data/customerDocumentStats.ts'
+import { buildActionCenterItems } from '../src/features/communications/actionCenter.ts'
+import { normalizePhoneNumber } from '../src/features/communications/customerContact.ts'
+import { buildCustomerPortalUrl } from '../api/_public-url.js'
 
 test('AI estimate scope stays exact unless upsells are explicitly requested', () => {
   assert.equal(isUpsellRequested('Replace 2 storm doors'), false)
@@ -184,4 +187,65 @@ test('customer cards show the same document totals as customer activity', () => 
   const stats = buildCustomerDocumentStats(estimates as never, invoices as never)
 
   assert.deepEqual(stats.get('customer-1'), { documents: 2, billed: 650 })
+})
+
+test('Customer Hub links always use a public HTTPS host', () => {
+  const previous = process.env.OWNER_HUB_PUBLIC_URL
+  process.env.OWNER_HUB_PUBLIC_URL = 'http://localhost:5173'
+
+  try {
+    const portalUrl = buildCustomerPortalUrl('safe-token', {
+      headers: { origin: 'http://localhost:5173' },
+    } as never)
+    assert.equal(
+      portalUrl,
+      'https://rabbits-foot-owner-hub.vercel.app/#portal/safe-token',
+    )
+  } finally {
+    if (previous === undefined) delete process.env.OWNER_HUB_PUBLIC_URL
+    else process.env.OWNER_HUB_PUBLIC_URL = previous
+  }
+})
+
+test('phone numbers are normalized before a customer text handoff', () => {
+  assert.equal(normalizePhoneNumber('(574) 703-5978'), '5747035978')
+  assert.equal(normalizePhoneNumber('+1 574-703-5978'), '+15747035978')
+  assert.equal(normalizePhoneNumber('not saved'), '')
+})
+
+test('action center prioritizes customer requests and overdue invoices', () => {
+  const now = new Date('2026-08-11T16:00:00.000Z')
+  const actions = buildActionCenterItems({
+    now,
+    customers: [{ id: 'customer-1', firstName: 'Jamie', lastName: 'Doe' }] as never,
+    estimates: [],
+    appointments: [],
+    invoices: [{
+      id: 'invoice-1',
+      customerId: 'customer-1',
+      invoiceNumber: 'INV-100',
+      jobName: 'Door repair',
+      status: 'overdue',
+      dueDate: '2026-08-01',
+      lineItems: [{ id: 'line-1', description: 'Repair', quantity: 1, unitPrice: 200 }],
+      payments: [],
+      taxRate: 0,
+      discount: 0,
+    }] as never,
+    communications: [{
+      id: 'request-1',
+      customerId: 'customer-1',
+      channel: 'system',
+      kind: 'custom',
+      status: 'delivered',
+      subject: 'New work request: Drywall',
+      body: 'Patch a damaged wall.',
+      createdAt: '2026-08-11T15:00:00.000Z',
+    }],
+  })
+
+  assert.deepEqual(actions.map((item) => item.kind), [
+    'customer_request',
+    'overdue_invoice',
+  ])
 })

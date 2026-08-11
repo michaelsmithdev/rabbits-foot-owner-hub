@@ -1,7 +1,8 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getSquareMerchantCredentials } from './_square-merchant.js'
 import { applyCors, requestedOrganizationId } from './_http-security.js'
+import { buildCustomerPortalUrl, getPublicAppUrl } from './_public-url.js'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -48,6 +49,37 @@ async function userId(token: string) {
 
 function tokenHash(token: string) { return createHash('sha256').update(token).digest('hex') }
 function clean(value: unknown, length = 500) { return typeof value === 'string' ? value.trim().slice(0, length) : '' }
+function base64Url(value: string) {
+  return Buffer.from(value).toString('base64url')
+}
+
+function createPortalRealtimeToken(link: {
+  id: string
+  organization_id: string
+  customer_id: string
+}) {
+  const secret = process.env.SUPABASE_JWT_SECRET?.trim()
+  if (!secret) return null
+
+  const now = Math.floor(Date.now() / 1000)
+  const expiresAt = now + 60 * 60
+  const header = base64Url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+  const claims = base64Url(JSON.stringify({
+    aud: 'authenticated',
+    role: 'authenticated',
+    sub: link.id,
+    iat: now,
+    exp: expiresAt,
+    portal_link_id: link.id,
+    portal_organization_id: link.organization_id,
+    portal_customer_id: link.customer_id,
+  }))
+  const signature = createHmac('sha256', secret)
+    .update(`${header}.${claims}`)
+    .digest('base64url')
+
+  return { token: `${header}.${claims}.${signature}`, expiresAt }
+}
 function total(record: Json) {
   const subtotal = (Array.isArray(record.lineItems) ? record.lineItems : []).reduce((sum, raw) => {
     const item = raw && typeof raw === 'object' ? raw as Json : {}
@@ -89,12 +121,17 @@ async function records(organizationId: string) {
   return response.json() as Promise<Array<{ record_type: string; record_id: string; payload: Json }>>
 }
 
-function safePortalData(all: Array<{ record_type: string; record_id: string; payload: Json }>, customerId: string, expiresAt: string) {
+function safePortalData(
+  all: Array<{ record_type: string; record_id: string; payload: Json }>,
+  link: { id: string; organization_id: string; customer_id: string; expires_at: string },
+) {
+  const customerId = link.customer_id
   const customer = all.find((item) => item.record_type === 'customer' && item.record_id === customerId)?.payload
   if (!customer) return null
   const belongs = (item: { payload: Json }) => item.payload.customerId === customerId
   return {
-    expiresAt,
+    expiresAt: link.expires_at,
+    realtime: createPortalRealtimeToken(link),
     customer: { id: customerId, firstName: clean(customer.firstName, 80), lastName: clean(customer.lastName, 80), email: clean(customer.email, 200), phone: clean(customer.phone, 40) },
     estimates: all.filter((item) => item.record_type === 'estimate' && belongs(item) && item.payload.status !== 'draft').map(({ payload }) => ({
       id: payload.id, estimateNumber: payload.estimateNumber, jobName: payload.jobName, serviceAddress: payload.serviceAddress,
@@ -116,7 +153,7 @@ async function loadPortal(token: string) {
   const link = await portalLink(token)
   if (!link) return null
   const all = await records(link.organization_id)
-  return { link, all, data: safePortalData(all, link.customer_id, link.expires_at) }
+  return { link, all, data: safePortalData(all, link) }
 }
 
 async function createCustomerSquareCheckout(
@@ -166,7 +203,7 @@ async function createCustomerSquareCheckout(
       `${portal.link.organization_id}:${invoiceId}:${amount}:${String(record.payload.updatedAt ?? '')}`,
     )
     .digest('hex')
-  const origin = request.headers.origin ?? 'https://rabbits-foot-owner-hub.vercel.app'
+  const publicAppUrl = getPublicAppUrl(request)
   const squareResponse = await fetch(`${merchant.baseUrl}/v2/online-checkout/payment-links`, {
     method: 'POST',
     headers: {
@@ -183,7 +220,7 @@ async function createCustomerSquareCheckout(
         location_id: merchant.locationId,
       },
       checkout_options: {
-        redirect_url: `${origin}/?payment=return#portal/${rawToken}`,
+        redirect_url: `${publicAppUrl}/?payment=return#portal/${rawToken}`,
       },
     }),
     signal: AbortSignal.timeout(15_000),
@@ -254,8 +291,10 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60_000).toISOString()
       const insertion = await database('/rest/v1/customer_portal_links', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ organization_id: organizationId, customer_id: customerId, token_hash: tokenHash(rawToken), expires_at: expiresAt, created_by: ownerId }) })
       if (!insertion.ok) return send(response, 502, { error: 'Run the Owner Hub 2.3 database migration, then retry.' })
-      const origin = request.headers.origin ?? 'https://rabbits-foot-owner-hub.vercel.app'
-      return send(response, 200, { url: `${origin}/#portal/${rawToken}`, expiresAt })
+      return send(response, 200, {
+        url: buildCustomerPortalUrl(rawToken, request),
+        expiresAt,
+      })
     }
     const rawToken = clean(payload.token, 80)
     const portal = await loadPortal(rawToken)
@@ -286,6 +325,44 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       const communication = { id, customerId: portal.link.customer_id, documentId: estimateId, channel: 'system', kind: 'custom', status: 'delivered', subject: 'Customer requested estimate changes', body: message, createdAt: now, sentAt: now }
       const insertion = await database('/rest/v1/business_records', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ organization_id: portal.link.organization_id, record_type: 'communication', record_id: id, payload: communication, is_deleted: false, client_updated_at: now }) })
       return insertion.ok ? send(response, 200, { ok: true }) : send(response, 502, { error: 'The request could not be delivered.' })
+    }
+    if (action === 'request_work') {
+      const service = clean(payload.service, 160)
+      const preferredTiming = clean(payload.preferredTiming, 240)
+      const details = clean(payload.details, 2000)
+      if (!service || !details) {
+        return send(response, 400, { error: 'Describe the service and work you need.' })
+      }
+
+      const now = new Date().toISOString()
+      const id = randomUUID()
+      const timingLine = preferredTiming ? `Preferred timing: ${preferredTiming}\n\n` : ''
+      const communication = {
+        id,
+        customerId: portal.link.customer_id,
+        channel: 'system',
+        kind: 'custom',
+        status: 'delivered',
+        subject: `New work request: ${service}`,
+        body: `${timingLine}${details}`,
+        createdAt: now,
+        sentAt: now,
+      }
+      const insertion = await database('/rest/v1/business_records', {
+        method: 'POST',
+        headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({
+          organization_id: portal.link.organization_id,
+          record_type: 'communication',
+          record_id: id,
+          payload: communication,
+          is_deleted: false,
+          client_updated_at: now,
+        }),
+      })
+      return insertion.ok
+        ? send(response, 200, { ok: true })
+        : send(response, 502, { error: 'The work request could not be delivered.' })
     }
     if (action === 'approve_estimate') {
       const estimateId = clean(payload.estimateId, 80); const approvingName = clean(payload.customerName, 160)

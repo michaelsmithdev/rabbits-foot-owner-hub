@@ -14,8 +14,11 @@ import { loadInvoices } from '../../invoices/data/invoiceStore'
 import { loadPhotos } from '../../photos/data/photoStore'
 import { useAuth } from '../../auth/authContext'
 import { buildCustomerDocumentStats } from '../data/customerDocumentStats'
+import { createCustomerPortalLink } from '../../communications/customerDocumentShare'
+import { normalizePhoneNumber, openSmsComposer } from '../../communications/customerContact'
 
 type CustomersProps = {
+  initialCustomerId?: string | null
   onStartEstimate: (customerId: string) => void
 }
 
@@ -37,6 +40,7 @@ const emptyCustomerForm: CustomerFormData = {
 }
 
 function Customers({
+  initialCustomerId = null,
   onStartEstimate,
 }: CustomersProps) {
   const { session } = useAuth()
@@ -51,7 +55,7 @@ function Customers({
   const [
     selectedCustomerId,
     setSelectedCustomerId,
-  ] = useState<string | null>(null)
+  ] = useState<string | null>(initialCustomerId)
 
   const [formData, setFormData] =
     useState<CustomerFormData>(emptyCustomerForm)
@@ -314,34 +318,18 @@ function Customers({
     setPortalMessage('Preparing a secure Customer Hub text…')
 
     try {
-      const apiOrigin =
-        import.meta.env.VITE_OWNER_HUB_API_URL?.trim().replace(/\/$/, '') ?? ''
-      const response = await fetch(`${apiOrigin}/api/customer-portal`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-          'X-Owner-Hub-Organization': localStorage.getItem('owner-hub-active-organization') ?? '',
-        },
-        body: JSON.stringify({ action: 'create', customerId: customer.id }),
-      })
-      const payload = (await response.json()) as {
-        url?: string
-        error?: string
-      }
-
-      if (!response.ok || !payload.url) {
-        throw new Error(payload.error || 'Customer Hub link failed.')
-      }
+      const portalUrl = await createCustomerPortalLink(
+        session.access_token,
+        customer.id,
+      )
 
       const message =
         `Hi ${customer.firstName}, here is your secure Rabbit's Foot Customer Hub. ` +
-        `You can review appointments, estimates, invoices, and pay securely: ${payload.url}`
-      const phone = formatPhoneLink(customer.phone)
+        `You can review appointments, estimates, invoices, and pay securely: ${portalUrl}`
 
       await navigator.clipboard.writeText(message).catch(() => undefined)
       setPortalMessage('Customer Hub text is ready. Review it, then tap Send.')
-      window.location.href = `sms:${phone}?body=${encodeURIComponent(message)}`
+      openSmsComposer(customer, message)
     } catch (error) {
       setPortalMessage(
         error instanceof Error ? error.message : 'Customer Hub link failed.',
@@ -371,10 +359,6 @@ function Customers({
       day: 'numeric',
       year: 'numeric',
     }).format(date)
-  }
-
-  function formatPhoneLink(phone: string) {
-    return phone.replace(/[^\d+]/g, '')
   }
 
   function formatFullAddress(
@@ -439,6 +423,7 @@ function Customers({
             </button>
             <button
               className="button-light"
+              data-tour="customer-hub"
               disabled={portalCustomerId === selectedCustomer.id}
               onClick={() => void textCustomerHub(selectedCustomer)}
               type="button"
@@ -502,7 +487,7 @@ function Customers({
                   <strong>Phone: </strong>
 
                   <a
-                    href={`tel:${formatPhoneLink(
+                    href={`tel:${normalizePhoneNumber(
                       selectedCustomer.phone,
                     )}`}
                   >
@@ -649,6 +634,7 @@ function Customers({
 
           <button
             className="button-dark"
+            data-tour="add-customer"
             onClick={openCustomerModal}
             type="button"
           >

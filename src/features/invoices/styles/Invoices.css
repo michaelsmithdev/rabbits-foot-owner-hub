@@ -220,7 +220,7 @@
 .invoice-modal,
 .payment-modal {
   width: min(1080px, 100%);
-  max-height: calc(100vh - 40px);
+  max-height: calc(100dvh - 40px);
   overflow-y: auto;
   border-radius: 24px;
   background: #fff;
@@ -537,7 +537,7 @@
 
   .invoice-modal,
   .payment-modal {
-    max-height: none;
+    max-height: calc(100dvh - 24px);
     margin: 0;
     border-radius: 18px;
     padding: 20px;
