@@ -24,6 +24,45 @@ function formatElapsed(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
+function recordingErrorName(error: unknown) {
+  return typeof error === 'object' && error !== null && 'name' in error
+    ? String(error.name)
+    : ''
+}
+
+function describeRecordingError(error: unknown) {
+  const name = recordingErrorName(error)
+  if (name === 'NotAllowedError' || name === 'SecurityError') {
+    return 'Microphone access is blocked for Owner Hub. Allow it in the app permissions, then try again.'
+  }
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+    return 'No working microphone was found on this device.'
+  }
+  if (name === 'NotReadableError' || name === 'TrackStartError' || name === 'AbortError') {
+    return 'The microphone is busy or could not start. Close other recording apps, then try again.'
+  }
+  if (name === 'NotSupportedError') {
+    return 'This device could not start a compatible audio recording. Restart Owner Hub and try again.'
+  }
+  return 'The microphone could not start. Restart Owner Hub and try again, or type the job notes.'
+}
+
+async function openMicrophone() {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: {
+        channelCount: 1,
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+      },
+    })
+  } catch (error) {
+    if (recordingErrorName(error) !== 'OverconstrainedError') throw error
+    return navigator.mediaDevices.getUserMedia({ audio: true })
+  }
+}
+
 export default function VoiceCapture({ notes, onChange, label = 'Talk through the job' }: Props) {
   const recorderRef = useRef<MediaRecorder | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -78,14 +117,7 @@ export default function VoiceCapture({ notes, onChange, label = 'Talk through th
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      })
+      const stream = await openMicrophone()
       const preferredType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm'].find((type) => MediaRecorder.isTypeSupported(type))
       const recorder = preferredType ? new MediaRecorder(stream, { mimeType: preferredType }) : new MediaRecorder(stream)
       chunksRef.current = []
@@ -137,8 +169,9 @@ export default function VoiceCapture({ notes, onChange, label = 'Talk through th
       recorder.start(500)
       setRecording(true)
       setElapsed(0)
-    } catch {
-      setError('Microphone access was not granted. Allow microphone access or type a note.')
+    } catch (recordingError) {
+      console.error('Owner Hub microphone startup failed', recordingError)
+      setError(describeRecordingError(recordingError))
     }
   }
 
