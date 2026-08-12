@@ -9,7 +9,6 @@ import {
   RefreshCw,
   Save,
   ShieldCheck,
-  PlayCircle,
 } from 'lucide-react'
 import { type FormEvent, useEffect, useState } from 'react'
 
@@ -31,9 +30,10 @@ import {
   saveBusinessSettings,
 } from '../../features/settings/data/businessSettingsStore'
 import type { BusinessSettings } from '../../features/settings/types/BusinessSettings'
+import TutorialSettingsCard from '../../features/tutorial/TutorialSettingsCard'
 import './Settings.css'
 
-function Settings({ onStartTour }: { onStartTour?: () => void }) {
+function Settings() {
   const { mode, session, signOut } = useAuth()
   const { errorMessage, lastSyncedAt, status, syncNow } = useCloudSync()
   const [settings, setSettings] = useState<BusinessSettings>(
@@ -162,7 +162,7 @@ function Settings({ onStartTour }: { onStartTour?: () => void }) {
   }
 
   return (
-    <section className="settings-page">
+    <section className="settings-page" data-tour="settings-page">
       <header className="settings-page-header">
         <div>
           <p className="eyebrow">YOUR BUSINESS</p>
@@ -183,7 +183,7 @@ function Settings({ onStartTour }: { onStartTour?: () => void }) {
       {formError && <div className="settings-error" role="alert">{formError}</div>}
 
       <form className="settings-form" id="business-settings-form" onSubmit={saveSettings}>
-        <article className="settings-form-card">
+        <article className="settings-form-card" data-tour="settings-profile">
           <header className="settings-section-header">
             <span className="settings-card-icon"><Building2 size={24} /></span>
             <div>
@@ -261,7 +261,7 @@ function Settings({ onStartTour }: { onStartTour?: () => void }) {
           </div>
         </article>
 
-        <article className="settings-form-card">
+        <article className="settings-form-card" data-tour="settings-document-defaults">
           <header className="settings-section-header">
             <span className="settings-card-icon"><FileText size={24} /></span>
             <div>
@@ -351,7 +351,7 @@ function Settings({ onStartTour }: { onStartTour?: () => void }) {
           </div>
         </article>
 
-        <article className="settings-form-card">
+        <article className="settings-form-card" data-tour="settings-pricing-defaults">
           <header className="settings-section-header">
             <span className="settings-card-icon"><DollarSign size={24} /></span>
             <div>
@@ -388,7 +388,7 @@ function Settings({ onStartTour }: { onStartTour?: () => void }) {
           </div>
         </article>
 
-        <article className="settings-form-card settings-preferences-card">
+        <article className="settings-form-card settings-preferences-card" data-tour="settings-preferences">
           <header className="settings-section-header">
             <span className="settings-card-icon"><ShieldCheck size={24} /></span>
             <div>
@@ -425,18 +425,8 @@ function Settings({ onStartTour }: { onStartTour?: () => void }) {
         </article>
       </form>
 
-      <div className="settings-grid">
-        <article className="settings-card" data-tour="settings">
-          <span className="settings-card-icon"><PlayCircle size={24} /></span>
-          <div>
-            <p className="eyebrow">HELP &amp; ONBOARDING</p>
-            <h2>Take the Owner Hub tour</h2>
-            <p>Revisit the guided walkthrough for customers, estimates, AI field capture, Customer Hub, invoices, and settings.</p>
-          </div>
-          <button className="settings-secondary-button" onClick={onStartTour} type="button">
-            <PlayCircle size={17} /> Start product tour
-          </button>
-        </article>
+      <div className="settings-grid" data-tour="settings-data-safety">
+        <TutorialSettingsCard />
 
         <article className="settings-card settings-security-card">
           <span className="settings-card-icon"><ShieldCheck size={24} /></span>

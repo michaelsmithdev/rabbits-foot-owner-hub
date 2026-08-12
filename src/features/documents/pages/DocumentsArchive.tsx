@@ -57,7 +57,7 @@ export default function DocumentsArchive() {
   }
 
   return (
-    <div className="feature-page document-archive-page">
+    <div className="feature-page document-archive-page" data-tour="pdf-archive-page">
       <header className="page-heading">
         <div><span className="eyebrow">PDF DOCUMENTS</span><h1>Document archive</h1><p>Every generated estimate and invoice PDF, ready to open, save, send, or print.</p></div>
         <div className="metric-card"><strong>{records.length}</strong><span>PDFs stored</span></div>
@@ -79,7 +79,7 @@ export default function DocumentsArchive() {
               <p>{record.customerName}</p>
               <small>{new Date(record.createdAt).toLocaleString()}</small>
             </div>
-            <div className="archive-actions" aria-label={`Actions for ${record.number}`}>
+            <div className="archive-actions" aria-label={`Actions for ${record.number}`} data-tour="pdf-archive-actions">
               <button disabled={Boolean(busy)} onClick={() => runAction(record, 'preview')} title="Preview PDF" type="button"><Eye /><span>Preview</span></button>
               <button disabled={Boolean(busy)} onClick={() => runAction(record, 'save')} title="Save PDF" type="button"><Download /><span>Save</span></button>
               <button disabled={Boolean(busy)} onClick={() => runAction(record, 'share')} title="Share PDF" type="button"><Share2 /><span>Send</span></button>

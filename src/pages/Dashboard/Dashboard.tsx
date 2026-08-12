@@ -248,7 +248,7 @@ function Dashboard({
         </div>
       </section>
 
-      <section aria-label="Business summary" className="dashboard-stats">
+      <section aria-label="Business summary" className="dashboard-stats" data-tour="dashboard-summary">
         {dashboardStats.map((stat) => {
           const Icon = stat.icon
 
@@ -268,7 +268,7 @@ function Dashboard({
       </section>
 
       <section className="dashboard-content-grid">
-        <article className="dashboard-panel attention-panel">
+        <article className="dashboard-panel attention-panel" data-tour="dashboard-schedule">
           <div className="panel-heading"><div><p className="eyebrow">TODAY</p><h2>Field schedule</h2></div><span className="attention-count">{todayAppointments.length}</span></div>
           {todayAppointments.length ? todayAppointments.slice(0, 4).map((appointment) => (
             <button className="attention-row" key={appointment.id} onClick={onOpenSchedule} type="button">
@@ -276,7 +276,7 @@ function Dashboard({
             </button>
           )) : <div className="dashboard-empty-state compact"><CheckCircle2 aria-hidden="true" size={24}/><div><strong>No appointments today</strong><p>Open the schedule to book work.</p></div></div>}
         </article>
-        <article className="dashboard-panel recent-work-panel">
+        <article className="dashboard-panel recent-work-panel" data-tour="dashboard-recent-work">
           <div className="panel-heading">
             <div>
               <p className="eyebrow">RECENT WORK</p>
@@ -343,7 +343,7 @@ function Dashboard({
           )}
         </article>
 
-        <article className="dashboard-panel attention-panel">
+        <article className="dashboard-panel attention-panel" data-tour="dashboard-action-center">
           <div className="panel-heading">
             <div>
               <p className="eyebrow">ACTION CENTER</p>

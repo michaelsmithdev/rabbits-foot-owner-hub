@@ -12,7 +12,8 @@ import ConnectionStatus from './features/pwa/components/ConnectionStatus'
 import { loadBusinessSettings } from './features/settings/data/businessSettingsStore'
 import { useSaas } from './features/saas/saasContext'
 import { useAuth } from './features/auth/authContext'
-import ProductTour from './features/onboarding/ProductTour'
+import LearnThisPageButton from './features/tutorial/LearnThisPageButton'
+import TutorialProvider from './features/tutorial/TutorialProvider'
 
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'))
 const Customers = lazy(() => import('./features/customers/pages/Customers'))
@@ -63,20 +64,6 @@ function App() {
     customerId: null as string | null,
   })
   const [dataRevision, setDataRevision] = useState(0)
-  const [tourState, setTourState] = useState<'welcome' | 'running' | null>(null)
-
-  const onboardingStorageKey = session?.user.id
-    ? `rabbits-foot-onboarding-${session.user.id}`
-    : mode === 'local'
-      ? 'rabbits-foot-onboarding-local'
-      : ''
-
-  useEffect(() => {
-    if (!onboardingStorageKey || localStorage.getItem(onboardingStorageKey)) return
-    const timeout = window.setTimeout(() => setTourState('welcome'), 0)
-    return () => window.clearTimeout(timeout)
-  }, [onboardingStorageKey])
-
   useEffect(() => {
     function handleHashChange() {
       setActivePage(getPageFromHash())
@@ -219,7 +206,7 @@ function App() {
         return <Photos />
 
       case 'settings':
-        return <Settings onStartTour={() => setTourState('running')} />
+        return <Settings />
 
       case 'business':
         return <BusinessWorkspace />
@@ -243,25 +230,35 @@ function App() {
     'Dashboard'
 
   return (
-    <div className="app-shell">
-      <Sidebar
-        activePage={activePage}
-        onPageChange={handlePageChange}
-      />
+    <TutorialProvider
+      activePage={activePage}
+      key={session?.user.id ?? mode}
+      onNavigate={navigateTo}
+      userScope={session?.user.id ?? mode}
+    >
+      <div className="app-shell">
+        <Sidebar
+          activePage={activePage}
+          onPageChange={handlePageChange}
+        />
 
-      <main className="workspace">
-        <header className="topbar">
+        <main className="workspace">
+        <header className="topbar" data-tour="app-topbar">
           <div className="topbar-context">
             <span>OWNER HUB</span>
             <strong>{currentPageLabel}</strong>
           </div>
 
           <div className="topbar-actions">
-            <ConnectionStatus />
-            <CloudSyncStatus />
+            <div className="workspace-status-group" data-tour="workspace-status">
+              <ConnectionStatus />
+              <CloudSyncStatus />
+            </div>
+            <LearnThisPageButton />
             <button
+              aria-label="Start AI walkthrough"
               className="new-estimate-button walkthrough-launch-button"
-              data-tour="ai-estimate"
+              data-tour="start-walkthrough"
               onClick={() => handlePageChange('walkthrough')}
               type="button"
             >
@@ -271,6 +268,7 @@ function App() {
             <button
               aria-label="New estimate"
               className="new-estimate-button"
+              data-tour="new-estimate"
               onClick={() => openEstimateBuilder()}
               type="button"
             >
@@ -301,24 +299,9 @@ function App() {
             {renderCurrentPage()}
           </Suspense>
         </section>
-      </main>
-
-      {tourState ? (
-        <ProductTour
-          initialWelcome={tourState === 'welcome'}
-          onClose={(completed) => {
-            if (onboardingStorageKey) {
-              localStorage.setItem(
-                onboardingStorageKey,
-                JSON.stringify({ completed, dismissedAt: new Date().toISOString() }),
-              )
-            }
-            setTourState(null)
-          }}
-          onNavigate={navigateTo}
-        />
-      ) : null}
-    </div>
+        </main>
+      </div>
+    </TutorialProvider>
   )
 }
 

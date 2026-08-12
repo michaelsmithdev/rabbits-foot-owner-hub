@@ -142,7 +142,7 @@ export default function BusinessWorkspace() {
   if (loading && !organization) return <section className="business-loading"><LoaderCircle className="auth-spinner" /><p>Loading your business workspace…</p></section>
 
   return (
-    <section className="business-workspace-page">
+    <section className="business-workspace-page" data-tour="business-page">
       <header className="business-hero">
         <div><p className="eyebrow">SUBSCRIPTION WORKSPACE</p><h1>{organization?.name ?? 'Your business'}</h1><p>{isNativeApp ? 'Manage setup, team access, integrations, usage, and your current subscription status.' : 'Manage setup, team access, integrations, usage, and subscription billing.'}</p></div>
         <div className={`subscription-status ${subscriptionIsUsable(subscription?.status ?? '', subscription?.trialEndsAt ?? null) ? 'active' : 'attention'}`}>
@@ -160,7 +160,7 @@ export default function BusinessWorkspace() {
           <ul>{onboarding.map((step) => <li className={step.complete ? 'done' : ''} key={step.label}>{step.complete ? <Check size={18}/> : <Circle size={18}/>}<span>{step.label}</span></li>)}</ul>
         </article>
 
-        <article className="business-panel usage-panel">
+        <article className="business-panel usage-panel" data-tour="business-usage">
           <header><span><Sparkles size={22}/></span><div><p className="eyebrow">THIS MONTH</p><h2>Plan usage</h2></div></header>
           <div className="usage-row"><div><strong>AI estimates</strong><span>{usage.aiEstimates} of {currentPlan.aiEstimates}</span></div><progress max={currentPlan.aiEstimates} value={usage.aiEstimates}/></div>
           <div className="usage-row"><div><strong>Voice transcriptions</strong><span>{usage.transcriptions} of {currentPlan.transcriptions}</span></div><progress max={currentPlan.transcriptions} value={usage.transcriptions}/></div>
@@ -175,13 +175,13 @@ export default function BusinessWorkspace() {
       </form>}
 
       <div className="business-dashboard-grid">
-        <article className="business-panel integration-panel">
+        <article className="business-panel integration-panel" data-tour="business-square">
           <header><span><CreditCard size={22}/></span><div><p className="eyebrow">PAYMENTS</p><h2>Square connection</h2></div></header>
           <div className="integration-state"><div className={square?.status === 'connected' ? 'connection-dot connected' : 'connection-dot'}/><div><strong>{square?.status === 'connected' ? 'Square connected' : 'Connect your Square account'}</strong><p>{square?.status === 'connected' ? `Payments route to merchant ${square.merchantId ?? ''}.` : 'Every subscriber connects their own merchant account. Credentials are encrypted server-side.'}</p></div></div>
           {canManage && <button className="business-action" disabled={busyAction === 'square'} onClick={() => void connectSquare()} type="button">{busyAction === 'square' ? <LoaderCircle className="auth-spinner"/> : <ExternalLink/>}{square?.status === 'connected' ? 'Reconnect Square' : 'Connect Square securely'}</button>}
         </article>
 
-        <article className="business-panel team-panel">
+        <article className="business-panel team-panel" data-tour="business-team">
           <header><span><UsersRound size={22}/></span><div><p className="eyebrow">TEAM & PERMISSIONS</p><h2>{members.length} of {currentPlan.seats} seats used</h2></div></header>
           <div className="member-list">{members.map((member) => <div className="member-row" key={member.userId}><span>{(member.displayName || member.email || 'T').slice(0, 1).toUpperCase()}</span><div><strong>{member.displayName || member.email}</strong><small>{member.email}</small></div>{role === 'owner' && member.role !== 'owner' ? <div className="member-controls"><select aria-label={`Role for ${member.displayName || member.email}`} disabled={busyAction === `member-${member.userId}`} onChange={(event) => void changeMember(member.userId, 'update-member', event.target.value as 'admin' | 'member')} value={member.role}><option value="member">Technician</option><option value="admin">Administrator</option></select><button aria-label={`Remove ${member.displayName || member.email}`} disabled={busyAction === `member-${member.userId}`} onClick={() => void changeMember(member.userId, 'remove-member')} type="button"><Trash2 size={16}/></button></div> : <b>{member.role}</b>}</div>)}</div>
           {canManage && <form className="invite-form" onSubmit={(event) => void createInvite(event)}><input aria-label="Team member email" onChange={(event) => setInviteEmail(event.target.value)} placeholder="team@email.com" required type="email" value={inviteEmail}/><select aria-label="Team member role" onChange={(event) => setInviteRole(event.target.value as 'admin' | 'member')} value={inviteRole}><option value="member">Technician</option><option value="admin">Office administrator</option></select><button disabled={busyAction === 'invite' || members.length >= currentPlan.seats} type="submit">{busyAction === 'invite' ? <LoaderCircle className="auth-spinner"/> : <Copy/>}Create invite link</button></form>}
@@ -200,7 +200,7 @@ export default function BusinessWorkspace() {
         <section className="plans-section"><header><div><p className="eyebrow">SIMPLE PRICING</p><h2>Choose the plan that fits the crew</h2></div><p>Annual billing includes two months free. AI and storage limits protect the business from surprise costs.</p></header><div className="plan-grid">{Object.values(planCatalog).map((plan) => <article className={`plan-card ${plan.id === subscription?.plan ? 'current' : ''}`} key={plan.id}><p className="eyebrow">{plan.name}</p><h3>${plan.monthlyPrice}<span>/month</span></h3><p>{plan.seats} seat{plan.seats === 1 ? '' : 's'} · {plan.aiEstimates} AI estimates/month</p><ul>{plan.features.map((feature) => <li key={feature}><Check size={17}/>{feature}</li>)}</ul><button disabled={!canManage || plan.id === subscription?.plan || busyAction === `plan-${plan.id}`} onClick={() => void choosePlan(plan.id)} type="button">{plan.id === subscription?.plan ? <><ShieldCheck/>Current plan</> : <>Choose {plan.name}</>}</button></article>)}</div></section>
       )}
 
-      <section className="business-panel account-control">
+      <section className="business-panel account-control" data-tour="business-account">
         <header><span><ShieldCheck size={22}/></span><div><p className="eyebrow">ACCOUNT CONTROL</p><h2>{isNativeApp ? 'Support and privacy' : 'Renewal, support, and privacy'}</h2><p>{isNativeApp ? 'Account assistance, legal information, and deletion controls.' : 'Clear controls for billing, legal information, support, and account deletion.'}</p></div></header>
         <div className="account-control-grid">
           <a href="#privacy"><FileText size={19}/><span><strong>Privacy policy</strong><small>How information is stored and protected</small></span></a>

@@ -701,7 +701,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
 
   return (
     <>
-      <section className="invoices-page">
+      <section className="invoices-page" data-tour="invoices-page">
         <div className="customers-page-header">
           <div>
             <p className="eyebrow">DOCUMENTS</p>
@@ -713,6 +713,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
           </div>
           <button
             className="button-dark"
+            data-tour="new-invoice"
             onClick={openNewInvoice}
             type="button"
           >
@@ -779,6 +780,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                     <select
                       aria-label={`Status for ${invoice.invoiceNumber}`}
                       className={`invoice-status invoice-status-select status-${invoice.status}`}
+                      data-tour="invoice-status"
                       onChange={(event) =>
                         changeInvoiceStatus(
                           invoice,
@@ -816,7 +818,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                     </div>
                   </div>
 
-                  <div className="invoice-card-actions">
+                  <div className="invoice-card-actions" data-tour="invoice-actions">
                     <button
                       onClick={() => openEditInvoice(invoice)}
                       type="button"
@@ -839,6 +841,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                         invoice.status,
                       ) && (
                       <button
+                        data-tour="square-payment"
                         disabled={squareLinkInvoiceId === invoice.id}
                         onClick={() => void createSquarePaymentLink(invoice)}
                         type="button"
@@ -855,6 +858,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                     {balance > 0 && invoice.status !== 'void' && (
                       <button
                         className="invoice-payment-button"
+                        data-tour="record-payment"
                         onClick={() => openPayment(invoice)}
                         type="button"
                       >

@@ -1,0 +1,248 @@
+.tutorial-is-active {
+  overflow: hidden;
+}
+
+.tutorial-overlay {
+  inset: 0;
+  position: fixed;
+  z-index: 10000;
+  pointer-events: auto;
+}
+
+.tutorial-full-backdrop {
+  background: rgba(8, 12, 8, 0.76);
+  inset: 0;
+  position: absolute;
+}
+
+.tutorial-spotlight {
+  border: 3px solid #8be000;
+  border-radius: 18px;
+  box-shadow: 0 0 0 9999px rgba(8, 12, 8, 0.76), 0 0 0 7px rgba(139, 224, 0, 0.18);
+  position: fixed;
+  transition: inset 180ms ease, height 180ms ease, width 180ms ease, top 180ms ease, left 180ms ease;
+}
+
+.tutorial-card {
+  background: #fff;
+  border: 1px solid #dce4d8;
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.3);
+  color: #111511;
+  display: grid;
+  max-height: calc(100dvh - 36px);
+  max-width: calc(100vw - 36px);
+  overflow: auto;
+  position: fixed;
+  width: 390px;
+}
+
+.tutorial-card-centered {
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.tutorial-card-header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 20px 12px;
+}
+
+.tutorial-card-header > div {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.tutorial-card-header span {
+  color: #4e7b00;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tutorial-card-header strong {
+  color: #727a72;
+  font-size: 0.78rem;
+}
+
+.tutorial-close {
+  background: #f0f3ee;
+  border: 0;
+  border-radius: 999px;
+  color: #111511;
+  display: grid;
+  height: 36px;
+  place-items: center;
+  width: 36px;
+}
+
+.tutorial-progress-track {
+  background: #edf1e9;
+  height: 5px;
+  margin: 0 20px;
+  overflow: hidden;
+}
+
+.tutorial-progress-track span {
+  background: #80d400;
+  display: block;
+  height: 100%;
+  transition: width 180ms ease;
+}
+
+.tutorial-card-copy {
+  padding: 22px 24px 18px;
+}
+
+.tutorial-card-copy h2 {
+  font-size: clamp(1.55rem, 3.5vw, 2rem);
+  letter-spacing: -0.035em;
+  line-height: 1.06;
+  margin: 0 0 12px;
+}
+
+.tutorial-card-copy > p {
+  color: #5f675f;
+  line-height: 1.58;
+  margin: 0;
+}
+
+.tutorial-finish-icon {
+  color: #67a900;
+  margin-bottom: 14px;
+}
+
+.tutorial-tip {
+  align-items: flex-start;
+  background: #eef8de;
+  border-radius: 14px;
+  color: #3a5f00;
+  display: flex;
+  gap: 10px;
+  line-height: 1.45;
+  margin-top: 16px;
+  padding: 12px 14px;
+}
+
+.tutorial-tip svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.tutorial-card-copy .tutorial-fallback-note {
+  color: #7a5511;
+  font-size: 0.82rem;
+  margin-top: 14px;
+}
+
+.tutorial-card-actions {
+  align-items: center;
+  border-top: 1px solid #e5e9e2;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 16px 20px 20px;
+}
+
+.tutorial-card-actions > div {
+  display: flex;
+  gap: 8px;
+}
+
+.tutorial-card-actions button {
+  align-items: center;
+  border: 0;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  font-weight: 850;
+  gap: 6px;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 14px;
+}
+
+.tutorial-skip {
+  background: transparent;
+  color: #687068;
+  padding-inline: 0 !important;
+}
+
+.tutorial-back {
+  background: #edf1e9;
+  color: #1e241e;
+}
+
+.tutorial-next {
+  background: #111511;
+  color: #fff;
+}
+
+.tutorial-card-actions button:disabled {
+  cursor: default;
+  opacity: 0.42;
+}
+
+.tutorial-card button:focus-visible {
+  outline: 3px solid #80d400;
+  outline-offset: 3px;
+}
+
+@media (max-width: 700px) {
+  .tutorial-spotlight {
+    border-radius: 14px;
+  }
+
+  .tutorial-card,
+  .tutorial-card-centered {
+    border-radius: 24px 24px 0 0;
+    bottom: 0;
+    left: 0 !important;
+    max-height: min(68dvh, 620px);
+    max-width: none;
+    padding-bottom: env(safe-area-inset-bottom);
+    right: 0;
+    top: auto !important;
+    transform: none;
+    width: 100%;
+  }
+
+  .tutorial-card-actions {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .tutorial-card-actions > div {
+    display: grid;
+    grid-template-columns: 1fr 1.25fr;
+    order: -1;
+  }
+
+  .tutorial-skip {
+    justify-self: center;
+  }
+}
+
+@media (max-width: 360px) {
+  .tutorial-card-copy {
+    padding: 18px;
+  }
+
+  .tutorial-card-header,
+  .tutorial-card-actions {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tutorial-spotlight,
+  .tutorial-progress-track span {
+    transition: none;
+  }
+}

@@ -268,7 +268,7 @@ export default function Walkthroughs() {
   }
 
   return (
-    <div className="walkthrough-page">
+    <div className="walkthrough-page" data-tour="walkthrough-page">
       <header className="walkthrough-hero">
         <div>
           <span className="eyebrow">WALK IT · TALK IT · PRICE IT</span>
@@ -282,7 +282,7 @@ export default function Walkthroughs() {
       {error && <div className="walkthrough-error" role="alert"><AlertTriangle size={18} /> {error}</div>}
 
       <section className="walkthrough-grid">
-        <article className="walkthrough-card">
+        <article className="walkthrough-card" data-tour="walkthrough-customer">
           <span className="step-number">1</span>
           <h2>Customer and job</h2>
           <div className="walkthrough-fields">
@@ -293,7 +293,7 @@ export default function Walkthroughs() {
           </div>
         </article>
 
-        <article className="walkthrough-card">
+        <article className="walkthrough-card" data-tour="walkthrough-voice">
           <span className="step-number">2</span>
           <h2>Talk through the work</h2>
           <p className="card-help">Say what the customer wants, measurements, materials, access, damage, finish, and anything excluded.</p>
@@ -301,7 +301,7 @@ export default function Walkthroughs() {
           <label className="walkthrough-note"><span>Typed field notes</span><textarea onChange={(event) => update({ typedNotes: event.target.value })} placeholder="Example: Replace two damaged stair treads. Customer will supply stain. Basement access available…" rows={6} value={walkthrough.typedNotes} /></label>
         </article>
 
-        <article className="walkthrough-card">
+        <article className="walkthrough-card" data-tour="walkthrough-photos">
           <span className="step-number">3</span>
           <h2>Photograph the job</h2>
           <p className="card-help">Add up to 10 jobsite photos. Images are stored in the private business photo library.</p>
@@ -311,13 +311,13 @@ export default function Walkthroughs() {
         </article>
       </section>
 
-      <section className="walkthrough-finish">
+      <section className="walkthrough-finish" data-tour="walkthrough-analyze">
         <div><span className="eyebrow">STEP 4 · PRICE IT</span><h2>Build the exact-scope estimate</h2><p>The AI quotes only the work you described. Optional upsells stay separate, and the configured card-processing allowance is added automatically.</p></div>
         <button className="walkthrough-primary" disabled={busy} onClick={() => void analyze()} type="button"><Sparkles size={20} /> {busy ? 'Analyzing safely…' : result ? 'Reanalyze walkthrough' : 'Finish and analyze'}</button>
       </section>
 
       {result && (
-        <section className="walkthrough-results">
+        <section className="walkthrough-results" data-tour="walkthrough-results">
           <header><div><span className="eyebrow">OWNER REVIEW</span><h2>{result.jobTitle}</h2><p>{result.summary}</p></div><div className="recommended-price"><span>Customer total</span><strong>{currency.format(quotedTotal)}</strong><small>{result.confidence}</small></div></header>
 
           {result.warnings.length > 0 && <div className="profit-warnings"><AlertTriangle size={20} /><div><strong>Check before approval</strong>{result.warnings.map((warning) => <p key={warning}>{warning}</p>)}</div></div>}

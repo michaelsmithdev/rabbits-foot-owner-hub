@@ -49,9 +49,9 @@ export default function PriceHistory() {
   }
 
   return (
-    <div className="feature-page pricing-page">
+    <div className="feature-page pricing-page" data-tour="pricing-page">
       <header className="page-heading"><div><span className="eyebrow">SMART PRICING</span><h1>Price history</h1><p>Search past work and use real job history to quote consistently.</p></div><div className="metric-card"><strong>{records.length}</strong><span>Jobs analyzed</span></div></header>
-      <section className="pricebook-panel">
+      <section className="pricebook-panel" data-tour="pricebook">
         <header><div><span className="eyebrow">BUSINESS PRICEBOOK</span><h2>Your cost and customer-price references</h2><p>AI estimates use matching active entries. Internal cost stays off customer documents.</p></div><strong>{pricebook.length} items</strong></header>
         <div className="pricebook-form">
           <input aria-label="Pricebook item name" onChange={(event) => setNewItem({ ...newItem, name: event.target.value })} placeholder="Item or service name" value={newItem.name} />
@@ -69,7 +69,7 @@ export default function PriceHistory() {
       </div>
       {suggestion && <section className="pricing-suggestion"><Sparkles aria-hidden="true" /><div><span className="eyebrow">SUGGESTED PRICE</span><h2>{currency.format(suggestion.suggestedPrice)}</h2><p>{suggestion.explanation}</p><strong>{suggestion.confidence}% confidence · Range {currency.format(suggestion.low)}–{currency.format(suggestion.high)}</strong></div></section>}
       <div className="analytics-grid compact"><div className="metric-card"><TrendingUp /><strong>{currency.format(average)}</strong><span>Average job</span></div><div className="metric-card"><strong>{totals.length ? currency.format(Math.min(...totals)) : '$0.00'}</strong><span>Lowest</span></div><div className="metric-card"><strong>{totals.length ? currency.format(Math.max(...totals)) : '$0.00'}</strong><span>Highest</span></div><div className="metric-card"><strong>{currency.format(visible.reduce((sum, record) => sum + record.materials, 0))}</strong><span>Materials tracked</span></div></div>
-      <div className="pricing-history-list">{visible.map((record) => <article className="history-row" key={`${record.documentType}-${record.id}`}><div><span className="status-pill">{record.documentType}</span><h3>{record.jobName || record.category}</h3><p>{record.category} · {record.propertyType} · {new Date(`${record.date}T12:00:00`).toLocaleDateString()}</p></div><div className="history-numbers"><strong>{currency.format(record.total)}</strong><span>Materials {currency.format(record.materials)} · Gross profit {currency.format(record.grossProfit)}</span></div></article>)}</div>
+      <div className="pricing-history-list" data-tour="price-history">{visible.map((record) => <article className="history-row" key={`${record.documentType}-${record.id}`}><div><span className="status-pill">{record.documentType}</span><h3>{record.jobName || record.category}</h3><p>{record.category} · {record.propertyType} · {new Date(`${record.date}T12:00:00`).toLocaleDateString()}</p></div><div className="history-numbers"><strong>{currency.format(record.total)}</strong><span>Materials {currency.format(record.materials)} · Gross profit {currency.format(record.grossProfit)}</span></div></article>)}</div>
       {!visible.length && <div className="empty-state"><Sparkles size={42} /><h2>No matching job history yet</h2><p>Completed estimates and invoices automatically become pricing history.</p></div>}
     </div>
   )

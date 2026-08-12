@@ -329,6 +329,31 @@ textarea:focus-visible {
   gap: 12px;
 }
 
+.workspace-status-group {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.learn-page-button {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #d7dfd2;
+  border-radius: 999px;
+  color: #3d5f15;
+  display: inline-flex;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 850;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 14px;
+}
+
+.learn-page-button:disabled {
+  display: none;
+}
+
 .connection-status {
   min-height: 38px;
   gap: 7px;
@@ -637,6 +662,20 @@ textarea:focus-visible {
 
   .topbar-actions {
     gap: 8px;
+  }
+
+  .workspace-status-group {
+    gap: 6px;
+  }
+
+  .learn-page-button {
+    height: 38px;
+    min-height: 38px;
+    padding: 0 10px;
+  }
+
+  .learn-page-button span {
+    display: none;
   }
 
   .connection-status {

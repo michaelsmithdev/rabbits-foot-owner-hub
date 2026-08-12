@@ -1470,8 +1470,8 @@ function Estimates({
 
   if (activeDocumentTab === 'invoices') {
     return (
-      <>
-        <div className="estimate-document-tabs">
+      <div data-tour="documents-page">
+        <div className="estimate-document-tabs" data-tour="document-tabs">
           <button
             onClick={() =>
               setActiveDocumentTab(
@@ -1485,7 +1485,7 @@ function Estimates({
 
           <button
             className="active"
-            data-tour="invoices"
+            data-tour="invoices-tab"
             onClick={() =>
               setActiveDocumentTab(
                 'invoices',
@@ -1502,14 +1502,14 @@ function Estimates({
             initialDocumentKind === 'invoice' ? initialDocumentId : null
           }
         />
-      </>
+      </div>
     )
   }
 
   return (
-    <>
-      <section className="customers-page">
-        <div className="estimate-document-tabs">
+    <div data-tour="documents-page">
+      <section className="customers-page" data-tour="estimates-page">
+        <div className="estimate-document-tabs" data-tour="document-tabs">
           <button
             className="active"
             onClick={() =>
@@ -1523,7 +1523,7 @@ function Estimates({
           </button>
 
           <button
-            data-tour="invoices"
+            data-tour="invoices-tab"
             onClick={() =>
               setActiveDocumentTab(
                 'invoices',
@@ -1554,6 +1554,7 @@ function Estimates({
 
           <button
             className="button-dark"
+            data-tour="new-estimate-page"
             onClick={startNewEstimate}
             type="button"
           >
@@ -1587,7 +1588,7 @@ function Estimates({
             </button>
           </div>
         ) : (
-          <div className="customer-grid">
+          <div className="customer-grid" data-tour="estimate-list">
             {estimates.map((estimate) => (
               <article
                 className="customer-card"
@@ -1669,10 +1670,11 @@ function Estimates({
                   </div>
                 </div>
 
-                <div className="customer-card-actions">
+                <div className="customer-card-actions" data-tour="estimate-next-actions">
                   <select
                     aria-label={`Status for ${estimate.estimateNumber}`}
                     className="estimate-status-select"
+                    data-tour="estimate-status"
                     disabled={Boolean(estimate.approval)}
                     onChange={(event) => updateEstimateStatus(estimate.id, event.target.value as Estimate['status'])}
                     value={estimate.status}
@@ -1795,6 +1797,7 @@ function Estimates({
             aria-labelledby="estimate-modal-title"
             aria-modal="true"
             className="estimate-modal"
+            data-tour="estimate-builder"
             role="dialog"
           >
             <header className="estimate-modal-header">
@@ -1823,7 +1826,7 @@ function Estimates({
 
             <div className="estimate-divider" />
 
-            <div className="estimate-top-grid">
+            <div className="estimate-top-grid" data-tour="estimate-basics">
               <label className="estimate-field">
                 <span>Type</span>
 
@@ -1957,17 +1960,19 @@ function Estimates({
               )}
             </div>
 
-            <AiEstimateAssistant
-              customer={selectedCustomer}
-              customerId={selectedCustomerId}
-              initialGeneration={aiGeneration ?? undefined}
-              jobCategory={jobCategory}
-              onGenerated={applyAiGeneration}
-              onGenerationChange={setAiGeneration}
-              propertyType={propertyType}
-            />
+            <div data-tour="estimate-ai-assistant">
+              <AiEstimateAssistant
+                customer={selectedCustomer}
+                customerId={selectedCustomerId}
+                initialGeneration={aiGeneration ?? undefined}
+                jobCategory={jobCategory}
+                onGenerated={applyAiGeneration}
+                onGenerationChange={setAiGeneration}
+                propertyType={propertyType}
+              />
+            </div>
 
-            <div className="estimate-line-items">
+            <div className="estimate-line-items" data-tour="estimate-line-items">
               <div className="estimate-help-bar">
                 Choose a repair from the
                 dropdown, or select a custom
@@ -2149,7 +2154,7 @@ function Estimates({
               </button>
             </div>
 
-            <div className="estimate-bottom-grid">
+            <div className="estimate-bottom-grid" data-tour="estimate-scope-notes">
               <label className="estimate-notes">
                 <span>Customer scope of work</span>
                 <textarea onChange={(event) => setScopeOfWork(event.target.value)} placeholder="Customer-facing work included in this estimate" rows={5} value={scopeOfWork} />
@@ -2174,7 +2179,7 @@ function Estimates({
                 />
               </label>
 
-              <div className="estimate-summary">
+              <div className="estimate-summary" data-tour="estimate-pricing">
                 <label>
                   <span>Tax rate</span>
 
@@ -2294,7 +2299,7 @@ function Estimates({
               </p>
             )}
 
-            <footer className="estimate-modal-footer">
+            <footer className="estimate-modal-footer" data-tour="estimate-save">
               <button
                 className="estimate-cancel-button"
                 onClick={cancelBuilder}
@@ -2523,7 +2528,7 @@ function Estimates({
           )}
         </article>
       )}
-    </>
+    </div>
   )
 }
 

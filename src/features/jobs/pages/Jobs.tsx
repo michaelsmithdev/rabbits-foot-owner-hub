@@ -314,7 +314,7 @@ export default function Jobs() {
   }
 
   if (!selectedJob) {
-    return <div className="jobs-page"><header className="page-heading"><div><span className="eyebrow">RUN THE JOB</span><h1>Jobs</h1><p>Approve an estimate, then use Create job to open the field workflow.</p></div></header><div className="empty-state"><Clock3 size={44} /><h2>No jobs yet</h2><p>Approved estimates become job workspaces with time, expenses, photos, and final invoicing.</p></div></div>
+    return <div className="jobs-page" data-tour="jobs-page"><header className="page-heading"><div><span className="eyebrow">RUN THE JOB</span><h1>Jobs</h1><p>Approve an estimate, then use Create job to open the field workflow.</p></div></header><div className="empty-state"><Clock3 size={44} /><h2>No jobs yet</h2><p>Approved estimates become job workspaces with time, expenses, photos, and final invoicing.</p></div></div>
   }
 
   const hours = actualJobHours(selectedJob, clock)
@@ -326,12 +326,12 @@ export default function Jobs() {
   const margin = revenue > 0 ? profit / revenue * 100 : 0
 
   return (
-    <div className="jobs-page">
+    <div className="jobs-page" data-tour="jobs-page">
       <header className="page-heading"><div><span className="eyebrow">RUN THE JOB</span><h1>Job Mode</h1><p>Track field time, photos, voice notes, costs, completion, and the final invoice.</p></div><div className="metric-card"><strong>{jobs.filter((job) => !['completed','invoiced'].includes(job.status)).length}</strong><span>Active jobs</span></div></header>
       {message && <div className="job-message" role="status">{message}</div>}
       <div className="job-layout">
         <aside className="job-list">{jobs.map((job) => <button className={job.id === selectedJob.id ? 'active' : ''} key={job.id} onClick={() => setSelectedId(job.id)} type="button"><span>{job.jobNumber}</span><strong>{job.jobName}</strong><small>{job.status.replace('_', ' ')}</small></button>)}</aside>
-        <main className="job-workspace">
+        <main className="job-workspace" data-tour="jobs-workspace">
           <header className="job-header"><div><span className={`job-status ${selectedJob.status}`}>{selectedJob.status.replace('_', ' ')}</span><h2>{selectedJob.jobName}</h2><p>{customer ? `${customer.firstName} ${customer.lastName} · ` : ''}{selectedJob.serviceAddress}</p></div><div className="job-timer"><span>Actual time</span><strong>{hours.toFixed(2)} hr</strong></div></header>
           <section className="job-brief">
             <article><span>Approved job price</span><strong>{currency.format(revenue)}</strong>{changeOrderTotal > 0 && <small>Includes {currency.format(changeOrderTotal)} approved changes</small>}</article>
@@ -340,7 +340,7 @@ export default function Jobs() {
             {selectedJob.exclusions.length > 0 && <article className="job-brief-wide"><span>Exclusions</span><p>{selectedJob.exclusions.join(' · ')}</p></article>}
             <label className="job-brief-wide"><span>Internal job notes</span><textarea onChange={(event) => updateJob(selectedJob.id, (current) => ({ ...current, internalNotes: event.target.value }))} placeholder="Crew instructions, access details, reminders..." value={selectedJob.internalNotes} /></label>
           </section>
-          <div className="job-primary-actions">
+          <div className="job-primary-actions" data-tour="job-field-actions">
             {activeTimer ? <button className="pause" onClick={() => pauseTimer(selectedJob)} type="button"><Pause /> Pause work</button> : !['completed','invoiced'].includes(selectedJob.status) && <button onClick={() => startTimer(selectedJob)} type="button"><Play /> Start work</button>}
             <input accept="image/*" capture="environment" hidden multiple onChange={(event) => void addJobPhotos(selectedJob, Array.from(event.target.files ?? []))} ref={photoInputRef} type="file" />
             <button className="secondary" onClick={() => photoInputRef.current?.click()} type="button"><Camera /> Job photo</button>
@@ -348,7 +348,7 @@ export default function Jobs() {
             <button className="danger" onClick={() => deleteJob(selectedJob)} type="button"><Trash2 /> Delete work</button>
           </div>
 
-          <section className="job-profit-grid"><article><Clock3 /><span>Estimated / actual hours</span><strong>{selectedJob.estimatedLaborHours.toFixed(1)} / {hours.toFixed(2)}</strong></article><article><Receipt /><span>Job expenses</span><strong>{currency.format(expenseTotal)}</strong></article><article><DollarSign /><span>Actual cost</span><strong>{currency.format(actualCost)}</strong></article><article className={margin < settings.targetGrossMarginPercent ? 'warning' : ''}><strong>{margin.toFixed(1)}%</strong><span>Actual margin · {currency.format(profit)} profit</span></article></section>
+          <section className="job-profit-grid" data-tour="job-costs"><article><Clock3 /><span>Estimated / actual hours</span><strong>{selectedJob.estimatedLaborHours.toFixed(1)} / {hours.toFixed(2)}</strong></article><article><Receipt /><span>Job expenses</span><strong>{currency.format(expenseTotal)}</strong></article><article><DollarSign /><span>Actual cost</span><strong>{currency.format(actualCost)}</strong></article><article className={margin < settings.targetGrossMarginPercent ? 'warning' : ''}><strong>{margin.toFixed(1)}%</strong><span>Actual margin · {currency.format(profit)} profit</span></article></section>
 
           {selectedJob.profitability && <section className="job-section job-profit-comparison"><h3>Estimated vs. actual profitability</h3><div><span>Labor hours</span><strong>{selectedJob.profitability.estimatedLaborHours.toFixed(2)}</strong><strong>{selectedJob.profitability.actualLaborHours.toFixed(2)}</strong></div><div><span>Labor cost</span><strong>{currency.format(selectedJob.profitability.estimatedLaborCost)}</strong><strong>{currency.format(selectedJob.profitability.actualLaborCost)}</strong></div><div><span>Material cost</span><strong>{currency.format(selectedJob.profitability.estimatedMaterialCost)}</strong><strong>{currency.format(selectedJob.profitability.actualMaterialCost)}</strong></div><div><span>Total cost</span><strong>{currency.format(selectedJob.profitability.estimatedCost)}</strong><strong>{currency.format(selectedJob.profitability.actualCost)}</strong></div><div><span>Profit</span><strong>{currency.format(selectedJob.profitability.estimatedProfit)}</strong><strong>{currency.format(selectedJob.profitability.actualProfit)}</strong></div><div><span>Margin</span><strong>{selectedJob.profitability.estimatedMargin.toFixed(1)}%</strong><strong>{selectedJob.profitability.actualMargin.toFixed(1)}%</strong></div><footer><span>Metric</span><span>Estimated</span><span>Actual</span></footer></section>}
 

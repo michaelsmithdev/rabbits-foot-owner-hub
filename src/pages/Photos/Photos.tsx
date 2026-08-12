@@ -211,7 +211,7 @@ function Photos() {
   }
 
   return (
-    <section className="photos-page">
+    <section className="photos-page" data-tour="photos-page">
       <header className="photos-page-header">
         <div>
           <p className="eyebrow">PRIVATE MEDIA</p>
@@ -224,7 +224,7 @@ function Photos() {
         </div>
       </header>
 
-      <form className="photo-upload-card" onSubmit={addPhotos}>
+      <form className="photo-upload-card" data-tour="photo-upload" onSubmit={addPhotos}>
         <header>
           <span><Upload size={22} /></span>
           <div>
@@ -308,7 +308,7 @@ function Photos() {
         {errorMessage && <p className="photo-error" role="alert">{errorMessage}</p>}
       </form>
 
-      <section className="photo-library">
+      <section className="photo-library" data-tour="photo-library">
         <header className="photo-library-toolbar">
           <div className="photo-search">
             <Search size={19} />

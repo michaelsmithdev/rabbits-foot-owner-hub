@@ -382,7 +382,7 @@ function Customers({
 
   if (selectedCustomer) {
     return (
-      <section className="customers-page">
+      <section className="customers-page" data-tour="customer-profile">
         <div className="customers-page-header">
           <div>
             <button
@@ -614,7 +614,7 @@ function Customers({
 
   return (
     <>
-      <section className="customers-page">
+      <section className="customers-page" data-tour="customers-page">
         <div className="customers-page-header">
           <div>
             <p className="eyebrow">
@@ -642,7 +642,7 @@ function Customers({
           </button>
         </div>
 
-        <label className="customer-search">
+        <label className="customer-search" data-tour="customer-search">
           <span aria-hidden="true">⌕</span>
 
           <input
@@ -657,7 +657,7 @@ function Customers({
         </label>
 
         {filteredCustomers.length > 0 ? (
-          <div className="customer-grid">
+          <div className="customer-grid" data-tour="customer-records">
             {filteredCustomers.map(
               (customer) => (
                 <article
@@ -810,6 +810,7 @@ function Customers({
         >
           <form
             className="customer-modal"
+            data-tour="customer-form"
             onSubmit={saveCustomer}
           >
             <div className="customer-modal-header">

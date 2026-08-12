@@ -101,3 +101,17 @@ Optional variables:
 The local `.env.local` and `.env.android.local` files are ignored by Git.
 OpenAI API billing must have available credit; a ChatGPT subscription does not
 provide API credit.
+
+## Interactive tutorial maintenance
+
+The complete, route-aware tutorial is configured in
+`src/features/tutorial/tutorialConfig.ts`. Add new steps there instead of
+building page-specific popups. Give the real control or section a stable
+`data-tour="feature-name"` attribute, use that value as the step target, and
+provide a nearby fallback target when the control depends on saved data.
+
+Tutorial actions are intentionally limited to the allowlist in that same file.
+Only harmless actions such as opening an empty form or changing the document
+tab belong there. Sending messages, saving records, taking payments, deleting
+data, or opening external pages must remain explanation-only steps. Increase
+`TUTORIAL_VERSION` only when an older saved step can no longer resume safely.

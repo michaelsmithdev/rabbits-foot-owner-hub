@@ -361,7 +361,7 @@ function Inbox({ onOpenDocuments }: InboxProps) {
   }
 
   return (
-    <section className="inbox-page">
+    <section className="inbox-page" data-tour="inbox-page">
       <header className="inbox-page-header">
         <div>
           <p className="eyebrow">WEBSITE LEADS</p>
@@ -380,7 +380,7 @@ function Inbox({ onOpenDocuments }: InboxProps) {
 
       {notice && <div className="inbox-notice" role="status"><Check size={18} />{notice}</div>}
 
-      <div className="inbox-toolbar">
+      <div className="inbox-toolbar" data-tour="inbox-toolbar">
         <label className="inbox-search">
           <Search aria-hidden="true" size={19} />
           <input
@@ -391,7 +391,7 @@ function Inbox({ onOpenDocuments }: InboxProps) {
             value={searchQuery}
           />
         </label>
-        <div className="inbox-filters" aria-label="Lead filters" role="group">
+        <div className="inbox-filters" aria-label="Lead filters" data-tour="inbox-filters" role="group">
           {(
             [
               ['inbox', 'Inbox'],
@@ -424,7 +424,7 @@ function Inbox({ onOpenDocuments }: InboxProps) {
           </p>
         </div>
       ) : (
-        <div className="lead-list">
+        <div className="lead-list" data-tour="lead-list">
           {visibleLeads.map((lead) => (
             <article className={`lead-card lead-${lead.status}`} key={lead.id}>
               <button className="lead-card-main" onClick={() => openLead(lead)} type="button">

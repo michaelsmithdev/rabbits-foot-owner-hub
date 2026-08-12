@@ -71,6 +71,7 @@ function Sidebar({
         <nav
           aria-label="Main navigation"
           className="sidebar-navigation"
+          data-tour="main-navigation"
         >
           {navigationItems.map((item) => {
             const Icon = item.icon
@@ -86,7 +87,7 @@ function Sidebar({
                     : 'nav-button'
                 }
                 key={item.id}
-                data-tour={item.id === 'documents' ? 'estimates' : item.id}
+                data-tour={`nav-${item.id}`}
                 onClick={() => selectPage(item.id)}
                 type="button"
               >
@@ -107,6 +108,7 @@ function Sidebar({
       <nav
         aria-label="Mobile navigation"
         className="mobile-navigation"
+        data-tour="mobile-navigation"
       >
         {primaryItems.map((item) => {
           const Icon = item.icon
@@ -122,7 +124,7 @@ function Sidebar({
                   : 'mobile-nav-button'
               }
               key={item.id}
-              data-tour={item.id === 'documents' ? 'estimates' : item.id}
+              data-tour={`nav-${item.id}`}
               onClick={() => selectPage(item.id)}
               type="button"
             >
@@ -141,6 +143,7 @@ function Sidebar({
               ? 'mobile-nav-button active'
               : 'mobile-nav-button'
           }
+          data-tour="mobile-more-menu"
           onClick={() => setMobileMenuOpen(true)}
           type="button"
         >
@@ -176,7 +179,7 @@ function Sidebar({
                   <button
                     aria-current={activePage === item.id ? 'page' : undefined}
                     className={activePage === item.id ? 'mobile-more-item active' : 'mobile-more-item'}
-                    data-tour={item.id}
+                    data-tour={`nav-${item.id}`}
                     key={item.id}
                     onClick={() => selectPage(item.id)}
                     type="button"
