@@ -249,6 +249,11 @@ test('official business phone powers the Customer Hub call and text actions', ()
   assert.equal(contact.tel, 'tel:5743348410')
   assert.equal(contact.sms, 'sms:5743348410')
   assert.equal(contact.digits, APP_SETTINGS.business.phone.digits)
+
+  const staleSavedContact = resolveBusinessPhone('(574) 555-0199', 2)
+  assert.equal(staleSavedContact.display, '(574) 334-8410')
+  assert.equal(staleSavedContact.tel, 'tel:5743348410')
+  assert.equal(staleSavedContact.sms, 'sms:5743348410')
 })
 
 test('action center prioritizes customer requests and overdue invoices', () => {

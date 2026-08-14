@@ -13,27 +13,6 @@ export const APP_SETTINGS = Object.freeze({
   }),
 })
 
-export function resolveBusinessPhone(phone, contactVersion) {
-  if (contactVersion !== APP_SETTINGS.business.contactVersion) {
-    return { ...APP_SETTINGS.business.phone }
-  }
-
-  const rawPhone = typeof phone === 'string' ? phone.trim() : ''
-  const rawDigits = rawPhone.replace(/\D/g, '')
-  const digits = rawDigits.length === 11 && rawDigits.startsWith('1')
-    ? rawDigits.slice(1)
-    : rawDigits
-
-  if (digits.length !== 10) {
-    return { ...APP_SETTINGS.business.phone }
-  }
-
-  const display = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
-
-  return {
-    display,
-    digits,
-    tel: `tel:${digits}`,
-    sms: `sms:${digits}`,
-  }
+export function resolveBusinessPhone() {
+  return { ...APP_SETTINGS.business.phone }
 }

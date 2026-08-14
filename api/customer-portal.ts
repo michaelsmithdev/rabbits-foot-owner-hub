@@ -142,17 +142,35 @@ function safePortalData(
     business: {
       name: clean(settings?.businessName, 120) || APP_SETTINGS.business.name,
       email: clean(settings?.email, 200) || APP_SETTINGS.business.email,
+      website: clean(settings?.website, 240),
       phoneDisplay: businessPhone.display,
       phoneDigits: businessPhone.digits,
       phoneTel: businessPhone.tel,
       phoneSms: businessPhone.sms,
+      estimateTerms: clean(settings?.estimateTerms, 5000),
+      invoiceTerms: clean(settings?.invoiceTerms, 5000),
     },
-    customer: { id: customerId, firstName: clean(customer.firstName, 80), lastName: clean(customer.lastName, 80), email: clean(customer.email, 200), phone: clean(customer.phone, 40) },
+    customer: {
+      id: customerId,
+      firstName: clean(customer.firstName, 80),
+      lastName: clean(customer.lastName, 80),
+      email: clean(customer.email, 200),
+      phone: clean(customer.phone, 40),
+      streetAddress: clean(customer.streetAddress, 240),
+      city: clean(customer.city, 100),
+      state: clean(customer.state, 40),
+      zipCode: clean(customer.zipCode, 24),
+    },
     estimates: all.filter((item) => item.record_type === 'estimate' && belongs(item) && item.payload.status !== 'draft').map(({ payload }) => ({
       id: payload.id, estimateNumber: payload.estimateNumber, jobName: payload.jobName, serviceAddress: payload.serviceAddress,
-      scopeOfWork: payload.scopeOfWork, exclusions: payload.exclusions, lineItems: payload.lineItems, taxRate: payload.taxRate, discount: payload.discount,
+      description: payload.description, scopeOfWork: payload.scopeOfWork, exclusions: payload.exclusions, lineItems: payload.lineItems, taxRate: payload.taxRate, discount: payload.discount, notes: payload.notes,
       issueDate: payload.issueDate, expirationDate: payload.expirationDate, status: payload.status,
-      approval: payload.approval && typeof payload.approval === 'object' ? { customerName: (payload.approval as Json).customerName, acceptedAt: (payload.approval as Json).acceptedAt } : undefined,
+      approval: payload.approval && typeof payload.approval === 'object' ? {
+        customerName: (payload.approval as Json).customerName,
+        acceptedAt: (payload.approval as Json).acceptedAt,
+        method: (payload.approval as Json).method,
+        note: (payload.approval as Json).note,
+      } : undefined,
       total: total(payload),
     })),
     invoices: all.filter((item) => item.record_type === 'invoice' && belongs(item) && !['draft', 'void'].includes(String(item.payload.status))).map(({ payload }) => {
@@ -161,9 +179,37 @@ function safePortalData(
       const checkout = cardCheckoutAmounts(balance, payload)
       const payments = (Array.isArray(payload.payments) ? payload.payments : []).map((raw) => {
         const payment = raw && typeof raw === 'object' ? raw as Json : {}
-        return { id: payment.id, date: payment.date, amount: payment.amount, method: payment.method }
+        return {
+          id: payment.id,
+          date: payment.date,
+          amount: payment.amount,
+          method: payment.method,
+          referenceNumber: payment.referenceNumber,
+          notes: payment.notes,
+        }
       })
-      return { id: payload.id, invoiceNumber: payload.invoiceNumber, jobName: payload.jobName, serviceAddress: payload.serviceAddress, description: payload.description, lineItems: payload.lineItems, issueDate: payload.issueDate, dueDate: payload.dueDate, status: payload.status, total: total(payload), balance, payments, cardProcessingFeePercent: checkout.feePercent, cardFeeAmount: checkout.feeAmount, cardCheckoutTotal: checkout.checkoutAmount }
+      return {
+        id: payload.id,
+        invoiceNumber: payload.invoiceNumber,
+        jobName: payload.jobName,
+        serviceAddress: payload.serviceAddress,
+        description: payload.description,
+        scopeOfWork: payload.scopeOfWork,
+        exclusions: payload.exclusions,
+        lineItems: payload.lineItems,
+        taxRate: payload.taxRate,
+        discount: payload.discount,
+        notes: payload.notes,
+        issueDate: payload.issueDate,
+        dueDate: payload.dueDate,
+        status: payload.status,
+        total: total(payload),
+        balance,
+        payments,
+        cardProcessingFeePercent: checkout.feePercent,
+        cardFeeAmount: checkout.feeAmount,
+        cardCheckoutTotal: checkout.checkoutAmount,
+      }
     }),
     appointments: all.filter((item) => item.record_type === 'appointment' && belongs(item)).map(({ payload }) => ({ id: payload.id, title: payload.title, serviceAddress: payload.serviceAddress, startAt: payload.startAt, endAt: payload.endAt, status: payload.status })),
     jobs: all.filter((item) => item.record_type === 'job' && belongs(item)).map(({ payload }) => ({ id: payload.id, jobNumber: payload.jobNumber, jobName: payload.jobName, serviceAddress: payload.serviceAddress, scopeOfWork: payload.scopeOfWork, status: payload.status, completedAt: payload.completedAt })),

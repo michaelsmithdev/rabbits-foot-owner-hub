@@ -55,6 +55,12 @@ function wrapText(text: string, font: PDFFont, size: number, width: number) {
 
 export async function generateBusinessDocumentPdf(input: PdfDocumentInput) {
   const settings = loadBusinessSettings()
+  const business = {
+    name: input.business?.name || settings.businessName,
+    phone: input.business?.phone || settings.phone,
+    email: input.business?.email || settings.email,
+    website: input.business?.website || settings.website,
+  }
   const pdf = await PDFDocument.create()
   const regular = await pdf.embedFont(StandardFonts.Helvetica)
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold)
@@ -64,7 +70,7 @@ export async function generateBusinessDocumentPdf(input: PdfDocumentInput) {
   const addPage = () => {
     page = pdf.addPage([PAGE_WIDTH, PAGE_HEIGHT])
     y = PAGE_HEIGHT - MARGIN
-    page.drawText(settings.businessName, { x: MARGIN, y, size: 10, font: bold, color: BLACK })
+    page.drawText(business.name, { x: MARGIN, y, size: 10, font: bold, color: BLACK })
     y -= 25
   }
   const ensure = (height: number) => { if (y - height < 62) addPage() }
@@ -86,9 +92,9 @@ export async function generateBusinessDocumentPdf(input: PdfDocumentInput) {
     page.drawImage(logo, { x: MARGIN, y: y - 52, width: 52, height: 52 })
   } catch { /* PDF remains fully usable when the logo cannot be fetched. */ }
 
-  page.drawText(settings.businessName, { x: 112, y: y - 15, size: 17, font: bold, color: BLACK })
-  page.drawText(settings.phone, { x: 112, y: y - 32, size: 9, font: regular, color: GRAY })
-  page.drawText(`${settings.email}  •  ${settings.website}`, { x: 112, y: y - 46, size: 9, font: regular, color: GRAY })
+  page.drawText(business.name, { x: 112, y: y - 15, size: 17, font: bold, color: BLACK })
+  page.drawText(business.phone, { x: 112, y: y - 32, size: 9, font: regular, color: GRAY })
+  page.drawText([business.email, business.website].filter(Boolean).join('  •  '), { x: 112, y: y - 46, size: 9, font: regular, color: GRAY })
   page.drawText(input.kind.toUpperCase(), { x: 458, y: y - 8, size: 20, font: bold, color: GREEN })
   page.drawText(`# ${input.number}`, { x: 458, y: y - 28, size: 10, font: bold, color: BLACK })
   y -= 78
@@ -181,14 +187,40 @@ export async function generateBusinessDocumentPdf(input: PdfDocumentInput) {
 
   if (input.notes) { text('NOTES', MARGIN, 9, bold, GREEN); y -= 15; wrapped(input.notes, MARGIN, PAGE_WIDTH - MARGIN * 2, 9, regular, GRAY); y -= 8 }
   if (input.terms && !input.notes.toLowerCase().includes(input.terms.toLowerCase())) { text('TERMS', MARGIN, 9, bold, GREEN); y -= 15; wrapped(input.terms, MARGIN, PAGE_WIDTH - MARGIN * 2, 8, regular, GRAY) }
+  if (input.payments?.length) {
+    ensure(45)
+    y -= 10
+    text('PAYMENT HISTORY', MARGIN, 9, bold, GREEN)
+    y -= 17
+    for (const payment of input.payments) {
+      ensure(payment.notes ? 45 : 28)
+      const paymentDate = date(payment.date)
+      page.drawText(`${paymentDate}  •  ${payment.method.replaceAll('_', ' ')}`, { x: MARGIN, y, size: 9, font: regular, color: BLACK })
+      page.drawText(money(payment.amount), { x: 500, y, size: 9, font: bold, color: BLACK })
+      y -= 13
+      if (payment.referenceNumber) {
+        wrapped(`Reference: ${payment.referenceNumber}`, MARGIN, PAGE_WIDTH - MARGIN * 2, 8, regular, GRAY)
+      }
+      if (payment.notes) {
+        wrapped(`Payment note: ${payment.notes}`, MARGIN, PAGE_WIDTH - MARGIN * 2, 8, regular, GRAY)
+      }
+      y -= 8
+    }
+  }
   if (input.approval) {
-    ensure(70)
+    ensure(input.approval.note ? 92 : 70)
     y -= 14
     page.drawRectangle({ x: MARGIN, y: y - 40, width: PAGE_WIDTH - MARGIN * 2, height: 52, color: LIGHT })
     page.drawText('CUSTOMER APPROVAL RECORDED', { x: MARGIN + 12, y: y - 4, size: 9, font: bold, color: GREEN })
     page.drawText(input.approval.customerName, { x: MARGIN + 12, y: y - 22, size: 11, font: bold, color: BLACK })
     page.drawText(`${new Date(input.approval.acceptedAt).toLocaleString()}  /  ${input.approval.method.replaceAll('_', ' ')}`, { x: 250, y: y - 22, size: 8, font: regular, color: GRAY })
     y -= 58
+    if (input.approval.note) {
+      text('APPROVAL NOTE', MARGIN, 8, bold, GREEN)
+      y -= 13
+      wrapped(input.approval.note, MARGIN, PAGE_WIDTH - MARGIN * 2, 8, regular, GRAY)
+      y -= 6
+    }
   }
 
   if (input.kind === 'invoice') {

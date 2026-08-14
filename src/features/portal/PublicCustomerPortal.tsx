@@ -10,30 +10,47 @@ import {
 import { createClient, type RealtimeChannel } from '@supabase/supabase-js'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import CustomerPortalDocumentPdf from './CustomerPortalDocumentPdf'
 import './PublicCustomerPortal.css'
 
-type PortalEstimate = {
+export type PortalEstimate = {
   id: string
   estimateNumber: string
   jobName: string
   serviceAddress: string
+  description: string
   scopeOfWork?: string
   exclusions?: string[]
   lineItems?: Array<{
     description: string
     quantity: number
+    unit?: string
     unitPrice: number
   }>
+  taxRate: number
+  discount: number
+  notes: string
+  issueDate: string
   status: string
   expirationDate: string
   total: number
-  approval?: { customerName?: string; acceptedAt?: string }
+  approval?: {
+    customerName?: string
+    acceptedAt?: string
+    method?: string
+    note?: string
+  }
 }
 
-type PortalInvoice = {
+export type PortalInvoice = {
   id: string
   invoiceNumber: string
   jobName: string
+  serviceAddress: string
+  description: string
+  scopeOfWork?: string
+  exclusions?: string[]
+  issueDate: string
   dueDate: string
   status: string
   total: number
@@ -46,24 +63,33 @@ type PortalInvoice = {
     date: string
     amount: number
     method: string
+    referenceNumber?: string
+    notes?: string
   }>
   lineItems?: Array<{
     description: string
     quantity: number
+    unit?: string
     unitPrice: number
   }>
+  taxRate: number
+  discount: number
+  notes: string
 }
 
-type PortalData = {
+export type PortalData = {
   expiresAt: string
   realtime?: { token: string; expiresAt: number } | null
   business: {
     name: string
     email: string
+    website: string
     phoneDisplay: string
     phoneDigits: string
     phoneTel: string
     phoneSms: string
+    estimateTerms: string
+    invoiceTerms: string
   }
   customer: {
     id: string
@@ -71,6 +97,10 @@ type PortalData = {
     lastName: string
     email: string
     phone: string
+    streetAddress: string
+    city: string
+    state: string
+    zipCode: string
   }
   estimates: PortalEstimate[]
   invoices: PortalInvoice[]
@@ -442,21 +472,12 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
                   </div>
                   <b>{money.format(item.total)}</b>
                 </div>
-                {item.scopeOfWork && <p>{item.scopeOfWork}</p>}
-                <details>
-                  <summary>View pricing</summary>
-                  {item.lineItems?.map((line, index) => (
-                    <div
-                      className="portal-line"
-                      key={`${line.description}-${index}`}
-                    >
-                      <span>
-                        {line.description} × {line.quantity}
-                      </span>
-                      <b>{money.format(line.quantity * line.unitPrice)}</b>
-                    </div>
-                  ))}
-                </details>
+                <CustomerPortalDocumentPdf
+                  business={data.business}
+                  customer={data.customer}
+                  document={item}
+                  kind="estimate"
+                />
                 {item.status === 'approved' ? (
                   <div className="portal-approved">
                     <CheckCircle2 /> Approved by {item.approval?.customerName}
@@ -540,22 +561,12 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
                   </div>
                   <b>{money.format(item.balance)}</b>
                 </div>
-                {item.lineItems?.map((lineItem, index) => (
-                  <div className="portal-line" key={`${item.id}-${index}`}>
-                    <span>{lineItem.description} × {lineItem.quantity}</span>
-                    <strong>{money.format(lineItem.quantity * lineItem.unitPrice)}</strong>
-                  </div>
-                ))}
-                {item.payments.length > 0 && (
-                  <div className="portal-payment-history">
-                    <strong>Payment history</strong>
-                    {item.payments.map((payment) => (
-                      <span key={payment.id}>
-                        {new Date(`${payment.date}T12:00:00`).toLocaleDateString()} · {money.format(payment.amount)} · {payment.method}
-                      </span>
-                    ))}
-                  </div>
-                )}
+                <CustomerPortalDocumentPdf
+                  business={data.business}
+                  customer={data.customer}
+                  document={item}
+                  kind="invoice"
+                />
                 {item.balance <= 0 ? (
                   <div className="portal-approved">
                     <CheckCircle2 /> Paid
