@@ -5,7 +5,6 @@ import type { Customer } from '../../customers/types/Customer'
 import { queuePhotoFiles } from '../../photos/data/photoStore'
 import VoiceCapture from '../../voice/components/VoiceCapture'
 import type { VoiceNote } from '../../voice/types/VoiceNote'
-import { applyPaymentOverheadToAmount } from '../../pricing/utils/paymentOverhead'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import {
   MAX_AI_ESTIMATE_PHOTOS,
@@ -65,12 +64,6 @@ export default function AiEstimateAssistant({
     useAiEstimateAssistant(initialGeneration)
   const result = generation?.draft ?? null
   const businessSettings = useMemo(() => loadBusinessSettings(), [])
-  const customerTotal = result
-    ? applyPaymentOverheadToAmount(
-        result.recommendedBid,
-        businessSettings.paymentProcessingOverheadPercent,
-      )
-    : 0
   const canGenerate = Boolean(
     customerId && jobDescription.trim().length >= 10 && !isPreparingPhotos,
   )
@@ -515,9 +508,8 @@ export default function AiEstimateAssistant({
           {result.economics && (
             <div className="ai-economics-summary">
               <div><span>Requested work</span><strong>{formatCurrency(result.recommendedBid)}</strong></div>
-              <div><span>Card allowance ({businessSettings.paymentProcessingOverheadPercent.toFixed(1)}%)</span><strong>{formatCurrency(customerTotal - result.recommendedBid)}</strong></div>
-              <div><span>Customer total</span><strong>{formatCurrency(customerTotal)}</strong></div>
-              <small>No automatic markup, overhead, contingency, or profit padding is included.</small>
+              <div><span>Estimate total</span><strong>{formatCurrency(result.recommendedBid)}</strong></div>
+              <small>No automatic markup, overhead, contingency, or profit padding is included. A {businessSettings.paymentProcessingOverheadPercent.toFixed(1)}% fee appears separately only if the customer chooses card checkout.</small>
             </div>
           )}
           {(result.upsellSuggestions ?? []).length > 0 && (

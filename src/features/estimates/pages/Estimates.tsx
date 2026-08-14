@@ -25,7 +25,6 @@ import { loadCustomers } from '../../customers/data/customerStore'
 import type { Customer } from '../../customers/types/Customer'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import { createJobFromEstimate, loadJobs, saveJobs } from '../../jobs/data/jobStore'
-import { applyPaymentOverheadToLineItems } from '../../pricing/utils/paymentOverhead'
 import { useSaas } from '../../saas/saasContext'
 import { useAuth } from '../../auth/authContext'
 import { textCustomerDocument } from '../../communications/customerDocumentShare'
@@ -511,20 +510,7 @@ function Estimates({
     )
   }, [lineItems])
 
-  const customerSubtotal = useMemo(() => {
-    if (editingEstimateId) return subtotal
-
-    return applyPaymentOverheadToLineItems(
-      lineItems,
-      businessSettings.paymentProcessingOverheadPercent,
-    ).reduce(
-      (total, item) =>
-        total +
-        Number(item.quantity || 0) *
-          Number(item.unitPrice || 0),
-      0,
-    )
-  }, [businessSettings.paymentProcessingOverheadPercent, editingEstimateId, lineItems, subtotal])
+  const customerSubtotal = subtotal
 
   const taxAmount = useMemo(() => {
     return customerSubtotal * (taxRate / 100)
@@ -886,12 +872,6 @@ function Estimates({
             item.description.trim(),
         }))
 
-    const newEstimateLineItems =
-      applyPaymentOverheadToLineItems(
-        completedLineItems,
-        businessSettings.paymentProcessingOverheadPercent,
-      )
-
     const currentTimestamp =
       new Date().toISOString()
 
@@ -997,7 +977,7 @@ function Estimates({
 
         expirationDate,
 
-        lineItems: newEstimateLineItems,
+        lineItems: completedLineItems,
 
         taxRate,
 
@@ -1013,8 +993,10 @@ function Estimates({
 
         taxReservePercent,
 
-        paymentProcessingOverheadPercent:
+        cardProcessingFeePercent:
           businessSettings.paymentProcessingOverheadPercent,
+
+        paymentProcessingOverheadPercent: 0,
 
         photoIds: aiGeneration?.photoIds ? [...aiGeneration.photoIds] : [],
 
@@ -1124,6 +1106,8 @@ function Estimates({
       materialCost: estimate.materialCost ?? 0,
 
       taxReservePercent: estimate.taxReservePercent ?? businessSettings.defaultTaxReservePercent,
+
+      cardProcessingFeePercent: estimate.cardProcessingFeePercent ?? 0,
 
       completionDate: estimate.completionDate,
 
@@ -2244,10 +2228,9 @@ function Estimates({
                   </strong>
                 </div>
 
-                {!editingEstimateId &&
-                  businessSettings.paymentProcessingOverheadPercent > 0 && (
+                {businessSettings.paymentProcessingOverheadPercent > 0 && (
                     <p className="estimate-payment-overhead-note">
-                      Includes {businessSettings.paymentProcessingOverheadPercent}% payment overhead in the all-in customer price.
+                      Card payments can add a {businessSettings.paymentProcessingOverheadPercent}% fee at secure checkout. Cash and check keep this estimate total.
                     </p>
                   )}
 

@@ -18,10 +18,6 @@ import { loadPendingPhotoBlob } from '../../photos/data/photoBlobStore'
 import { getPhotoUrl, loadPhotos, queuePhotoFiles } from '../../photos/data/photoStore'
 import { cloudClient } from '../../cloud/cloudClient'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
-import {
-  applyPaymentOverheadToAmount,
-  applyPaymentOverheadToLineItems,
-} from '../../pricing/utils/paymentOverhead'
 import VoiceCapture from '../../voice/components/VoiceCapture'
 import type { VoiceNote } from '../../voice/types/VoiceNote'
 import { latestDraftWalkthrough, upsertWalkthrough } from '../data/walkthroughStore'
@@ -82,15 +78,7 @@ export default function Walkthroughs() {
   const selectedCustomer = customers.find((customer) => customer.id === walkthrough.customerId)
   const attachedPhotos = loadPhotos().filter((photo) => walkthrough.photoIds.includes(photo.id))
   const result = walkthrough.aiEstimate?.draft
-  const quotedTotal = result
-    ? applyPaymentOverheadToAmount(
-        result.economics.recommendedPrice,
-        businessSettings.paymentProcessingOverheadPercent,
-      )
-    : 0
-  const processingAllowance = result
-    ? quotedTotal - result.economics.recommendedPrice
-    : 0
+  const quotedTotal = result?.economics.recommendedPrice ?? 0
 
   useEffect(() => {
     if (initialRender.current) {
@@ -228,10 +216,7 @@ export default function Walkthroughs() {
       exclusions: result.exclusions,
       issueDate: today(),
       expirationDate: dateAfter(settings.estimateValidDays),
-      lineItems: applyPaymentOverheadToLineItems(
-        result.lineItems,
-        settings.paymentProcessingOverheadPercent,
-      ).map((item) => ({
+      lineItems: result.lineItems.map((item) => ({
         id: createId(),
         description: item.description,
         quantity: item.quantity,
@@ -245,6 +230,8 @@ export default function Walkthroughs() {
       jobCategory: walkthrough.jobCategory,
       materialCost: result.economics.materialCost,
       taxReservePercent: settings.defaultTaxReservePercent,
+      cardProcessingFeePercent: settings.paymentProcessingOverheadPercent,
+      paymentProcessingOverheadPercent: 0,
       photoIds: walkthrough.photoIds,
       aiEstimate: walkthrough.aiEstimate,
       economics: result.economics,
@@ -312,7 +299,7 @@ export default function Walkthroughs() {
       </section>
 
       <section className="walkthrough-finish" data-tour="walkthrough-analyze">
-        <div><span className="eyebrow">STEP 4 · PRICE IT</span><h2>Build the exact-scope estimate</h2><p>The AI quotes only the work you described. Optional upsells stay separate, and the configured card-processing allowance is added automatically.</p></div>
+        <div><span className="eyebrow">STEP 4 · PRICE IT</span><h2>Build the exact-scope estimate</h2><p>The AI quotes only the work you described. Optional upsells stay separate, and any card fee appears only if the customer chooses card checkout.</p></div>
         <button className="walkthrough-primary" disabled={busy} onClick={() => void analyze()} type="button"><Sparkles size={20} /> {busy ? 'Analyzing safely…' : result ? 'Reanalyze walkthrough' : 'Finish and analyze'}</button>
       </section>
 
@@ -326,11 +313,10 @@ export default function Walkthroughs() {
             <article><h3><ClipboardList size={18} /> Customer scope</h3><p>{result.customerScope}</p><h4>Exclusions</h4><ul>{result.exclusions.map((item) => <li key={item}>{item}</li>)}</ul></article>
             <article><h3><Sparkles size={18} /> Exact quote summary</h3><dl>
               <div><dt>Requested work</dt><dd>{currency.format(result.economics.recommendedPrice)}</dd></div>
-              <div><dt>Card allowance ({businessSettings.paymentProcessingOverheadPercent.toFixed(1)}%)</dt><dd>{currency.format(processingAllowance)}</dd></div>
-              <div><dt>Customer total</dt><dd>{currency.format(quotedTotal)}</dd></div>
+              <div><dt>Estimate total</dt><dd>{currency.format(quotedTotal)}</dd></div>
               <div><dt>Labor hours / direct labor</dt><dd>{result.economics.laborHours.toFixed(1)} · {currency.format(result.economics.laborCost)}</dd></div>
               <div><dt>Direct materials</dt><dd>{currency.format(result.economics.materialCost)}</dd></div>
-            </dl><small>Only the work you described is included. No automatic markup, overhead, contingency, or profit padding.</small></article>
+            </dl><small>Only the work you described is included. No automatic markup, overhead, contingency, or profit padding. A {businessSettings.paymentProcessingOverheadPercent.toFixed(1)}% fee is shown separately only if the customer chooses card checkout.</small></article>
           </div>
 
           {(result.upsellSuggestions ?? []).length > 0 && <article className="smart-questions"><h3>Optional upsell ideas</h3><p>These ideas are not included in the quoted total.</p><ul>{result.upsellSuggestions.map((item) => <li key={item}>{item}</li>)}</ul></article>}

@@ -7,10 +7,7 @@ import { approvedChangeOrderTotal, jobRevenue } from '../src/features/jobs/utils
 import type { Job } from '../src/features/jobs/types/Job.ts'
 import { appointmentConflicts } from '../src/features/schedule/data/appointmentStore.ts'
 import type { Appointment } from '../src/features/schedule/types/Appointment.ts'
-import {
-  applyPaymentOverheadToAmount,
-  applyPaymentOverheadToLineItems,
-} from '../src/features/pricing/utils/paymentOverhead.ts'
+import { cardCheckoutAmounts } from '../api/_card-fee.js'
 import {
   isExactScopeLineItemAllowed,
   isUpsellRequested,
@@ -45,13 +42,19 @@ test('AI estimate scope stays exact unless upsells are explicitly requested', ()
   )
 })
 
-test('payment overhead is folded into customer pricing without mutating base prices', () => {
-  const baseLineItems = [{ id: 'line-1', quantity: 1, unitPrice: 500 }]
-  const customerLineItems = applyPaymentOverheadToLineItems(baseLineItems, 3.5)
-
-  assert.equal(applyPaymentOverheadToAmount(500, 3.5), 517.5)
-  assert.equal(customerLineItems[0].unitPrice, 517.5)
-  assert.equal(baseLineItems[0].unitPrice, 500)
+test('card fee is separate from the invoice amount and rounded to cents', () => {
+  assert.deepEqual(cardCheckoutAmounts(500, { cardProcessingFeePercent: 3.5 }), {
+    invoiceAmount: 500,
+    feePercent: 3.5,
+    feeAmount: 17.5,
+    checkoutAmount: 517.5,
+  })
+  assert.deepEqual(cardCheckoutAmounts(139.73, { cardProcessingFeePercent: 0 }), {
+    invoiceAmount: 139.73,
+    feePercent: 0,
+    feeAmount: 0,
+    checkoutAmount: 139.73,
+  })
 })
 
 test('invoice math applies tax and discount and never returns a negative balance', () => {

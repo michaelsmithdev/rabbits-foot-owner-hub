@@ -1,5 +1,8 @@
 .inbox-page {
   display: grid;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   gap: 24px;
 }
 
@@ -412,7 +415,7 @@
 @media (max-width: 640px) {
   .inbox-page-header { align-items: start; }
   .inbox-summary { display: none; }
-  .inbox-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: visible; }
+  .inbox-filters { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); overflow: visible; }
   .inbox-filters button { min-width: 0; padding: 0 8px; }
   .lead-card-main { padding: 19px 48px 19px 18px; }
   .lead-contact-line { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

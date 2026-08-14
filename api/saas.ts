@@ -212,9 +212,9 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
     if (action === 'start-subscription') {
       const plan = payload.plan
-      if (plan !== 'starter' && plan !== 'pro' && plan !== 'team') return send(response, 400, { error: 'Choose a valid subscription plan.' })
+      if (plan !== 'pro') return send(response, 400, { error: 'Owner Hub is the only subscription currently available.' })
       await createSquareSubscription(membership.organization_id, user.email, plan)
-      return send(response, 200, { message: `${plan[0].toUpperCase()}${plan.slice(1)} subscription started. Square will email the billing receipt.` })
+      return send(response, 200, { message: 'Owner Hub subscription started. Square will email the billing receipt.' })
     }
 
     if (action === 'cancel-subscription' || action === 'resume-subscription') {

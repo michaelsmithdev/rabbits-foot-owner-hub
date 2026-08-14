@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getSquareMerchantCredentials } from './_square-merchant.js'
 import { applyCors, requestedOrganizationId } from './_http-security.js'
+import { cardCheckoutAmounts } from './_card-fee.js'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -96,10 +97,11 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const requested = typeof body.amount === 'number' && Number.isFinite(body.amount) ? body.amount : balance
     const amount = Math.min(balance, Math.max(0, Math.round(requested * 100) / 100))
     if (amount < 0.5) return sendJson(response, 400, { error: 'This invoice has no payable balance.' })
+    const checkout = cardCheckoutAmounts(amount, invoice)
 
     const merchant = await getSquareMerchantCredentials(organizationId)
     const invoiceNumber = typeof invoice.invoiceNumber === 'string' ? invoice.invoiceNumber : 'Invoice'
-    const idempotencyKey = createHash('sha256').update(`${organizationId}:${body.invoiceId}:${amount}:${String(invoice.updatedAt ?? '')}`).digest('hex')
+    const idempotencyKey = createHash('sha256').update(`${organizationId}:${body.invoiceId}:${checkout.checkoutAmount}:${String(invoice.updatedAt ?? '')}`).digest('hex')
     const origin = request.headers.origin && allowedOrigin(request, response) ? request.headers.origin : 'https://rabbits-foot-owner-hub.vercel.app'
     const squareResponse = await fetch(`${merchant.baseUrl}/v2/online-checkout/payment-links`, {
       method: 'POST',
@@ -107,7 +109,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       body: JSON.stringify({
         idempotency_key: idempotencyKey || randomUUID(),
         description: `Owner Hub ${invoiceNumber}`,
-        quick_pay: { name: `${invoiceNumber} - ${String(invoice.jobName ?? 'Handyman services').slice(0, 80)}`, price_money: { amount: Math.round(amount * 100), currency: 'USD' }, location_id: merchant.locationId },
+        quick_pay: { name: `${invoiceNumber} - ${String(invoice.jobName ?? 'Handyman services').slice(0, 80)}`, price_money: { amount: Math.round(checkout.checkoutAmount * 100), currency: 'USD' }, location_id: merchant.locationId },
         checkout_options: { redirect_url: `${origin}/#documents` },
         pre_populated_data: {},
       }),
@@ -118,7 +120,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
       console.error('Square payment-link error', squarePayload.errors?.map((item) => item.detail))
       return sendJson(response, 502, { error: 'Square could not create the payment link. Check the Square connection and retry.' })
     }
-    return sendJson(response, 200, { url: squarePayload.payment_link.url, paymentLinkId: squarePayload.payment_link.id, orderId: squarePayload.payment_link.order_id, amount })
+    return sendJson(response, 200, { url: squarePayload.payment_link.url, paymentLinkId: squarePayload.payment_link.id, orderId: squarePayload.payment_link.order_id, amount: checkout.checkoutAmount, invoiceAmount: checkout.invoiceAmount, cardFeeAmount: checkout.feeAmount, cardFeePercent: checkout.feePercent })
   } catch (error) {
     console.error('Square payment-link request failed.', error instanceof Error ? error.message : 'Unknown error')
     return sendJson(response, 500, { error: 'The payment link could not be created safely.' })

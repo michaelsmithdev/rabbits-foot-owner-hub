@@ -4,7 +4,6 @@ export type PlanDefinition = {
   id: SubscriptionPlan
   name: string
   monthlyPrice: number
-  annualPrice: number
   seats: number
   aiEstimates: number
   transcriptions: number
@@ -15,9 +14,8 @@ export type PlanDefinition = {
 export const planCatalog: Record<SubscriptionPlan, PlanDefinition> = {
   starter: {
     id: 'starter',
-    name: 'Starter',
-    monthlyPrice: 39,
-    annualPrice: 390,
+    name: 'Owner Hub',
+    monthlyPrice: 69.99,
     seats: 1,
     aiEstimates: 15,
     transcriptions: 30,
@@ -26,27 +24,29 @@ export const planCatalog: Record<SubscriptionPlan, PlanDefinition> = {
   },
   pro: {
     id: 'pro',
-    name: 'Pro',
-    monthlyPrice: 89,
-    annualPrice: 890,
+    name: 'Owner Hub',
+    monthlyPrice: 69.99,
     seats: 3,
     aiEstimates: 100,
     transcriptions: 200,
     photos: 3_000,
-    features: ['Everything in Starter', 'Team access', 'AI walkthroughs', 'Automated follow-ups', 'Job costing'],
+    features: ['Customers, estimates, and invoices', 'Customer Hub', 'AI walkthroughs', 'Square payments', 'Team access'],
   },
   team: {
     id: 'team',
-    name: 'Team',
-    monthlyPrice: 169,
-    annualPrice: 1_690,
+    name: 'Owner Hub',
+    monthlyPrice: 69.99,
     seats: 8,
     aiEstimates: 300,
     transcriptions: 600,
     photos: 10_000,
-    features: ['Everything in Pro', 'Advanced permissions', 'Dispatch and assignments', 'Audit log', 'Priority support'],
+    features: ['Customers, estimates, and invoices', 'Customer Hub', 'AI walkthroughs', 'Square payments', 'Team access'],
   },
 }
+
+// New subscriptions use one simple Owner Hub product. The older plan IDs remain
+// readable so existing customer records and usage limits continue to work.
+export const ownerHubSubscriptionPlan = planCatalog.pro
 
 export function subscriptionIsUsable(status: string, trialEndsAt: string | null) {
   if (status === 'active') return true

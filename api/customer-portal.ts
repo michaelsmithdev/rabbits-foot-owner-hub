@@ -3,6 +3,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { getSquareMerchantCredentials } from './_square-merchant.js'
 import { applyCors, requestedOrganizationId } from './_http-security.js'
 import { buildCustomerPortalUrl, getPublicAppUrl } from './_public-url.js'
+import { cardCheckoutAmounts } from './_card-fee.js'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -142,7 +143,13 @@ function safePortalData(
     })),
     invoices: all.filter((item) => item.record_type === 'invoice' && belongs(item) && !['draft', 'void'].includes(String(item.payload.status))).map(({ payload }) => {
       const paid = (Array.isArray(payload.payments) ? payload.payments : []).reduce((sum, raw) => sum + (raw && typeof raw === 'object' && typeof (raw as Json).amount === 'number' ? (raw as Json).amount as number : 0), 0)
-      return { id: payload.id, invoiceNumber: payload.invoiceNumber, jobName: payload.jobName, serviceAddress: payload.serviceAddress, description: payload.description, lineItems: payload.lineItems, issueDate: payload.issueDate, dueDate: payload.dueDate, status: payload.status, total: total(payload), balance: Math.max(0, total(payload) - paid), squarePaymentLink: payload.squarePaymentLink && typeof payload.squarePaymentLink === 'object' ? { url: (payload.squarePaymentLink as Json).url, amount: (payload.squarePaymentLink as Json).amount } : undefined }
+      const balance = Math.max(0, Math.round((total(payload) - paid) * 100) / 100)
+      const checkout = cardCheckoutAmounts(balance, payload)
+      const payments = (Array.isArray(payload.payments) ? payload.payments : []).map((raw) => {
+        const payment = raw && typeof raw === 'object' ? raw as Json : {}
+        return { id: payment.id, date: payment.date, amount: payment.amount, method: payment.method }
+      })
+      return { id: payload.id, invoiceNumber: payload.invoiceNumber, jobName: payload.jobName, serviceAddress: payload.serviceAddress, description: payload.description, lineItems: payload.lineItems, issueDate: payload.issueDate, dueDate: payload.dueDate, status: payload.status, total: total(payload), balance, payments, cardProcessingFeePercent: checkout.feePercent, cardFeeAmount: checkout.feeAmount, cardCheckoutTotal: checkout.checkoutAmount }
     }),
     appointments: all.filter((item) => item.record_type === 'appointment' && belongs(item)).map(({ payload }) => ({ id: payload.id, title: payload.title, serviceAddress: payload.serviceAddress, startAt: payload.startAt, endAt: payload.endAt, status: payload.status })),
     jobs: all.filter((item) => item.record_type === 'job' && belongs(item)).map(({ payload }) => ({ id: payload.id, jobNumber: payload.jobNumber, jobName: payload.jobName, serviceAddress: payload.serviceAddress, scopeOfWork: payload.scopeOfWork, status: payload.status, completedAt: payload.completedAt })),
@@ -178,6 +185,7 @@ async function createCustomerSquareCheckout(
   }
 
   const amount = customerInvoiceBalance(record.payload)
+  const checkout = cardCheckoutAmounts(amount, record.payload)
 
   const existingLink =
     record.payload.squarePaymentLink &&
@@ -190,9 +198,12 @@ async function createCustomerSquareCheckout(
     existingLink.source === 'customer_portal' &&
     typeof existingLink.url === 'string' &&
     typeof existingLink.amount === 'number' &&
-    Math.abs(existingLink.amount - amount) <= 0.005
+    typeof existingLink.invoiceAmount === 'number' &&
+    Math.abs(existingLink.invoiceAmount - amount) <= 0.005 &&
+    typeof existingLink.cardFeePercent === 'number' &&
+    Math.abs(existingLink.cardFeePercent - checkout.feePercent) <= 0.005
   ) {
-    return { url: existingLink.url, amount }
+    return { url: existingLink.url, ...checkout }
   }
 
   const merchant = await getSquareMerchantCredentials(portal.link.organization_id)
@@ -200,7 +211,7 @@ async function createCustomerSquareCheckout(
   const jobName = clean(record.payload.jobName, 80) || 'Handyman services'
   const idempotencyKey = createHash('sha256')
     .update(
-      `${portal.link.organization_id}:${invoiceId}:${amount}:${String(record.payload.updatedAt ?? '')}`,
+      `${portal.link.organization_id}:${invoiceId}:${checkout.checkoutAmount}:${String(record.payload.updatedAt ?? '')}`,
     )
     .digest('hex')
   const publicAppUrl = getPublicAppUrl(request)
@@ -216,7 +227,7 @@ async function createCustomerSquareCheckout(
       description: `Owner Hub ${invoiceNumber}`,
       quick_pay: {
         name: `${invoiceNumber} - ${jobName}`,
-        price_money: { amount: Math.round(amount * 100), currency: 'USD' },
+        price_money: { amount: Math.round(checkout.checkoutAmount * 100), currency: 'USD' },
         location_id: merchant.locationId,
       },
       checkout_options: {
@@ -243,7 +254,10 @@ async function createCustomerSquareCheckout(
       url: paymentLink.url,
       paymentLinkId: paymentLink.id,
       orderId: paymentLink.order_id,
-      amount,
+      amount: checkout.checkoutAmount,
+      invoiceAmount: checkout.invoiceAmount,
+      cardFeeAmount: checkout.feeAmount,
+      cardFeePercent: checkout.feePercent,
       createdAt: now,
       source: 'customer_portal',
     },
@@ -259,7 +273,7 @@ async function createCustomerSquareCheckout(
   )
 
   if (!update.ok) throw new Error('checkout_tracking_failed')
-  return { url: paymentLink.url, amount }
+  return { url: paymentLink.url, ...checkout }
 }
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {

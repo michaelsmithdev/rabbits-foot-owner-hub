@@ -61,6 +61,9 @@ export interface Estimate {
   jobCategory?: string
   materialCost?: number
   taxReservePercent?: number
+  /** Optional fee shown only when the customer chooses card checkout. */
+  cardProcessingFeePercent?: number
+  /** Legacy all-in pricing marker retained so older estimates are never charged twice. */
   paymentProcessingOverheadPercent?: number
   completionDate?: string
   photoIds?: string[]

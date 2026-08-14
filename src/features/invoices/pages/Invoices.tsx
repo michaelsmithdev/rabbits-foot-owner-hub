@@ -200,6 +200,9 @@ type SquarePaymentLinkResponse = {
   paymentLinkId?: string
   orderId?: string
   amount?: number
+  invoiceAmount?: number
+  cardFeeAmount?: number
+  cardFeePercent?: number
 }
 
 async function requestSquarePaymentLink(
@@ -228,6 +231,10 @@ async function requestSquarePaymentLink(
     paymentLinkId: payload.paymentLinkId,
     orderId: payload.orderId,
     amount: payload.amount,
+    invoiceAmount: payload.invoiceAmount,
+    cardFeeAmount: payload.cardFeeAmount,
+    cardFeePercent: payload.cardFeePercent,
+    source: 'owner' as const,
   }
 }
 
@@ -515,6 +522,10 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
       jobCategory: draft.jobCategory.trim(),
       materialCost: draft.materialCost,
       taxReservePercent: draft.taxReservePercent,
+      cardProcessingFeePercent:
+        existingInvoice
+          ? existingInvoice.cardProcessingFeePercent ?? 0
+          : businessSettings.paymentProcessingOverheadPercent,
       completionDate: existingInvoice?.completionDate,
       photoIds: existingInvoice?.photoIds ? [...existingInvoice.photoIds] : [],
       aiEstimate: existingInvoice?.aiEstimate,

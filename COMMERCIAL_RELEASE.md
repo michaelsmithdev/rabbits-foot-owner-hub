@@ -6,7 +6,7 @@ This checklist covers the external controls that cannot be guaranteed by applica
 
 1. Apply every SQL migration in `supabase/migrations`, including `202608090007_commercial_launch_controls.sql`.
 2. Confirm production has all variables listed in `.env.example`. Keep every server-only secret out of variables whose names begin with `VITE_`.
-3. Configure Square subscription plan variation IDs for Starter, Pro, and Team, then test purchase, webhook renewal, past-due, cancel-at-period-end, and renewal restoration with a non-owner test workspace.
+3. Configure `SQUARE_SUBSCRIPTION_PLAN_PRO` to the live Square Owner Hub subscription priced at $69.99 per month, then test purchase, webhook renewal, past-due, cancel-at-period-end, and renewal restoration with a non-owner test workspace.
 4. Keep plan purchase and plan changes in the web dashboard. The Android build may display plan status, but it must not launch Square checkout for digital app access.
 5. Publish the public URLs `/#privacy`, `/#terms`, `/#delete-account`, and `/#support` in the Play Console and sales site.
 

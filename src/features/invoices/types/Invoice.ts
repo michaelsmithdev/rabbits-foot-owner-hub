@@ -21,6 +21,10 @@ export type InvoicePayment = {
   method: PaymentMethod
   referenceNumber: string
   notes: string
+  /** Amount Square charged above the invoice payment for card processing. */
+  cardFeeAmount?: number
+  /** Total amount collected by Square, including any card fee. */
+  grossAmount?: number
   createdAt: string
 }
 
@@ -64,6 +68,8 @@ export type Invoice = {
   jobCategory?: string
   materialCost?: number
   taxReservePercent?: number
+  /** Optional fee shown only when the customer chooses card checkout. */
+  cardProcessingFeePercent?: number
   completionDate?: string
   photoIds?: string[]
   aiEstimate?: AiEstimateGeneration
@@ -74,6 +80,10 @@ export type Invoice = {
     paymentLinkId?: string
     orderId?: string
     amount: number
+    invoiceAmount?: number
+    cardFeeAmount?: number
+    cardFeePercent?: number
+    source?: 'customer_portal' | 'owner'
     createdAt: string
   }
 

@@ -126,7 +126,15 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     const payments = Array.isArray(record.payload.payments) ? [...record.payload.payments] as Json[] : []
     if (!payments.some((entry) => entry.referenceNumber === paymentId)) {
       const paidAt = typeof payment.updated_at === 'string' ? payment.updated_at : new Date().toISOString()
-      payments.push({ id: `square-${paymentId}`, date: paidAt.slice(0, 10), amount: Math.round(cents) / 100, method: 'online', referenceNumber: paymentId, notes: 'Paid securely through Square', createdAt: paidAt })
+      const grossAmount = Math.round(cents) / 100
+      const link = record.payload.squarePaymentLink && typeof record.payload.squarePaymentLink === 'object'
+        ? record.payload.squarePaymentLink as Json
+        : {}
+      const outstanding = Math.max(0, invoiceTotal(record.payload) - amountPaid(record.payload))
+      const linkedInvoiceAmount = typeof link.invoiceAmount === 'number' ? link.invoiceAmount : grossAmount
+      const invoiceAmount = Math.max(0, Math.min(outstanding, Math.round(linkedInvoiceAmount * 100) / 100))
+      const cardFeeAmount = Math.max(0, Math.round((grossAmount - invoiceAmount) * 100) / 100)
+      payments.push({ id: `square-${paymentId}`, date: paidAt.slice(0, 10), amount: invoiceAmount, grossAmount, cardFeeAmount, method: 'online', referenceNumber: paymentId, notes: cardFeeAmount > 0 ? `Paid securely through Square; ${cardFeeAmount.toFixed(2)} card fee collected separately` : 'Paid securely through Square', createdAt: paidAt })
       const nextPaid = amountPaid({ ...record.payload, payments })
       const fullyPaid = nextPaid + 0.005 >= invoiceTotal(record.payload)
       const updatedAt = new Date().toISOString()

@@ -38,6 +38,20 @@ type PortalInvoice = {
   status: string
   total: number
   balance: number
+  cardProcessingFeePercent: number
+  cardFeeAmount: number
+  cardCheckoutTotal: number
+  payments: Array<{
+    id: string
+    date: string
+    amount: number
+    method: string
+  }>
+  lineItems?: Array<{
+    description: string
+    quantity: number
+    unitPrice: number
+  }>
 }
 
 type PortalData = {
@@ -92,6 +106,7 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
   } | null>(null)
   const [message, setMessage] = useState('')
   const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null)
+  const [paymentConfirmation, setPaymentConfirmation] = useState<PortalInvoice | null>(null)
   const [realtimeConfig, setRealtimeConfig] = useState<PortalData['realtime']>(null)
   const [workRequest, setWorkRequest] = useState({
     service: '',
@@ -517,6 +532,22 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
                   </div>
                   <b>{money.format(item.balance)}</b>
                 </div>
+                {item.lineItems?.map((lineItem, index) => (
+                  <div className="portal-line" key={`${item.id}-${index}`}>
+                    <span>{lineItem.description} × {lineItem.quantity}</span>
+                    <strong>{money.format(lineItem.quantity * lineItem.unitPrice)}</strong>
+                  </div>
+                ))}
+                {item.payments.length > 0 && (
+                  <div className="portal-payment-history">
+                    <strong>Payment history</strong>
+                    {item.payments.map((payment) => (
+                      <span key={payment.id}>
+                        {new Date(`${payment.date}T12:00:00`).toLocaleDateString()} · {money.format(payment.amount)} · {payment.method}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 {item.balance <= 0 ? (
                   <div className="portal-approved">
                     <CheckCircle2 /> Paid
@@ -525,12 +556,12 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
                   <button
                     className="portal-pay"
                     disabled={paymentInvoiceId === item.id}
-                    onClick={() => void payInvoice(item)}
+                    onClick={() => setPaymentConfirmation(item)}
                     type="button"
                   >
                     {paymentInvoiceId === item.id
                       ? 'Opening secure Square checkout…'
-                      : `Pay ${money.format(item.balance)} securely with Square`}
+                      : 'Pay securely with Square'}
                   </button>
                 )}
               </div>
@@ -617,6 +648,38 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
               <button
                 className="secondary"
                 onClick={() => setApproval(null)}
+                type="button"
+              >
+                Cancel
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {paymentConfirmation && (
+        <div className="portal-modal">
+          <section aria-labelledby="card-payment-title" aria-modal="true" role="dialog">
+            <h2 id="card-payment-title">Confirm card payment</h2>
+            <p>Review the amount before continuing to Square&apos;s secure checkout.</p>
+            <div className="portal-payment-summary">
+              <span>Invoice balance <strong>{money.format(paymentConfirmation.balance)}</strong></span>
+              <span>Card processing fee ({paymentConfirmation.cardProcessingFeePercent.toFixed(1)}%) <strong>{money.format(paymentConfirmation.cardFeeAmount)}</strong></span>
+              <span className="portal-payment-total">Card total <strong>{money.format(paymentConfirmation.cardCheckoutTotal)}</strong></span>
+            </div>
+            <p className="portal-payment-note">This fee applies only to card checkout. Contact Rabbit&apos;s Foot to pay by cash or check without this card fee.</p>
+            <div>
+              <button
+                disabled={paymentInvoiceId === paymentConfirmation.id}
+                onClick={() => void payInvoice(paymentConfirmation)}
+                type="button"
+              >
+                {paymentInvoiceId === paymentConfirmation.id ? 'Opening Square…' : 'Continue to Square'}
+              </button>
+              <button
+                className="secondary"
+                disabled={paymentInvoiceId === paymentConfirmation.id}
+                onClick={() => setPaymentConfirmation(null)}
                 type="button"
               >
                 Cancel

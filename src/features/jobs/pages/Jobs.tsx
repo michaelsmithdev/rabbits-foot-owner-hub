@@ -269,6 +269,7 @@ export default function Jobs() {
 
   function createInvoice(job: Job) {
     const invoices = loadInvoices()
+    const sourceEstimate = loadEstimates().find((estimate) => estimate.id === job.estimateId)
     const existing = invoices.find((invoice) => invoice.jobId === job.id || invoice.estimateId === job.estimateId)
     if (existing) {
       updateJob(job.id, (current) => ({ ...current, invoiceId: existing.id, status: 'invoiced' }))
@@ -300,6 +301,7 @@ export default function Jobs() {
       taxRate: job.taxRate,
       discount: job.discount,
       notes: settings.invoiceTerms,
+      cardProcessingFeePercent: sourceEstimate?.cardProcessingFeePercent ?? 0,
       completionDate: job.completedAt?.slice(0, 10),
       photoIds: [...job.photoIds],
       status: 'draft',

@@ -8,7 +8,7 @@ import { type FormEvent, useMemo, useState } from 'react'
 
 import { useAuth } from '../../auth/authContext'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
-import { planCatalog, subscriptionIsUsable } from '../planCatalog'
+import { ownerHubSubscriptionPlan, planCatalog, subscriptionIsUsable } from '../planCatalog'
 import { useSaas } from '../saasContext'
 import type { OrganizationRole, SubscriptionPlan } from '../types'
 import './BusinessWorkspace.css'
@@ -188,17 +188,19 @@ export default function BusinessWorkspace() {
         </article>
       </div>
 
-      {isNativeApp ? (
-        <section className="business-panel native-subscription-panel">
-          <header><span><ShieldCheck size={22}/></span><div><p className="eyebrow">CURRENT SUBSCRIPTION</p><h2>{currentPlan.name}</h2><p>Billing is managed separately by the account owner.</p></div></header>
-          <div className="native-subscription-summary">
-            <span><strong>Status</strong><small>{subscription?.status === 'trialing' ? 'Trial active' : subscription?.status ?? 'Setup required'}</small></span>
-            <span><strong>Team access</strong><small>{members.length} of {currentPlan.seats} seats in use</small></span>
-          </div>
-        </section>
-      ) : (
-        <section className="plans-section"><header><div><p className="eyebrow">SIMPLE PRICING</p><h2>Choose the plan that fits the crew</h2></div><p>Annual billing includes two months free. AI and storage limits protect the business from surprise costs.</p></header><div className="plan-grid">{Object.values(planCatalog).map((plan) => <article className={`plan-card ${plan.id === subscription?.plan ? 'current' : ''}`} key={plan.id}><p className="eyebrow">{plan.name}</p><h3>${plan.monthlyPrice}<span>/month</span></h3><p>{plan.seats} seat{plan.seats === 1 ? '' : 's'} · {plan.aiEstimates} AI estimates/month</p><ul>{plan.features.map((feature) => <li key={feature}><Check size={17}/>{feature}</li>)}</ul><button disabled={!canManage || plan.id === subscription?.plan || busyAction === `plan-${plan.id}`} onClick={() => void choosePlan(plan.id)} type="button">{plan.id === subscription?.plan ? <><ShieldCheck/>Current plan</> : <>Choose {plan.name}</>}</button></article>)}</div></section>
-      )}
+      <section className="business-panel native-subscription-panel">
+        <header><span><ShieldCheck size={22}/></span><div><p className="eyebrow">CURRENT SUBSCRIPTION</p><h2>Owner Hub</h2><p>{isNativeApp ? 'Billing is managed separately by the account owner.' : 'One subscription includes the complete Owner Hub workspace. Public pricing stays on the Owner Hub sales page.'}</p></div></header>
+        <div className="native-subscription-summary">
+          <span><strong>Status</strong><small>{subscription?.status === 'trialing' ? 'Trial active' : subscription?.status ?? 'Setup required'}</small></span>
+          <span><strong>Team access</strong><small>{members.length} of {currentPlan.seats} seats in use</small></span>
+        </div>
+        {!isNativeApp && canManage && !subscriptionIsUsable(subscription?.status ?? '', subscription?.trialEndsAt ?? null) && (
+          <button className="business-action" disabled={busyAction === `plan-${ownerHubSubscriptionPlan.id}`} onClick={() => void choosePlan(ownerHubSubscriptionPlan.id)} type="button">
+            {busyAction === `plan-${ownerHubSubscriptionPlan.id}` ? <LoaderCircle className="auth-spinner"/> : <ShieldCheck/>}
+            Activate Owner Hub
+          </button>
+        )}
+      </section>
 
       <section className="business-panel account-control" data-tour="business-account">
         <header><span><ShieldCheck size={22}/></span><div><p className="eyebrow">ACCOUNT CONTROL</p><h2>{isNativeApp ? 'Support and privacy' : 'Renewal, support, and privacy'}</h2><p>{isNativeApp ? 'Account assistance, legal information, and deletion controls.' : 'Clear controls for billing, legal information, support, and account deletion.'}</p></div></header>
