@@ -1,12 +1,14 @@
 import { queueCollectionSync } from '../../cloud/syncQueue'
+import { APP_SETTINGS, resolveBusinessPhone } from '../../../config/appSettings'
 import type { BusinessSettings } from '../types/BusinessSettings'
 
 const SETTINGS_STORAGE_KEY = 'rabbits-foot-business-settings'
 
 export const defaultBusinessSettings: BusinessSettings = {
   id: 'business-settings',
+  businessContactVersion: APP_SETTINGS.business.contactVersion,
   businessName: 'My Service Business',
-  phone: '',
+  phone: APP_SETTINGS.business.phone.display,
   email: '',
   website: '',
   streetAddress: '',
@@ -69,6 +71,34 @@ function isBusinessSettings(value: unknown): value is BusinessSettings {
   )
 }
 
+function currentBusinessContact(settings: BusinessSettings): BusinessSettings {
+  const phone = resolveBusinessPhone(
+    settings.phone,
+    settings.businessContactVersion,
+  )
+
+  return {
+    ...settings,
+    businessContactVersion: APP_SETTINGS.business.contactVersion,
+    phone: phone.display,
+  }
+}
+
+function migrateBusinessContact(settings: BusinessSettings): BusinessSettings {
+  const migratedSettings = currentBusinessContact(settings)
+
+  if (
+    settings.businessContactVersion !== migratedSettings.businessContactVersion ||
+    settings.phone !== migratedSettings.phone
+  ) {
+    migratedSettings.updatedAt = new Date().toISOString()
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify([migratedSettings]))
+    queueCollectionSync('settings', [migratedSettings])
+  }
+
+  return migratedSettings
+}
+
 export function loadBusinessSettings(): BusinessSettings {
   try {
     const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY)
@@ -81,7 +111,7 @@ export function loadBusinessSettings(): BusinessSettings {
       : parsedSettings
 
     return isBusinessSettings(settingsRecord)
-      ? {
+      ? migrateBusinessContact({
           ...defaultBusinessSettings,
           ...settingsRecord,
           defaultTaxReservePercent:
@@ -149,7 +179,7 @@ export function loadBusinessSettings(): BusinessSettings {
             typeof settingsRecord.darkMode === 'boolean'
               ? settingsRecord.darkMode
               : false,
-        }
+        })
       : { ...defaultBusinessSettings }
   } catch {
     return { ...defaultBusinessSettings }
@@ -157,6 +187,7 @@ export function loadBusinessSettings(): BusinessSettings {
 }
 
 export function saveBusinessSettings(settings: BusinessSettings) {
-  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify([settings]))
-  queueCollectionSync('settings', [settings])
+  const normalizedSettings = currentBusinessContact(settings)
+  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify([normalizedSettings]))
+  queueCollectionSync('settings', [normalizedSettings])
 }

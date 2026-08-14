@@ -20,6 +20,7 @@ import { buildCustomerDocumentStats } from '../src/features/customers/data/custo
 import { buildActionCenterItems } from '../src/features/communications/actionCenter.ts'
 import { normalizePhoneNumber } from '../src/features/communications/customerContact.ts'
 import { buildCustomerPortalUrl } from '../api/_public-url.js'
+import { APP_SETTINGS, resolveBusinessPhone } from '../src/config/appSettings.ts'
 
 test('AI estimate scope stays exact unless upsells are explicitly requested', () => {
   assert.equal(isUpsellRequested('Replace 2 storm doors'), false)
@@ -211,9 +212,17 @@ test('Customer Hub links always use a public HTTPS host', () => {
 })
 
 test('phone numbers are normalized before a customer text handoff', () => {
-  assert.equal(normalizePhoneNumber('(574) 703-5978'), '5747035978')
-  assert.equal(normalizePhoneNumber('+1 574-703-5978'), '+15747035978')
+  assert.equal(normalizePhoneNumber('(574) 334-8410'), '5743348410')
+  assert.equal(normalizePhoneNumber('+1 574-334-8410'), '+15743348410')
   assert.equal(normalizePhoneNumber('not saved'), '')
+})
+
+test('official business phone powers the Customer Hub call and text actions', () => {
+  const contact = resolveBusinessPhone('', 0)
+  assert.equal(contact.display, '(574) 334-8410')
+  assert.equal(contact.tel, 'tel:5743348410')
+  assert.equal(contact.sms, 'sms:5743348410')
+  assert.equal(contact.digits, APP_SETTINGS.business.phone.digits)
 })
 
 test('action center prioritizes customer requests and overdue invoices', () => {

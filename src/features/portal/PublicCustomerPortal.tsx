@@ -57,6 +57,14 @@ type PortalInvoice = {
 type PortalData = {
   expiresAt: string
   realtime?: { token: string; expiresAt: number } | null
+  business: {
+    name: string
+    email: string
+    phoneDisplay: string
+    phoneDigits: string
+    phoneTel: string
+    phoneSms: string
+  }
   customer: {
     id: string
     firstName: string
@@ -370,9 +378,9 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
       <nav aria-label="Contact Rabbit's Foot" className="portal-contact-bar">
         <span>Questions about your project?</span>
         <div>
-          <a href="tel:+15747035978">Call 574-703-5978</a>
-          <a href="sms:+15747035978">Text Rabbit&apos;s Foot</a>
-          <a href="mailto:callrabbitsfoot@gmail.com">Email us</a>
+          <a href={data.business.phoneTel}>Call {data.business.phoneDisplay}</a>
+          <a href={data.business.phoneSms}>Text Rabbit&apos;s Foot</a>
+          <a href={`mailto:${data.business.email}`}>Email us</a>
         </div>
       </nav>
 
@@ -615,7 +623,7 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
 
       <footer className="portal-footer">
         Secure link expires {new Date(data.expiresAt).toLocaleDateString()} ·
-        Rabbit's Foot Handyman Services · 574-703-5978
+        {data.business.name} · {data.business.phoneDisplay}
       </footer>
 
       {approval && (

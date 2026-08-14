@@ -70,7 +70,7 @@ export function SaasProvider({ children }: { children: ReactNode }) {
       const currentSettings = loadBusinessSettings()
       const hasUntouchedIdentity =
         currentSettings.businessName === defaultBusinessSettings.businessName &&
-        !currentSettings.phone &&
+        (!currentSettings.phone || currentSettings.phone === defaultBusinessSettings.phone) &&
         !currentSettings.email &&
         !currentSettings.website &&
         !currentSettings.streetAddress &&

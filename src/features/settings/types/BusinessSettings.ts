@@ -1,5 +1,6 @@
 export interface BusinessSettings {
   id: 'business-settings'
+  businessContactVersion: number
   businessName: string
   phone: string
   email: string

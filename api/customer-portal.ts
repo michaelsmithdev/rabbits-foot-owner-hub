@@ -4,6 +4,7 @@ import { getSquareMerchantCredentials } from './_square-merchant.js'
 import { applyCors, requestedOrganizationId } from './_http-security.js'
 import { buildCustomerPortalUrl, getPublicAppUrl } from './_public-url.js'
 import { cardCheckoutAmounts } from './_card-fee.js'
+import { APP_SETTINGS, resolveBusinessPhone } from '../src/config/appSettings.ts'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -129,10 +130,23 @@ function safePortalData(
   const customerId = link.customer_id
   const customer = all.find((item) => item.record_type === 'customer' && item.record_id === customerId)?.payload
   if (!customer) return null
+  const settings = all.find((item) => item.record_type === 'settings' && item.record_id === 'business-settings')?.payload
+  const businessPhone = resolveBusinessPhone(
+    settings?.phone,
+    settings?.businessContactVersion,
+  )
   const belongs = (item: { payload: Json }) => item.payload.customerId === customerId
   return {
     expiresAt: link.expires_at,
     realtime: createPortalRealtimeToken(link),
+    business: {
+      name: clean(settings?.businessName, 120) || APP_SETTINGS.business.name,
+      email: clean(settings?.email, 200) || APP_SETTINGS.business.email,
+      phoneDisplay: businessPhone.display,
+      phoneDigits: businessPhone.digits,
+      phoneTel: businessPhone.tel,
+      phoneSms: businessPhone.sms,
+    },
     customer: { id: customerId, firstName: clean(customer.firstName, 80), lastName: clean(customer.lastName, 80), email: clean(customer.email, 200), phone: clean(customer.phone, 40) },
     estimates: all.filter((item) => item.record_type === 'estimate' && belongs(item) && item.payload.status !== 'draft').map(({ payload }) => ({
       id: payload.id, estimateNumber: payload.estimateNumber, jobName: payload.jobName, serviceAddress: payload.serviceAddress,
