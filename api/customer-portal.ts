@@ -4,7 +4,7 @@ import { getSquareMerchantCredentials } from './_square-merchant.js'
 import { applyCors, requestedOrganizationId } from './_http-security.js'
 import { buildCustomerPortalUrl, getPublicAppUrl } from './_public-url.js'
 import { cardCheckoutAmounts } from './_card-fee.js'
-import { APP_SETTINGS, resolveBusinessPhone } from '../src/config/appSettings.ts'
+import { APP_SETTINGS, resolveBusinessPhone } from './_app-settings.js'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>

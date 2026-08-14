@@ -32,13 +32,24 @@ export async function createCustomerPortalLink(
     },
     body: JSON.stringify({ action: 'create', customerId }),
   })
-  const payload = (await response.json()) as {
-    url?: string
-    error?: string
+  const responseText = await response.text()
+  let payload: { url?: string; error?: string }
+
+  try {
+    payload = responseText
+      ? (JSON.parse(responseText) as { url?: string; error?: string })
+      : {}
+  } catch {
+    throw new Error(
+      'Customer Hub is temporarily unavailable. Please wait a moment and try again.',
+    )
   }
 
   if (!response.ok || !payload.url) {
-    throw new Error(payload.error || 'Customer Hub link could not be created.')
+    throw new Error(
+      payload.error ||
+        'Customer Hub is temporarily unavailable. Please wait a moment and try again.',
+    )
   }
   if (!isSafeCustomerFacingUrl(payload.url)) {
     throw new Error('The Customer Hub link was not a safe public URL.')
