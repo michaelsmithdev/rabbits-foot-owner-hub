@@ -13,6 +13,7 @@ import {
   type AuthMode,
 } from './authContext'
 import { recordStartupEvent } from '../../startup/startupDiagnostics'
+import { markDemoTutorialPending } from '../demo/demoWorkspace'
 
 const AUTH_STARTUP_TIMEOUT_MS = 12_000
 
@@ -75,12 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async signIn(email, password) {
         if (!cloudClient) throw new Error('Cloud login is not configured.')
 
-        const { error } = await cloudClient.auth.signInWithPassword({
+        const { data, error } = await cloudClient.auth.signInWithPassword({
           email: email.trim(),
           password,
         })
 
         if (error) throw error
+        markDemoTutorialPending(data.session)
+        setSession(data.session)
       },
       async signUp(email, password, businessName, displayName) {
         if (!cloudClient) throw new Error('Cloud login is not configured.')

@@ -28,9 +28,11 @@ import type {
   TutorialSectionId,
   TutorialStep,
 } from './types'
+import { consumeDemoTutorialPending } from '../demo/demoWorkspace'
 
 type TutorialProviderProps = {
   activePage: PageName
+  autoStartCompleteTutorial?: boolean
   children: ReactNode
   onNavigate: (page: PageName) => void
   userScope: string
@@ -69,6 +71,7 @@ function getSequence(mode: TutorialRunMode | null) {
 
 export default function TutorialProvider({
   activePage,
+  autoStartCompleteTutorial = false,
   children,
   onNavigate,
   userScope,
@@ -81,6 +84,7 @@ export default function TutorialProvider({
   const [currentStepId, setCurrentStepId] = useState<string | null>(null)
   const [targetState, setTargetState] = useState<TutorialTargetState>(EMPTY_TARGET)
   const activatedStepRef = useRef<string | null>(null)
+  const demoTutorialStartedRef = useRef(false)
 
   const sequence = useMemo(() => getSequence(runMode), [runMode])
   const currentIndex = Math.max(
@@ -129,6 +133,24 @@ export default function TutorialProvider({
     setRunMode({ type: 'section', sectionId })
     setCurrentStepId(steps[0].id)
   }, [])
+
+  useEffect(() => {
+    if (
+      !autoStartCompleteTutorial ||
+      demoTutorialStartedRef.current ||
+      !consumeDemoTutorialPending(userScope)
+    ) {
+      return
+    }
+
+    demoTutorialStartedRef.current = true
+    const timer = window.setTimeout(
+      () => startCompleteTutorial({ restart: true }),
+      350,
+    )
+
+    return () => window.clearTimeout(timer)
+  }, [autoStartCompleteTutorial, startCompleteTutorial, userScope])
 
   const startPageTutorial = useCallback(() => {
     if (activePageSection) startSectionTutorial(activePageSection)

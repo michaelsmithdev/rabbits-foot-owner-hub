@@ -14,6 +14,7 @@ import { useSaas } from './features/saas/saasContext'
 import { useAuth } from './features/auth/authContext'
 import LearnThisPageButton from './features/tutorial/LearnThisPageButton'
 import TutorialProvider from './features/tutorial/TutorialProvider'
+import { isDemoSession } from './features/demo/demoWorkspace'
 
 const Dashboard = lazy(() => import('./pages/Dashboard/Dashboard'))
 const Customers = lazy(() => import('./features/customers/pages/Customers'))
@@ -232,6 +233,7 @@ function App() {
   return (
     <TutorialProvider
       activePage={activePage}
+      autoStartCompleteTutorial={isDemoSession(session)}
       key={session?.user.id ?? mode}
       onNavigate={navigateTo}
       userScope={session?.user.id ?? mode}

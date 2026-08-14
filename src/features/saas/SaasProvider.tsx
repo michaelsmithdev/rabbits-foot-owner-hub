@@ -13,6 +13,7 @@ import type {
 } from './types'
 import { activateOrganizationStorage } from '../../storage/workspaceStorage'
 import { defaultBusinessSettings, loadBusinessSettings, saveBusinessSettings } from '../settings/data/businessSettingsStore'
+import { isDemoSession } from '../demo/demoWorkspace'
 
 const emptyUsage: UsageSummary = { aiEstimates: 0, transcriptions: 0, photos: 0, sms: 0, emails: 0 }
 
@@ -89,7 +90,10 @@ export function SaasProvider({ children }: { children: ReactNode }) {
         accentColor: org.accent_color ?? '#78c800', onboardingCompletedAt: org.onboarding_completed_at,
       })
       const sub = subscriptionResult.data
-      setSubscription(sub ? {
+      setSubscription(isDemoSession(session) ? {
+        plan: 'pro', status: 'active', trialEndsAt: null,
+        currentPeriodEndsAt: null, cancelAtPeriodEnd: false,
+      } : sub ? {
         plan: sub.plan, status: sub.status, trialEndsAt: sub.trial_ends_at,
         currentPeriodEndsAt: sub.current_period_ends_at, cancelAtPeriodEnd: sub.cancel_at_period_end,
       } as WorkspaceSubscription : null)

@@ -8,6 +8,11 @@ import {
   tutorialSections,
   tutorialSteps,
 } from '../src/features/tutorial/tutorialConfig.ts'
+import {
+  consumeDemoTutorialPending,
+  isDemoSession,
+  markDemoTutorialPending,
+} from '../src/features/demo/demoWorkspace.ts'
 
 function sourceTourTargets() {
   let source = ''
@@ -68,4 +73,24 @@ test('tutorial targets use stable names instead of CSS selectors', () => {
       assert.match(target!, /^[a-z0-9-]+$/)
     }
   }
+})
+
+test('demo sign-in requests the complete tutorial exactly once', () => {
+  const values = new Map<string, string>()
+  Object.defineProperty(globalThis, 'sessionStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => values.get(key) ?? null,
+      removeItem: (key: string) => values.delete(key),
+      setItem: (key: string, value: string) => values.set(key, value),
+    },
+  })
+  const demoSession = {
+    user: { id: 'demo-user', user_metadata: { is_demo: true } },
+  } as Parameters<typeof isDemoSession>[0]
+
+  assert.equal(isDemoSession(demoSession), true)
+  markDemoTutorialPending(demoSession)
+  assert.equal(consumeDemoTutorialPending('demo-user'), true)
+  assert.equal(consumeDemoTutorialPending('demo-user'), false)
 })
