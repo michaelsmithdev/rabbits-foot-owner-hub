@@ -14,6 +14,8 @@ export type PaymentMethod =
   | 'card'
   | 'online'
 
+export type InvoiceLineItemKind = 'service' | 'material'
+
 export type InvoicePayment = {
   id: string
   date: string
@@ -30,6 +32,8 @@ export type InvoicePayment = {
 
 export type InvoiceLineItem = {
   id: string
+  /** Older saved invoices omit this field and are treated as service lines. */
+  kind?: InvoiceLineItemKind
   description: string
   quantity: number
   unit?: string

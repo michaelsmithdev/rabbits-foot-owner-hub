@@ -143,7 +143,10 @@ export async function generateBusinessDocumentPdf(input: PdfDocumentInput) {
     const rowHeight = Math.max(26, lines.length * 12 + 8)
     ensure(rowHeight)
     lines.forEach((line, index) => page.drawText(line, { x: MARGIN + 10, y: y - index * 12, size: 9, font: regular, color: BLACK }))
-    page.drawText(String(item.quantity), { x: 390, y, size: 9, font: regular, color: BLACK })
+    page.drawText(
+      `${item.quantity}${item.unit ? ` ${item.unit}` : ''}`,
+      { x: 375, y, size: 9, font: regular, color: BLACK },
+    )
     page.drawText(money(item.unitPrice), { x: 430, y, size: 9, font: regular, color: BLACK })
     page.drawText(money(item.quantity * item.unitPrice), { x: 500, y, size: 9, font: bold, color: BLACK })
     y -= rowHeight

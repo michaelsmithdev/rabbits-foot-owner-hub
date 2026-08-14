@@ -200,9 +200,18 @@
 }
 
 .estimate-service-cell select,
+.estimate-service-cell input,
 .estimate-item-row > input {
   min-height: 52px;
   padding: 0 14px;
+}
+
+.estimate-line-item-kind {
+  min-height: 36px !important;
+  color: #35560f;
+  background: #f1f8e4;
+  font-size: 0.78rem;
+  font-weight: 850;
 }
 
 .estimate-service-cell textarea {
@@ -224,8 +233,14 @@
   cursor: pointer;
 }
 
-.estimate-add-item {
+.estimate-add-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
   margin: 0 14px 16px;
+}
+
+.estimate-add-item {
   padding: 10px 0;
   border: 0;
   color: #356148;
@@ -474,6 +489,10 @@
 
 .estimate-document-tabs button:hover {
   background: #c8e77b;
+}
+
+.estimate-add-material {
+  color: #162b09;
 }
 
 .estimate-payment-overhead-note {

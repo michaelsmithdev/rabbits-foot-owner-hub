@@ -6,8 +6,12 @@ export type EstimateStatus =
   | 'approved'
   | 'declined'
 
+export type EstimateLineItemKind = 'service' | 'material'
+
 export interface EstimateLineItem {
   id: string
+  /** Older saved estimates omit this field and are treated as service lines. */
+  kind?: EstimateLineItemKind
   description: string
   quantity: number
   unit?: string

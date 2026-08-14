@@ -315,6 +315,18 @@
   color: #10130f;
 }
 
+.invoice-line-item select {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid #d6d8d1;
+  border-radius: 11px;
+  outline: none;
+  background: #eef6de;
+  padding: 11px 13px;
+  color: #35560f;
+  font-weight: 800;
+}
+
 .invoice-form-grid textarea,
 .payment-form-grid textarea {
   resize: vertical;
@@ -367,6 +379,19 @@
   font-weight: 850;
 }
 
+.invoice-line-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.invoice-line-item-description-fields {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.65fr) minmax(180px, 1.7fr);
+  gap: 8px;
+}
+
 .invoice-line-items {
   display: flex;
   gap: 10px;
@@ -376,7 +401,7 @@
 
 .invoice-line-item {
   display: grid;
-  grid-template-columns: minmax(240px, 2fr) minmax(100px, 0.55fr) minmax(120px, 0.7fr) minmax(100px, 0.6fr) 40px;
+  grid-template-columns: minmax(240px, 2fr) minmax(90px, 0.5fr) minmax(90px, 0.5fr) minmax(120px, 0.7fr) minmax(100px, 0.6fr) 40px;
   align-items: end;
   gap: 10px;
   border-radius: 14px;
@@ -573,6 +598,15 @@
   .invoice-section-heading {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .invoice-line-item-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .invoice-line-item-description-fields {
+    grid-template-columns: 1fr;
   }
 
   .invoice-line-item {

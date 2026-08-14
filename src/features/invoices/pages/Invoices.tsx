@@ -29,6 +29,7 @@ import {
 import type {
   Invoice,
   InvoiceLineItem,
+  InvoiceLineItemKind,
   InvoicePayment,
   InvoiceStatus,
   PaymentMethod,
@@ -106,11 +107,15 @@ function getDefaultDueDate(dueDays = 14) {
   return getDateInputValue(dueDate)
 }
 
-function createEmptyLineItem(): InvoiceLineItem {
+function createEmptyLineItem(
+  kind: InvoiceLineItemKind = 'service',
+): InvoiceLineItem {
   return {
     id: createId(),
+    kind,
     description: '',
     quantity: 1,
+    unit: kind === 'material' ? 'each' : 'hour',
     unitPrice: 0,
   }
 }
@@ -436,16 +441,38 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
         return {
           ...lineItem,
           [field]:
-            field === 'description' ? value : Math.max(0, Number(value)),
+            field === 'description' || field === 'unit'
+              ? value
+              : Math.max(0, Number(value)),
         }
       }),
     }))
   }
 
-  function addLineItem() {
+  function addLineItem(kind: InvoiceLineItemKind = 'service') {
     setDraft((currentDraft) => ({
       ...currentDraft,
-      lineItems: [...currentDraft.lineItems, createEmptyLineItem()],
+      lineItems: [...currentDraft.lineItems, createEmptyLineItem(kind)],
+    }))
+  }
+
+  function updateLineItemKind(
+    lineItemId: string,
+    kind: InvoiceLineItemKind,
+  ) {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      lineItems: currentDraft.lineItems.map((lineItem) =>
+        lineItem.id === lineItemId
+          ? {
+              ...lineItem,
+              kind,
+              description: '',
+              unit: kind === 'material' ? 'each' : 'hour',
+              unitPrice: 0,
+            }
+          : lineItem,
+      ),
     }))
   }
 
@@ -1025,28 +1052,53 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                   <p className="eyebrow">LINE ITEMS</p>
                   <h3>Labor, materials, and services</h3>
                 </div>
-                <button onClick={addLineItem} type="button">
-                  <Plus aria-hidden="true" size={16} />
-                  Add line item
-                </button>
+                <div className="invoice-line-item-actions">
+                  <button onClick={() => addLineItem('service')} type="button">
+                    <Plus aria-hidden="true" size={16} />
+                    Add service / labor
+                  </button>
+                  <button onClick={() => addLineItem('material')} type="button">
+                    <Plus aria-hidden="true" size={16} />
+                    Add material
+                  </button>
+                </div>
               </div>
 
               <div className="invoice-line-items">
                 {draft.lineItems.map((lineItem) => (
                   <div className="invoice-line-item" key={lineItem.id}>
                     <label className="line-item-description">
-                      <span>Description</span>
-                      <input
-                        onChange={(event) =>
-                          updateLineItem(
-                            lineItem.id,
-                            'description',
-                            event.target.value,
-                          )
-                        }
-                        placeholder="Service or material"
-                        value={lineItem.description}
-                      />
+                      <span>Type and description</span>
+                      <div className="invoice-line-item-description-fields">
+                        <select
+                          aria-label="Line item type"
+                          onChange={(event) =>
+                            updateLineItemKind(
+                              lineItem.id,
+                              event.target.value as InvoiceLineItemKind,
+                            )
+                          }
+                          value={lineItem.kind ?? 'service'}
+                        >
+                          <option value="service">Service / labor</option>
+                          <option value="material">Material</option>
+                        </select>
+                        <input
+                          onChange={(event) =>
+                            updateLineItem(
+                              lineItem.id,
+                              'description',
+                              event.target.value,
+                            )
+                          }
+                          placeholder={
+                            (lineItem.kind ?? 'service') === 'material'
+                              ? 'Material name or description'
+                              : 'Service or labor description'
+                          }
+                          value={lineItem.description}
+                        />
+                      </div>
                     </label>
                     <label>
                       <span>Quantity</span>
@@ -1062,6 +1114,20 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                         step="0.25"
                         type="number"
                         value={lineItem.quantity || ''}
+                      />
+                    </label>
+                    <label>
+                      <span>Unit</span>
+                      <input
+                        onChange={(event) =>
+                          updateLineItem(
+                            lineItem.id,
+                            'unit',
+                            event.target.value,
+                          )
+                        }
+                        placeholder="each"
+                        value={lineItem.unit ?? 'each'}
                       />
                     </label>
                     <label>
@@ -1372,7 +1438,10 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
               {printInvoice.lineItems.map((lineItem) => (
                 <tr key={lineItem.id}>
                   <td>{lineItem.description}</td>
-                  <td>{lineItem.quantity}</td>
+                  <td>
+                    {lineItem.quantity}
+                    {lineItem.unit ? ` ${lineItem.unit}` : ''}
+                  </td>
                   <td>{formatCurrency(lineItem.unitPrice)}</td>
                   <td>
                     {formatCurrency(lineItem.quantity * lineItem.unitPrice)}

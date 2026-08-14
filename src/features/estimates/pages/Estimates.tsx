@@ -40,6 +40,7 @@ import type {
   Estimate,
   EstimateApprovalMethod,
   EstimateLineItem,
+  EstimateLineItemKind,
 } from '../types/Estimate'
 
 import '../styles/Estimates.css'
@@ -285,12 +286,15 @@ function getExpirationDate(validDays = 30): string {
   return date.toISOString().split('T')[0]
 }
 
-function createEmptyLineItem(): EstimateLineItem {
+function createEmptyLineItem(
+  kind: EstimateLineItemKind = 'service',
+): EstimateLineItem {
   return {
     id: createId(),
+    kind,
     description: '',
     quantity: 1,
-    unit: 'hour',
+    unit: kind === 'material' ? 'each' : 'hour',
     unitPrice: 0,
   }
 }
@@ -676,11 +680,32 @@ function Estimates({
     setJobName(value)
   }
 
-  function addLineItem(): void {
+  function addLineItem(
+    kind: EstimateLineItemKind = 'service',
+  ): void {
     setLineItems((currentItems) => [
       ...currentItems,
-      createEmptyLineItem(),
+      createEmptyLineItem(kind),
     ])
+  }
+
+  function updateLineItemKind(
+    lineItemId: string,
+    kind: EstimateLineItemKind,
+  ): void {
+    setLineItems((currentItems) =>
+      currentItems.map((item) =>
+        item.id === lineItemId
+          ? {
+              ...item,
+              kind,
+              description: '',
+              unit: kind === 'material' ? 'each' : 'hour',
+              unitPrice: 0,
+            }
+          : item,
+      ),
+    )
   }
 
   function updateLineItem(
@@ -729,7 +754,8 @@ function Estimates({
           item.id === lineItemId
             ? {
                 ...item,
-              description: '',
+                kind: 'service',
+                description: '',
                 unit: 'hour',
                 unitPrice: 0,
               }
@@ -751,6 +777,7 @@ function Estimates({
         item.id === lineItemId
           ? {
               ...item,
+              kind: 'service',
               description: value,
               unit: 'hour',
               unitPrice:
@@ -1958,15 +1985,12 @@ function Estimates({
 
             <div className="estimate-line-items" data-tour="estimate-line-items">
               <div className="estimate-help-bar">
-                Choose a repair from the
-                dropdown, or select a custom
-                repair.
+                Add services, labor, and materials as separate line items so
+                the customer can see exactly what is included.
               </div>
 
               <div className="estimate-table-header">
-                <span>
-                  Repair / Service
-                </span>
+                <span>Service / Material</span>
 
                 <span>Quantity</span>
 
@@ -1981,11 +2005,14 @@ function Estimates({
 
               <div className="estimate-item-list">
                 {lineItems.map((item) => {
+                  const itemKind = item.kind ?? 'service'
                   const selectedDescription =
-                    getMatchingOption(
-                      item.description,
-                      SERVICE_DESCRIPTIONS,
-                    )
+                    itemKind === 'service'
+                      ? getMatchingOption(
+                          item.description,
+                          SERVICE_DESCRIPTIONS,
+                        )
+                      : ''
 
                   return (
                     <div
@@ -1994,70 +2021,75 @@ function Estimates({
                     >
                       <div className="estimate-service-cell">
                         <select
-                          className="estimate-green-field"
-                          onChange={(
-                            event,
-                          ) =>
-                            handleDescriptionSelection(
+                          aria-label="Line item type"
+                          className="estimate-line-item-kind"
+                          onChange={(event) =>
+                            updateLineItemKind(
                               item.id,
-                              event.target
-                                .value,
+                              event.target.value as EstimateLineItemKind,
                             )
                           }
-                          value={
-                            selectedDescription
-                          }
+                          value={itemKind}
                         >
-                          <option value="">
-                            Service or product
-                          </option>
-
-                          {SERVICE_OPTIONS.map(
-                            (service) => (
-                              <option
-                                key={
-                                  service.description
-                                }
-                                value={
-                                  service.description
-                                }
-                              >
-                                {
-                                  service.description
-                                }
-                              </option>
-                            ),
-                          )}
-
-                          <option
-                            value={
-                              CUSTOM_OPTION
-                            }
-                          >
-                            Custom repair or
-                            service
-                          </option>
+                          <option value="service">Service / labor</option>
+                          <option value="material">Material</option>
                         </select>
 
-                        {selectedDescription ===
-                          CUSTOM_OPTION && (
-                          <textarea
-                            onChange={(
-                              event,
-                            ) =>
+                        {itemKind === 'material' ? (
+                          <input
+                            aria-label="Material description"
+                            onChange={(event) =>
                               updateLineItem(
                                 item.id,
                                 'description',
-                                event.target
-                                  .value,
+                                event.target.value,
                               )
                             }
-                            placeholder="Describe the custom repair or service..."
-                            rows={2}
-                            value={
-                              item.description
-                            }
+                            placeholder="Material name or description"
+                            type="text"
+                            value={item.description}
                           />
+                        ) : (
+                          <>
+                            <select
+                              className="estimate-green-field"
+                              onChange={(event) =>
+                                handleDescriptionSelection(
+                                  item.id,
+                                  event.target.value,
+                                )
+                              }
+                              value={selectedDescription}
+                            >
+                              <option value="">Choose a service</option>
+                              {SERVICE_OPTIONS.map((service) => (
+                                <option
+                                  key={service.description}
+                                  value={service.description}
+                                >
+                                  {service.description}
+                                </option>
+                              ))}
+                              <option value={CUSTOM_OPTION}>
+                                Custom repair or service
+                              </option>
+                            </select>
+
+                            {selectedDescription === CUSTOM_OPTION && (
+                              <textarea
+                                onChange={(event) =>
+                                  updateLineItem(
+                                    item.id,
+                                    'description',
+                                    event.target.value,
+                                  )
+                                }
+                                placeholder="Describe the custom repair or service..."
+                                rows={2}
+                                value={item.description}
+                              />
+                            )}
+                          </>
                         )}
                       </div>
 
@@ -2129,13 +2161,22 @@ function Estimates({
                 })}
               </div>
 
-              <button
-                className="estimate-add-item"
-                onClick={addLineItem}
-                type="button"
-              >
-                + Add line item
-              </button>
+              <div className="estimate-add-item-actions">
+                <button
+                  className="estimate-add-item"
+                  onClick={() => addLineItem('service')}
+                  type="button"
+                >
+                  + Add service / labor
+                </button>
+                <button
+                  className="estimate-add-item estimate-add-material"
+                  onClick={() => addLineItem('material')}
+                  type="button"
+                >
+                  + Add material
+                </button>
+              </div>
             </div>
 
             <div className="estimate-bottom-grid" data-tour="estimate-scope-notes">
@@ -2434,7 +2475,10 @@ function Estimates({
                     <td>
                       {lineItem.description}
                     </td>
-                    <td>{lineItem.quantity}</td>
+                    <td>
+                      {lineItem.quantity}
+                      {lineItem.unit ? ` ${lineItem.unit}` : ''}
+                    </td>
                     <td>
                       {formatCurrency(
                         lineItem.unitPrice,

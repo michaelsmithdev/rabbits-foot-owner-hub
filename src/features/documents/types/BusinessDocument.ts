@@ -14,6 +14,7 @@ export type BusinessDocumentRecord = {
 export type PdfLineItem = {
   description: string
   quantity: number
+  unit?: string
   unitPrice: number
 }
 

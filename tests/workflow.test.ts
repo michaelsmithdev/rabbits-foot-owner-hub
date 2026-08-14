@@ -60,14 +60,17 @@ test('card fee is separate from the invoice amount and rounded to cents', () => 
 
 test('invoice math applies tax and discount and never returns a negative balance', () => {
   const invoice = {
-    lineItems: [{ id: 'line-1', description: 'Repair', quantity: 2, unitPrice: 100 }],
+    lineItems: [
+      { id: 'line-1', kind: 'service' as const, description: 'Repair', quantity: 2, unitPrice: 100 },
+      { id: 'line-2', kind: 'material' as const, description: 'Replacement part', quantity: 2, unitPrice: 25 },
+    ],
     taxRate: 5,
     discount: 10,
-    payments: [{ id: 'pay-1', amount: 250, method: 'cash' as const, paidAt: '2026-08-08', note: '' }],
+    payments: [{ id: 'pay-1', amount: 300, method: 'cash' as const, paidAt: '2026-08-08', note: '' }],
     status: 'paid' as const,
   }
 
-  assert.equal(calculateInvoiceTotal(invoice), 200)
+  assert.equal(calculateInvoiceTotal(invoice), 252.5)
   assert.equal(calculateInvoiceBalance(invoice as never), 0)
 })
 
