@@ -1,4 +1,5 @@
 import type { Customer } from '../customers/types/Customer'
+import { APP_SETTINGS } from '../../config/appSettings.ts'
 
 export function resolveCustomer(
   customers: Customer[],
@@ -28,4 +29,11 @@ export function openSmsComposer(customer: Customer, message: string) {
   }
 
   window.location.href = `sms:${recipient}?body=${encodeURIComponent(message)}`
+}
+
+export function buildReviewRequestMessage(customer: Customer) {
+  const customerName = customer.firstName.trim()
+  const greeting = customerName ? `Hi ${customerName},` : 'Hi,'
+
+  return `${greeting} thank you for choosing ${APP_SETTINGS.business.name}. If you were happy with our work, would you mind leaving us a Google review? It really helps our small business: ${APP_SETTINGS.business.googleReviewUrl}`
 }

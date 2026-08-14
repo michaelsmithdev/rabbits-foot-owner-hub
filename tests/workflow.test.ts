@@ -18,7 +18,10 @@ import { nextEstimateNumber } from '../src/features/estimates/data/estimateNumbe
 import { isAllowedOrigin, requestedOrganizationId } from '../api/_http-security.js'
 import { buildCustomerDocumentStats } from '../src/features/customers/data/customerDocumentStats.ts'
 import { buildActionCenterItems } from '../src/features/communications/actionCenter.ts'
-import { normalizePhoneNumber } from '../src/features/communications/customerContact.ts'
+import {
+  buildReviewRequestMessage,
+  normalizePhoneNumber,
+} from '../src/features/communications/customerContact.ts'
 import { buildCustomerPortalUrl } from '../api/_public-url.js'
 import { APP_SETTINGS, resolveBusinessPhone } from '../src/config/appSettings.ts'
 
@@ -218,6 +221,26 @@ test('phone numbers are normalized before a customer text handoff', () => {
   assert.equal(normalizePhoneNumber('(574) 334-8410'), '5743348410')
   assert.equal(normalizePhoneNumber('+1 574-334-8410'), '+15743348410')
   assert.equal(normalizePhoneNumber('not saved'), '')
+})
+
+test('review requests include the customer name and official Google review link', () => {
+  const message = buildReviewRequestMessage({
+    id: 'customer-review',
+    firstName: 'Michael',
+    lastName: 'Smith',
+    phone: '(574) 334-8410',
+    email: '',
+    streetAddress: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    notes: '',
+    createdAt: '2026-08-14T00:00:00.000Z',
+  })
+
+  assert.match(message, /^Hi Michael,/)
+  assert.match(message, /Rabbit's Foot Handyman Services/)
+  assert.match(message, /https:\/\/g\.page\/r\/CUF3RlgX_N3XEBM\/review$/)
 })
 
 test('official business phone powers the Customer Hub call and text actions', () => {

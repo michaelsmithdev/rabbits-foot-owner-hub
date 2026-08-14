@@ -194,7 +194,7 @@ export function buildActionCenterItems(input: {
       documentId: invoice.id,
       title: 'Ask for a review',
       detail: `${customerName(input.customers, invoice.customerId)} · ${invoice.jobName}`,
-      actionLabel: 'Open customer',
+      actionLabel: 'Text review request',
     })
   })
 

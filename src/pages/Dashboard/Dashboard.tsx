@@ -6,6 +6,7 @@ import {
   ReceiptText,
   UsersRound,
 } from 'lucide-react'
+import { useState } from 'react'
 
 import { loadCustomers } from '../../features/customers/data/customerStore'
 import { loadEstimates } from '../../features/estimates/data/estimateStore'
@@ -19,6 +20,11 @@ import {
   saveCommunications,
 } from '../../features/communications/data/communicationStore'
 import { buildActionCenterItems } from '../../features/communications/actionCenter'
+import {
+  buildReviewRequestMessage,
+  openSmsComposer,
+} from '../../features/communications/customerContact'
+import type { Communication } from '../../features/communications/types/Communication'
 
 type DashboardProps = {
   onOpenCustomer: (customerId: string) => void
@@ -70,7 +76,7 @@ function Dashboard({
   const invoices = loadInvoices()
   const settings = loadBusinessSettings()
   const appointments = loadAppointments()
-  const communications = loadCommunications()
+  const [communications, setCommunications] = useState(loadCommunications)
   const customerNames = new Map(
     customers.map((customer) => [
       customer.id,
@@ -147,13 +153,13 @@ function Dashboard({
 
   function openAction(item: (typeof actionItems)[number]) {
     if (item.communicationId) {
-      saveCommunications(
-        communications.map((communication) =>
-          communication.id === item.communicationId
-            ? { ...communication, status: 'handled' }
-            : communication,
-        ),
+      const nextCommunications = communications.map((communication) =>
+        communication.id === item.communicationId
+          ? { ...communication, status: 'handled' as const }
+          : communication,
       )
+      saveCommunications(nextCommunications)
+      setCommunications(nextCommunications)
     }
 
     if (item.kind === 'overdue_invoice' && item.documentId) {
@@ -168,6 +174,46 @@ function Dashboard({
 
     if (item.kind === 'appointment_reminder') {
       onOpenSchedule()
+      return
+    }
+
+    if (item.kind === 'review_request') {
+      const customer = customers.find(
+        (currentCustomer) => currentCustomer.id === item.customerId,
+      )
+
+      if (!customer) {
+        window.alert('This customer could not be found.')
+        return
+      }
+
+      try {
+        const body = buildReviewRequestMessage(customer)
+
+        const nextCommunications: Communication[] = [
+          ...communications,
+          {
+            id: crypto.randomUUID(),
+            customerId: customer.id,
+            documentId: item.documentId,
+            channel: 'sms',
+            kind: 'review_request',
+            status: 'drafted' as const,
+            subject: 'Google review request',
+            body,
+            createdAt: new Date().toISOString(),
+          },
+        ]
+        saveCommunications(nextCommunications)
+        setCommunications(nextCommunications)
+        openSmsComposer(customer, body)
+      } catch (error) {
+        window.alert(
+          error instanceof Error
+            ? error.message
+            : 'The review request could not be opened.',
+        )
+      }
       return
     }
 

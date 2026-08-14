@@ -9,6 +9,7 @@ export const APP_SETTINGS = {
       tel: 'tel:5743348410',
       sms: 'sms:5743348410',
     },
+    googleReviewUrl: 'https://g.page/r/CUF3RlgX_N3XEBM/review',
   },
 } as const
 
