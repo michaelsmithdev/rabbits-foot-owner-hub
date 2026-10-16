@@ -28,3 +28,6 @@ dist-ssr
 
 # Local render and QA artifacts
 tmp/
+output/tutorial-local-mode-*.log
+output/social-video/.tools/
+supabase/.temp/

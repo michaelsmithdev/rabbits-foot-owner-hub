@@ -25,6 +25,10 @@ export function buildCustomerPortalUrl(portalToken: string) {
   return `${getPublicAppUrl()}/#portal/${encodeURIComponent(portalToken)}`
 }
 
+export function buildPublicBookingUrl(organizationSlug: string) {
+  return `${getPublicAppUrl()}/#book/${encodeURIComponent(organizationSlug)}`
+}
+
 export function isSafeCustomerFacingUrl(value: string) {
   if (!isSafePublicUrl(value)) return false
 

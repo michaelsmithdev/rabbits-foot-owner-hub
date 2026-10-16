@@ -4,6 +4,7 @@ import {
   SYNC_REQUESTED_EVENT,
 } from '../../cloud/syncQueue'
 import { mergeRemoteLeadSnapshot } from './leadMerge'
+import { recordBusinessEvent } from '../../aiOperations/data/operationsStore'
 
 const LEADS_STORAGE_KEY = 'rabbits-foot-leads'
 const LEAD_QUEUE_STORAGE_KEY = 'rabbits-foot-lead-sync-queue'
@@ -65,7 +66,18 @@ export function loadLeads(): Lead[] {
 }
 
 export function saveLeads(leads: Lead[]) {
+  const previous = new Map(loadLeads().map((lead) => [lead.id, lead]))
   localStorage.setItem(LEADS_STORAGE_KEY, JSON.stringify(leads))
+
+  leads.forEach((lead) => {
+    const prior = previous.get(lead.id)
+    if (prior && prior.updatedAt === lead.updatedAt) return
+    recordBusinessEvent({
+      type: prior ? 'lead_updated' : 'lead_created', timestamp: lead.updatedAt,
+      entityType: 'lead', entityId: lead.id,
+      metadata: { service: lead.service, source: lead.source, status: lead.status },
+    })
+  })
 
   const metadata = readJson<LeadMetadata>(LEAD_METADATA_STORAGE_KEY, {})
   const queuedById = new Map(

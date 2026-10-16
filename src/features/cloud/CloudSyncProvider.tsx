@@ -10,7 +10,8 @@ import {
   getOrganizationId,
   synchronizeBusinessRecords,
 } from './cloudSync'
-import { SYNC_REQUESTED_EVENT } from './syncQueue'
+import { loadSyncQueue, SYNC_REQUESTED_EVENT } from './syncQueue'
+import { recordReliabilityEvent } from '../reliability/data/reliabilityStore'
 
 export function CloudSyncProvider({ children }: { children: ReactNode }) {
   const { session, mode } = useAuth()
@@ -19,8 +20,11 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     mode === 'local' ? 'local' : 'offline',
   )
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null)
+  const [lastAttemptAt, setLastAttemptAt] = useState<string | null>(null)
+  const [pendingRecordCount, setPendingRecordCount] = useState(loadSyncQueue().length)
   const [errorMessage, setErrorMessage] = useState('')
   const syncInProgress = useRef(false)
+  const lastSyncFailed = useRef(false)
 
   const syncNow = useCallback(async () => {
     if (mode === 'local' || !cloudClient || !session) {
@@ -30,6 +34,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
 
     if (!navigator.onLine) {
       setStatus('offline')
+      setPendingRecordCount(loadSyncQueue().length)
       return
     }
 
@@ -38,6 +43,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     }
 
     syncInProgress.current = true
+    setLastAttemptAt(new Date().toISOString())
     setStatus('syncing')
     setErrorMessage('')
 
@@ -50,10 +56,30 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
         cloudClient,
         currentOrganizationId,
       )
+      const pendingAfterSync = loadSyncQueue().length
+      setPendingRecordCount(pendingAfterSync)
       setLastSyncedAt(new Date().toISOString())
       setStatus('synced')
+      if (lastSyncFailed.current) {
+        recordReliabilityEvent({
+          area: 'sync',
+          severity: 'info',
+          message: 'Cloud synchronization recovered.',
+          context: { pendingRecordCount: pendingAfterSync },
+        })
+      }
+      lastSyncFailed.current = false
     } catch (error) {
       console.error('Cloud synchronization failed.', error)
+      lastSyncFailed.current = true
+      setPendingRecordCount(loadSyncQueue().length)
+      recordReliabilityEvent({
+        area: 'sync',
+        severity: 'error',
+        message: 'Cloud synchronization failed.',
+        detail: error,
+        context: { pendingRecordCount: loadSyncQueue().length },
+      })
       setErrorMessage(
         error instanceof Error
           ? error.message
@@ -75,6 +101,9 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
     const intervalId = window.setInterval(() => void syncNow(), 60_000)
     const handleOnline = () => void syncNow()
     const handleOffline = () => setStatus('offline')
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') void syncNow()
+    }
     let debounceId: number | undefined
     const handleSyncRequested = () => {
       window.clearTimeout(debounceId)
@@ -83,6 +112,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
 
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     window.addEventListener(SYNC_REQUESTED_EVENT, handleSyncRequested)
 
     return () => {
@@ -91,6 +121,7 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       window.clearTimeout(debounceId)
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.removeEventListener(SYNC_REQUESTED_EVENT, handleSyncRequested)
     }
   }, [mode, session, syncNow])
@@ -134,10 +165,12 @@ export function CloudSyncProvider({ children }: { children: ReactNode }) {
       organizationId,
       status,
       lastSyncedAt,
+      lastAttemptAt,
+      pendingRecordCount,
       errorMessage,
       syncNow,
     }),
-    [errorMessage, lastSyncedAt, organizationId, status, syncNow],
+    [errorMessage, lastAttemptAt, lastSyncedAt, organizationId, pendingRecordCount, status, syncNow],
   )
 
   return (

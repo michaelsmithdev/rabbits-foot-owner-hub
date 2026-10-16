@@ -1,0 +1,95 @@
+.email-delivery-card {
+  gap: 1rem;
+}
+
+.email-delivery-icon {
+  align-items: center;
+  background: #eff8df;
+  border-radius: 999px;
+  color: #4f8d00;
+  display: inline-flex;
+  height: 40px;
+  justify-content: center;
+  width: 40px;
+}
+
+.email-delivery-warning,
+.email-delivery-note {
+  border-radius: 12px;
+  margin: 0;
+  padding: 0.85rem 1rem;
+}
+
+.email-delivery-warning {
+  align-items: flex-start;
+  background: #fff2ed;
+  color: #8a2f16;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.email-delivery-note {
+  background: #f4f6f1;
+  color: #596054;
+}
+
+.email-delivery-list {
+  display: grid;
+  gap: 0.65rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.email-delivery-list li {
+  align-items: center;
+  border-top: 1px solid #e0e5da;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: minmax(110px, auto) 1fr auto;
+  padding-top: 0.65rem;
+}
+
+.email-delivery-list time {
+  color: #6b7168;
+  font-size: 0.8rem;
+}
+
+.email-delivery-badge {
+  align-items: center;
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 0.78rem;
+  font-weight: 800;
+  gap: 0.35rem;
+  justify-content: center;
+  padding: 0.35rem 0.55rem;
+  text-transform: capitalize;
+}
+
+.email-delivery-badge.status-delivered {
+  background: #e7f6df;
+  color: #2f6a11;
+}
+
+.email-delivery-badge.status-bounced,
+.email-delivery-badge.status-complained,
+.email-delivery-badge.status-suppressed,
+.email-delivery-badge.status-failed {
+  background: #fff0eb;
+  color: #8a2f16;
+}
+
+.email-delivery-badge.status-pending,
+.email-delivery-badge.status-sent,
+.email-delivery-badge.status-delayed {
+  background: #eef2f5;
+  color: #46515a;
+}
+
+@media (max-width: 640px) {
+  .email-delivery-list li {
+    align-items: flex-start;
+    grid-template-columns: 1fr;
+  }
+}

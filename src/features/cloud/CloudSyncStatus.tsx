@@ -19,12 +19,20 @@ const statusContent = {
 
 export default function CloudSyncStatus() {
   const { session } = useAuth()
-  const { errorMessage, lastSyncedAt, status, syncNow } = useCloudSync()
+  const {
+    errorMessage,
+    lastSyncedAt,
+    pendingRecordCount,
+    status,
+    syncNow,
+  } = useCloudSync()
   const { Icon, label } = statusContent[status]
   const title =
     status === 'error'
       ? errorMessage
-      : lastSyncedAt
+      : pendingRecordCount > 0
+        ? `${pendingRecordCount} saved change${pendingRecordCount === 1 ? '' : 's'} waiting for cloud protection`
+        : lastSyncedAt
         ? `Last synced ${new Date(lastSyncedAt).toLocaleTimeString([], {
             hour: 'numeric',
             minute: '2-digit',
@@ -45,7 +53,7 @@ export default function CloudSyncStatus() {
         className={status === 'syncing' ? 'cloud-sync-spinner' : undefined}
         size={17}
       />
-      <span>{label}</span>
+      <span>{pendingRecordCount > 0 && status !== 'syncing' ? `${pendingRecordCount} queued` : label}</span>
     </button>
   )
 }

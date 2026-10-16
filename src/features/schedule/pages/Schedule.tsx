@@ -1,4 +1,4 @@
-import { CalendarDays, Clock3, Link, Mail, MapPin, MessageSquareText, Plus, Trash2 } from 'lucide-react'
+import { CalendarDays, Clock3, Link, Mail, MapPin, MessageSquareText, Plus, Trash2, UsersRound } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 import { loadCommunications, saveCommunications } from '../../communications/data/communicationStore'
@@ -8,6 +8,8 @@ import type { Communication } from '../../communications/types/Communication'
 import { loadCustomers } from '../../customers/data/customerStore'
 import type { Customer } from '../../customers/types/Customer'
 import { useAuth } from '../../auth/authContext'
+import { loadJobs } from '../../jobs/data/jobStore'
+import { useSaas } from '../../saas/saasContext'
 import { appointmentConflicts, loadAppointments, saveAppointments } from '../data/appointmentStore'
 import type { Appointment, AppointmentStatus } from '../types/Appointment'
 import './Schedule.css'
@@ -38,20 +40,22 @@ function fullAddress(customer?: Customer) {
 function appointmentMessage(item: Appointment, customer: Customer | undefined, kind: Communication['kind']) {
   const when = new Date(item.startAt).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })
   const greeting = `Hi ${customer?.firstName || 'there'},`
-  if (kind === 'on_my_way') return `${greeting} Rabbit's Foot Handyman Services is on the way for ${item.title}. See you soon.`
+  if (kind === 'on_my_way') return `${greeting} Rabbit's Foot Handyman Services LLC is on the way for ${item.title}. See you soon.`
   if (kind === 'appointment_reminder') return `${greeting} this is a reminder that ${item.title} is scheduled for ${when} at ${item.serviceAddress}. Reply if anything has changed.`
-  return `${greeting} your appointment for ${item.title} is confirmed for ${when} at ${item.serviceAddress}. Thank you for choosing Rabbit's Foot Handyman Services.`
+  return `${greeting} your appointment for ${item.title} is confirmed for ${when} at ${item.serviceAddress}. Thank you for choosing Rabbit's Foot Handyman Services LLC.`
 }
 
 export default function Schedule() {
   const { session } = useAuth()
+  const { members } = useSaas()
   const customers = loadCustomers()
+  const jobs = loadJobs()
   const [appointments, setAppointments] = useState(loadAppointments)
   const [communications, setCommunications] = useState(loadCommunications)
   const firstStart = useMemo(() => {
     const date = new Date(); date.setHours(date.getHours() + 1, 0, 0, 0); return localDateTime(date)
   }, [])
-  const [draft, setDraft] = useState({ customerId: '', title: '', startAt: firstStart, endAt: localDateTime(new Date(new Date(firstStart).getTime() + 60 * 60_000)), notes: '' })
+  const [draft, setDraft] = useState({ customerId: '', jobId: '', title: '', startAt: firstStart, endAt: localDateTime(new Date(new Date(firstStart).getTime() + 60 * 60_000)), notes: '' })
   const [error, setError] = useState('')
   const [portalMessage, setPortalMessage] = useState('')
 
@@ -59,18 +63,19 @@ export default function Schedule() {
 
   function createAppointment() {
     const customer = customers.find((item) => item.id === draft.customerId)
+    const job = jobs.find((item) => item.id === draft.jobId)
     if (!customer || !draft.title.trim()) { setError('Choose a customer and enter the work being scheduled.'); return }
     if (new Date(draft.endAt) <= new Date(draft.startAt)) { setError('The ending time must be after the starting time.'); return }
     const now = new Date().toISOString()
     const appointment: Appointment = {
-      id: crypto.randomUUID(), customerId: customer.id, title: draft.title.trim(), serviceAddress: fullAddress(customer),
+      id: crypto.randomUUID(), customerId: customer.id, jobId: job?.id, title: draft.title.trim(), serviceAddress: job?.serviceAddress || fullAddress(customer),
       startAt: new Date(draft.startAt).toISOString(), endAt: new Date(draft.endAt).toISOString(), status: 'scheduled',
       notes: draft.notes.trim(), createdAt: now, updatedAt: now,
     }
     const conflicts = appointmentConflicts(appointments, appointment)
     if (conflicts.length) { setError(`This overlaps ${conflicts[0].title}. Choose another time.`); return }
     persist([...appointments, appointment])
-    setDraft({ customerId: '', title: '', startAt: firstStart, endAt: localDateTime(new Date(new Date(firstStart).getTime() + 60 * 60_000)), notes: '' })
+    setDraft({ customerId: '', jobId: '', title: '', startAt: firstStart, endAt: localDateTime(new Date(new Date(firstStart).getTime() + 60 * 60_000)), notes: '' })
     setError('')
   }
 
@@ -134,6 +139,7 @@ export default function Schedule() {
     <div className="schedule-layout">
       <article className="schedule-card schedule-builder" data-tour="schedule-builder"><h2><Plus size={20}/> New appointment</h2>
         <label><span>Customer</span><select value={draft.customerId} onChange={(event) => setDraft({ ...draft, customerId: event.target.value })}><option value="">Choose customer</option>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customerName(customer)}</option>)}</select></label>
+        <label><span>Linked job (optional)</span><select disabled={!draft.customerId} onChange={(event) => { const job = jobs.find((item) => item.id === event.target.value); setDraft({ ...draft, jobId: event.target.value, title: job?.jobName || draft.title }) }} value={draft.jobId}><option value="">No linked job</option>{jobs.filter((job) => !draft.customerId || job.customerId === draft.customerId).map((job) => <option key={job.id} value={job.id}>{job.jobNumber} · {job.jobName}</option>)}</select></label>
         {draft.customerId && <button className="schedule-primary" onClick={()=>void createCustomerHubLink(draft.customerId)} type="button"><Link size={16}/> Copy Customer Hub link</button>}
         <label><span>Work</span><input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="Drywall repair" /></label>
         <div className="schedule-time-grid" data-tour="schedule-time"><label><span>Starts</span><input type="datetime-local" value={draft.startAt} onChange={(event) => setDraft({ ...draft, startAt: event.target.value })}/></label><label><span>Ends</span><input type="datetime-local" value={draft.endAt} onChange={(event) => setDraft({ ...draft, endAt: event.target.value })}/></label></div>
@@ -142,7 +148,7 @@ export default function Schedule() {
         <button className="schedule-primary" onClick={createAppointment} type="button">Add to schedule</button>
       </article>
       <div className="schedule-agenda" data-tour="schedule-agenda">
-        {Object.keys(grouped).length === 0 ? <article className="schedule-empty"><CalendarDays size={32}/><h2>No appointments yet</h2><p>Scheduled work will appear here.</p></article> : Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([date, items]) => <section className="schedule-day" key={date}><h2>{new Date(`${date}T12:00:00`).toLocaleDateString([], { weekday:'long', month:'long', day:'numeric' })}</h2>{items.sort((a,b)=>a.startAt.localeCompare(b.startAt)).map((item) => { const customer=customers.find((entry)=>entry.id===item.customerId); return <article className="appointment-card" key={item.id}><header><div><strong>{item.title}</strong><span>{customerName(customer)}</span></div><select aria-label="Appointment status" value={item.status} onChange={(event)=>updateStatus(item.id,event.target.value as AppointmentStatus)}>{Object.entries(statusLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></header><p><Clock3 size={16}/>{new Date(item.startAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}-{new Date(item.endAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</p><p><MapPin size={16}/>{item.serviceAddress || 'No service address'}</p>{item.notes && <small>{item.notes}</small>}<footer><button onClick={()=>handOffMessage(item,'sms','appointment_confirmation')} type="button"><MessageSquareText size={16}/> Confirm</button><button onClick={()=>handOffMessage(item,'email','appointment_reminder')} type="button"><Mail size={16}/> Remind</button><button onClick={()=>handOffMessage(item,'sms','on_my_way')} type="button"><MessageSquareText size={16}/> On my way</button><button onClick={()=>void createCustomerHubLink(item.customerId)} type="button"><Link size={16}/> Customer Hub</button><button className="danger" onClick={()=>removeAppointment(item.id)} type="button"><Trash2 size={16}/></button></footer></article>})}</section>)}
+        {Object.keys(grouped).length === 0 ? <article className="schedule-empty"><CalendarDays size={32}/><h2>No appointments yet</h2><p>Scheduled work will appear here.</p></article> : Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([date, items]) => <section className="schedule-day" key={date}><h2>{new Date(`${date}T12:00:00`).toLocaleDateString([], { weekday:'long', month:'long', day:'numeric' })}</h2>{items.sort((a,b)=>a.startAt.localeCompare(b.startAt)).map((item) => { const customer=customers.find((entry)=>entry.id===item.customerId); const job=jobs.find((entry)=>entry.id===item.jobId); const assigned=(job?.assignedMemberIds??[]).map((id)=>members.find((member)=>member.userId===id)).filter(Boolean); return <article className="appointment-card" key={item.id}><header><div><strong>{item.title}</strong><span>{customerName(customer)}</span></div><select aria-label="Appointment status" value={item.status} onChange={(event)=>updateStatus(item.id,event.target.value as AppointmentStatus)}>{Object.entries(statusLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></header><p><Clock3 size={16}/>{new Date(item.startAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}-{new Date(item.endAt).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}</p><p><MapPin size={16}/>{item.serviceAddress || 'No service address'}</p>{assigned.length>0&&<p className="appointment-crew"><UsersRound size={16}/>{assigned.map((member)=>member?.displayName||member?.email).join(' · ')}</p>}{job?.crewInstructions&&<small><b>Crew:</b> {job.crewInstructions}</small>}{item.notes && <small>{item.notes}</small>}<footer><button onClick={()=>handOffMessage(item,'sms','appointment_confirmation')} type="button"><MessageSquareText size={16}/> Confirm</button><button onClick={()=>handOffMessage(item,'email','appointment_reminder')} type="button"><Mail size={16}/> Remind</button><button onClick={()=>handOffMessage(item,'sms','on_my_way')} type="button"><MessageSquareText size={16}/> On my way</button><button onClick={()=>void createCustomerHubLink(item.customerId)} type="button"><Link size={16}/> Customer Hub</button><button className="danger" onClick={()=>removeAppointment(item.id)} type="button"><Trash2 size={16}/></button></footer></article>})}</section>)}
         {communications.length > 0 && <section className="schedule-day"><h2>Recent customer messages</h2>{communications.slice(0,5).map((item)=><article className="appointment-card" key={item.id}><header><div><strong>{customerName(customers.find((customer)=>customer.id===item.customerId))}</strong><span>{item.channel.toUpperCase()} - {new Date(item.createdAt).toLocaleString()}</span></div></header><small>{item.body}</small></article>)}</section>}
       </div>
     </div>

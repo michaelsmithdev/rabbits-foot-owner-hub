@@ -1,0 +1,11 @@
+.receipt-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.receipt-row-actions button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}

@@ -11,7 +11,10 @@ export interface BusinessSettings {
   zipCode: string
   defaultTaxRate: number
   defaultTaxReservePercent: number
+  /** Customer-facing hourly rate used when building estimate and invoice pricing. */
   defaultLaborRate: number
+  /** Private owner cost used only for profitability and job-cost calculations. */
+  internalLaborCostPerHour: number
   minimumJobCharge: number
   serviceCallCharge: number
   diagnosticFee: number

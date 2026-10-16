@@ -18,6 +18,7 @@ export const defaultBusinessSettings: BusinessSettings = {
   defaultTaxRate: 0,
   defaultTaxReservePercent: 30,
   defaultLaborRate: 120,
+  internalLaborCostPerHour: 40,
   minimumJobCharge: 125,
   serviceCallCharge: 65,
   diagnosticFee: 65,
@@ -27,17 +28,17 @@ export const defaultBusinessSettings: BusinessSettings = {
   emergencyRatePercent: 50,
   defaultMaterialMarkupPercent: 25,
   defaultOverheadPercent: 12,
-  paymentProcessingOverheadPercent: 3.5,
+  paymentProcessingOverheadPercent: 0,
   targetGrossMarginPercent: 35,
   defaultDeliveryCost: 0,
   defaultDisposalCost: 0,
   darkMode: false,
   estimateValidDays: 30,
-  invoiceDueDays: 14,
+  invoiceDueDays: 0,
   estimatePrefix: 'EST',
   invoicePrefix: 'INV',
   estimateTerms: 'Estimate valid for 30 days.',
-  invoiceTerms: 'Payment is due within 14 days.',
+  invoiceTerms: 'Payment is due upon completion.',
   emailNotifications: true,
   leadNotifications: true,
   updatedAt: new Date(0).toISOString(),
@@ -84,12 +85,27 @@ function currentBusinessContact(settings: BusinessSettings): BusinessSettings {
   }
 }
 
-function migrateBusinessContact(settings: BusinessSettings): BusinessSettings {
+function migrateBusinessSettings(settings: BusinessSettings): BusinessSettings {
   const migratedSettings = currentBusinessContact(settings)
+
+  // Replace only the exact defaults used by earlier releases. Truly custom
+  // payment settings remain unchanged.
+  if (settings.paymentProcessingOverheadPercent === 3.5) {
+    migratedSettings.paymentProcessingOverheadPercent = 0
+  }
+  if (settings.invoiceDueDays === 14) {
+    migratedSettings.invoiceDueDays = 0
+  }
+  if (settings.invoiceTerms.trim() === 'Payment is due within 14 days.') {
+    migratedSettings.invoiceTerms = 'Payment is due upon completion.'
+  }
 
   if (
     settings.businessContactVersion !== migratedSettings.businessContactVersion ||
-    settings.phone !== migratedSettings.phone
+    settings.phone !== migratedSettings.phone ||
+    settings.paymentProcessingOverheadPercent !== migratedSettings.paymentProcessingOverheadPercent ||
+    settings.invoiceDueDays !== migratedSettings.invoiceDueDays ||
+    settings.invoiceTerms !== migratedSettings.invoiceTerms
   ) {
     migratedSettings.updatedAt = new Date().toISOString()
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify([migratedSettings]))
@@ -111,7 +127,7 @@ export function loadBusinessSettings(): BusinessSettings {
       : parsedSettings
 
     return isBusinessSettings(settingsRecord)
-      ? migrateBusinessContact({
+      ? migrateBusinessSettings({
           ...defaultBusinessSettings,
           ...settingsRecord,
           defaultTaxReservePercent:
@@ -123,6 +139,10 @@ export function loadBusinessSettings(): BusinessSettings {
             settingsRecord.defaultLaborRate !== 45
               ? settingsRecord.defaultLaborRate
               : defaultBusinessSettings.defaultLaborRate,
+          internalLaborCostPerHour:
+            typeof settingsRecord.internalLaborCostPerHour === 'number'
+              ? settingsRecord.internalLaborCostPerHour
+              : defaultBusinessSettings.internalLaborCostPerHour,
           minimumJobCharge:
             typeof settingsRecord.minimumJobCharge === 'number'
               ? settingsRecord.minimumJobCharge

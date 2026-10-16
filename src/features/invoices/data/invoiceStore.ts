@@ -6,6 +6,7 @@ import type {
   PaymentMethod,
 } from '../types/Invoice'
 import { queueCollectionSync } from '../../cloud/syncQueue'
+import { recordBusinessEvent } from '../../aiOperations/data/operationsStore'
 
 const INVOICES_STORAGE_KEY = 'rabbits-foot-invoices'
 
@@ -62,6 +63,36 @@ function isPayment(value: unknown): value is InvoicePayment {
   )
 }
 
+export function applyCurrentInvoicePaymentPolicy(invoice: Invoice): Invoice {
+  const usesCurrentPaymentPolicy = invoice.paymentPolicyVersion === 2
+  const legacyIssueDate = new Date(`${invoice.issueDate}T00:00:00Z`)
+  const legacyDueDate = new Date(`${invoice.dueDate}T00:00:00Z`)
+  const wasLegacyFourteenDayTerm =
+    Number.isFinite(legacyIssueDate.getTime()) &&
+    Number.isFinite(legacyDueDate.getTime()) &&
+    legacyDueDate.getTime() - legacyIssueDate.getTime() ===
+      14 * 24 * 60 * 60 * 1000
+
+  return {
+    ...invoice,
+    dueDate:
+      !usesCurrentPaymentPolicy && wasLegacyFourteenDayTerm
+        ? invoice.issueDate
+        : invoice.dueDate,
+    notes:
+      !usesCurrentPaymentPolicy &&
+      invoice.notes.trim() === 'Payment is due within 14 days.'
+        ? 'Payment is due upon completion.'
+        : invoice.notes,
+    cardProcessingFeePercent:
+      invoice.cardProcessingFeeMode === 'optional'
+        ? Math.min(15, Math.max(0, invoice.cardProcessingFeePercent ?? 0))
+        : 0,
+    cardProcessingFeeMode: 'optional',
+    paymentPolicyVersion: 2,
+  }
+}
+
 function normalizeInvoice(value: unknown): Invoice | null {
   if (!value || typeof value !== 'object') return null
 
@@ -101,11 +132,11 @@ function normalizeInvoice(value: unknown): Invoice | null {
     ? invoice.payments.filter(isPayment)
     : []
 
-  return {
+  return applyCurrentInvoicePaymentPolicy({
     ...invoice,
     status: invoice.status as InvoiceStatus,
     payments,
-  } as Invoice
+  } as Invoice)
 }
 
 export function loadInvoices(): Invoice[] {
@@ -129,11 +160,41 @@ export function loadInvoices(): Invoice[] {
 
 export function saveInvoices(invoices: Invoice[]): void {
   try {
+    const previous = new Map(loadInvoices().map((invoice) => [invoice.id, invoice]))
     localStorage.setItem(
       INVOICES_STORAGE_KEY,
       JSON.stringify(invoices),
     )
     queueCollectionSync('invoice', invoices)
+    invoices.forEach((invoice) => {
+      const prior = previous.get(invoice.id)
+      const eventType = !prior
+        ? 'invoice_created'
+        : prior.status !== invoice.status
+          ? invoice.status === 'sent'
+            ? 'invoice_sent'
+            : invoice.status === 'overdue'
+              ? 'invoice_overdue'
+              : invoice.status === 'paid'
+                ? 'invoice_paid'
+                : null
+          : null
+      if (eventType) {
+        recordBusinessEvent({
+          type: eventType, timestamp: invoice.paidAt ?? invoice.updatedAt,
+          entityType: 'invoice', entityId: invoice.id, customerId: invoice.customerId,
+          jobId: invoice.jobId,
+        })
+      }
+      const priorPayments = new Set(prior?.payments.map((payment) => payment.id) ?? [])
+      invoice.payments.filter((payment) => !priorPayments.has(payment.id)).forEach((payment) => {
+        recordBusinessEvent({
+          type: 'payment_received', timestamp: payment.createdAt,
+          entityType: 'payment', entityId: payment.id, customerId: invoice.customerId,
+          jobId: invoice.jobId, metadata: { invoiceId: invoice.id, amount: payment.amount, method: payment.method },
+        })
+      })
+    })
   } catch (error) {
     console.error('Unable to save invoices:', error)
   }

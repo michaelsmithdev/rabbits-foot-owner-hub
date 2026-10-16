@@ -1,9 +1,10 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
-import { MessageSquareText, Trash2 } from 'lucide-react'
+import { Mail, MessageSquareText, Trash2 } from 'lucide-react'
 
 import Invoices from '../../invoices/pages/Invoices'
 import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
@@ -27,7 +28,7 @@ import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import { createJobFromEstimate, loadJobs, saveJobs } from '../../jobs/data/jobStore'
 import { useSaas } from '../../saas/saasContext'
 import { useAuth } from '../../auth/authContext'
-import { textCustomerDocument } from '../../communications/customerDocumentShare'
+import { emailCustomerDocument, textCustomerDocument } from '../../communications/customerDocumentShare'
 
 import {
   createEstimateNumber,
@@ -59,7 +60,6 @@ type ServiceOption = {
 
 type DocumentTab = 'estimates' | 'invoices'
 
-const CUSTOM_OPTION = '__custom__'
 const DOCUMENT_TAB_STORAGE_KEY = 'rabbit-foot-owner-hub-document-tab'
 
 function loadDocumentTab(): DocumentTab {
@@ -318,19 +318,6 @@ function formatCustomerAddress(
     .join(', ')
 }
 
-function getMatchingOption(
-  value: string,
-  options: string[],
-): string {
-  if (!value) {
-    return ''
-  }
-
-  return options.includes(value)
-    ? value
-    : CUSTOM_OPTION
-}
-
 function Estimates({
   initialCustomerId,
   initialDocumentId = null,
@@ -384,15 +371,6 @@ function Estimates({
 
   const [jobName, setJobName] = useState(initialEstimate?.jobName ?? '')
 
-  const [
-    selectedJobNameOption,
-    setSelectedJobNameOption,
-  ] = useState(() =>
-    initialEstimate
-      ? getMatchingOption(initialEstimate.jobName, JOB_NAME_OPTIONS)
-      : '',
-  )
-
   const [serviceAddress, setServiceAddress] =
     useState(() => {
       if (initialEstimate) return initialEstimate.serviceAddress
@@ -441,6 +419,8 @@ function Estimates({
     useState('')
   const [shareMessage, setShareMessage] = useState('')
   const [sharingEstimateId, setSharingEstimateId] = useState<string | null>(null)
+  const [emailingEstimateId, setEmailingEstimateId] = useState<string | null>(null)
+  const emailSendLocks = useRef(new Set<string>())
 
   const [approvalEstimateId, setApprovalEstimateId] = useState<string | null>(null)
   const [approvalCustomerName, setApprovalCustomerName] = useState('')
@@ -558,7 +538,6 @@ function Estimates({
     setEditingEstimateId(null)
     setSelectedCustomerId('')
     setJobName('')
-    setSelectedJobNameOption('')
     setServiceAddress('')
     setDescription('')
     setScopeOfWork('')
@@ -599,13 +578,6 @@ function Estimates({
     )
 
     setJobName(estimate.jobName)
-
-    setSelectedJobNameOption(
-      getMatchingOption(
-        estimate.jobName,
-        JOB_NAME_OPTIONS,
-      ),
-    )
 
     setServiceAddress(
       estimate.serviceAddress,
@@ -665,19 +637,6 @@ function Estimates({
     } else {
       setServiceAddress('')
     }
-  }
-
-  function handleJobNameSelection(
-    value: string,
-  ): void {
-    setSelectedJobNameOption(value)
-
-    if (value === CUSTOM_OPTION) {
-      setJobName('')
-      return
-    }
-
-    setJobName(value)
   }
 
   function addLineItem(
@@ -748,24 +707,6 @@ function Estimates({
     lineItemId: string,
     value: string,
   ): void {
-    if (!value || value === CUSTOM_OPTION) {
-      setLineItems((currentItems) =>
-        currentItems.map((item) =>
-          item.id === lineItemId
-            ? {
-                ...item,
-                kind: 'service',
-                description: '',
-                unit: 'hour',
-                unitPrice: 0,
-              }
-            : item,
-        ),
-      )
-
-      return
-    }
-
     const selectedService =
       SERVICE_OPTIONS.find(
         (service) =>
@@ -773,18 +714,23 @@ function Estimates({
       )
 
     setLineItems((currentItems) =>
-      currentItems.map((item) =>
-        item.id === lineItemId
-          ? {
-              ...item,
-              kind: 'service',
-              description: value,
-              unit: 'hour',
-              unitPrice:
-                selectedService?.rate ?? 0,
-            }
-          : item,
-      ),
+      currentItems.map((item) => {
+        if (item.id !== lineItemId) return item
+
+        const wasPresetService = SERVICE_DESCRIPTIONS.includes(item.description)
+
+        return {
+          ...item,
+          kind: 'service',
+          description: value,
+          unit: selectedService ? 'hour' : item.unit,
+          unitPrice: selectedService
+            ? selectedService.rate
+            : !value || wasPresetService
+              ? 0
+              : item.unitPrice,
+        }
+      }),
     )
   }
 
@@ -965,16 +911,18 @@ function Estimates({
           status: 'draft',
           createdAt: currentTimestamp,
         }
-        setEstimates((currentEstimates) => [revisedEstimate, ...currentEstimates])
+        const nextEstimates = [revisedEstimate, ...estimates]
+        saveEstimates(nextEstimates)
+        setEstimates(nextEstimates)
         setSaveMessage(`${revisedEstimate.estimateNumber} was created. The approved agreement remains unchanged.`)
       } else {
-        setEstimates((currentEstimates) =>
-          currentEstimates.map((estimate) =>
-            estimate.id === editingEstimateId
-              ? updatedEstimate
-              : estimate,
-          ),
+        const nextEstimates = estimates.map((estimate) =>
+          estimate.id === editingEstimateId
+            ? updatedEstimate
+            : estimate,
         )
+        saveEstimates(nextEstimates)
+        setEstimates(nextEstimates)
 
         setSaveMessage(
           `${updatedEstimate.estimateNumber} was updated.`,
@@ -1020,8 +968,7 @@ function Estimates({
 
         taxReservePercent,
 
-        cardProcessingFeePercent:
-          businessSettings.paymentProcessingOverheadPercent,
+        cardProcessingFeePercent: 0,
 
         paymentProcessingOverheadPercent: 0,
 
@@ -1037,10 +984,9 @@ function Estimates({
         updatedAt: currentTimestamp,
       }
 
-      setEstimates((currentEstimates) => [
-        newEstimate,
-        ...currentEstimates,
-      ])
+      const nextEstimates = [newEstimate, ...estimates]
+      saveEstimates(nextEstimates)
+      setEstimates(nextEstimates)
 
       setSaveMessage(
         `${newEstimate.estimateNumber} was created.`,
@@ -1134,7 +1080,9 @@ function Estimates({
 
       taxReservePercent: estimate.taxReservePercent ?? businessSettings.defaultTaxReservePercent,
 
-      cardProcessingFeePercent: estimate.cardProcessingFeePercent ?? 0,
+      cardProcessingFeePercent: 0,
+      cardProcessingFeeMode: 'optional',
+      paymentPolicyVersion: 2,
 
       completionDate: estimate.completionDate,
 
@@ -1268,6 +1216,52 @@ function Estimates({
       setShareMessage(error instanceof Error ? error.message : 'The estimate could not be sent.')
     } finally {
       setSharingEstimateId(null)
+    }
+  }
+
+  async function emailEstimate(estimate: Estimate) {
+    if (emailSendLocks.current.has(estimate.id)) return
+    const customer = customers.find((item) => item.id === estimate.customerId)
+    if (!customer) {
+      setShareMessage('The customer attached to this estimate could not be found.')
+      return
+    }
+    if (!customer.email.trim()) {
+      setShareMessage('No email address is saved for this customer. Edit the customer before sending.')
+      return
+    }
+    if (!session?.access_token) {
+      setShareMessage('Sign in and connect cloud sync before sending this estimate.')
+      return
+    }
+
+    const sentEstimate: Estimate = {
+      ...estimate,
+      status: estimate.status === 'draft' ? 'sent' : estimate.status,
+      updatedAt: new Date().toISOString(),
+    }
+    emailSendLocks.current.add(estimate.id)
+    setEmailingEstimateId(estimate.id)
+    setShareMessage('Sending estimate email…')
+    try {
+      await emailCustomerDocument({
+        accessToken: session.access_token,
+        idempotencyKey: `estimate/${estimate.id}/${crypto.randomUUID()}`,
+        kind: 'estimate',
+        document: sentEstimate,
+        customer,
+      })
+      const nextEstimates = estimates.map((item) =>
+        item.id === estimate.id ? sentEstimate : item,
+      )
+      setEstimates(nextEstimates)
+      saveEstimates(nextEstimates)
+      setShareMessage('Email sent')
+    } catch (error) {
+      setShareMessage(error instanceof Error ? error.message : 'Email could not be sent right now. Please try again.')
+    } finally {
+      emailSendLocks.current.delete(estimate.id)
+      setEmailingEstimateId(null)
     }
   }
 
@@ -1416,7 +1410,6 @@ function Estimates({
 
     setAiGeneration(generation)
     setJobName(result.jobTitle)
-    setSelectedJobNameOption(getMatchingOption(result.jobTitle, JOB_NAME_OPTIONS))
     setDescription(result.summary)
     setScopeOfWork(result.customerScope ?? result.summary)
     setExclusions(result.exclusions ?? [])
@@ -1730,6 +1723,16 @@ function Estimates({
 
                   <button
                     className="customer-secondary-action"
+                    disabled={emailingEstimateId === estimate.id}
+                    onClick={() => void emailEstimate(estimate)}
+                    type="button"
+                  >
+                    <Mail aria-hidden="true" size={16} />
+                    {emailingEstimateId === estimate.id ? 'Sending…' : 'Email estimate'}
+                  </button>
+
+                  <button
+                    className="customer-secondary-action"
                     data-tour="send-estimate"
                     disabled={sharingEstimateId === estimate.id}
                     onClick={() => void textEstimate(estimate)}
@@ -1887,38 +1890,18 @@ function Estimates({
                   Job or order title *
                 </span>
 
-                <select
+                <input
                   className="estimate-green-field"
-                  onChange={(event) =>
-                    handleJobNameSelection(
-                      event.target.value,
-                    )
-                  }
-                  value={
-                    selectedJobNameOption
-                  }
-                >
-                  <option value="">
-                    Select a job title
-                  </option>
-
-                  {JOB_NAME_OPTIONS.map(
-                    (jobOption) => (
-                      <option
-                        key={jobOption}
-                        value={jobOption}
-                      >
-                        {jobOption}
-                      </option>
-                    ),
-                  )}
-
-                  <option
-                    value={CUSTOM_OPTION}
-                  >
-                    Custom job title
-                  </option>
-                </select>
+                  list="estimate-job-title-options"
+                  onChange={(event) => setJobName(event.target.value)}
+                  placeholder="Choose or type any job title"
+                  value={jobName}
+                />
+                <datalist id="estimate-job-title-options">
+                  {JOB_NAME_OPTIONS.map((jobOption) => (
+                    <option key={jobOption} value={jobOption} />
+                  ))}
+                </datalist>
               </label>
 
               <label className="estimate-field">
@@ -1949,26 +1932,6 @@ function Estimates({
                 />
               </label>
 
-              {selectedJobNameOption ===
-                CUSTOM_OPTION && (
-                <label className="estimate-field estimate-full-width">
-                  <span>
-                    Custom job title *
-                  </span>
-
-                  <input
-                    autoFocus
-                    onChange={(event) =>
-                      setJobName(
-                        event.target.value,
-                      )
-                    }
-                    placeholder="Enter the job title"
-                    type="text"
-                    value={jobName}
-                  />
-                </label>
-              )}
             </div>
 
             <div data-tour="estimate-ai-assistant">
@@ -2004,15 +1967,13 @@ function Estimates({
               </div>
 
               <div className="estimate-item-list">
+                <datalist id="estimate-service-description-options">
+                  {SERVICE_DESCRIPTIONS.map((serviceDescription) => (
+                    <option key={serviceDescription} value={serviceDescription} />
+                  ))}
+                </datalist>
                 {lineItems.map((item) => {
                   const itemKind = item.kind ?? 'service'
-                  const selectedDescription =
-                    itemKind === 'service'
-                      ? getMatchingOption(
-                          item.description,
-                          SERVICE_DESCRIPTIONS,
-                        )
-                      : ''
 
                   return (
                     <div
@@ -2050,46 +2011,18 @@ function Estimates({
                             value={item.description}
                           />
                         ) : (
-                          <>
-                            <select
-                              className="estimate-green-field"
-                              onChange={(event) =>
-                                handleDescriptionSelection(
-                                  item.id,
-                                  event.target.value,
-                                )
-                              }
-                              value={selectedDescription}
-                            >
-                              <option value="">Choose a service</option>
-                              {SERVICE_OPTIONS.map((service) => (
-                                <option
-                                  key={service.description}
-                                  value={service.description}
-                                >
-                                  {service.description}
-                                </option>
-                              ))}
-                              <option value={CUSTOM_OPTION}>
-                                Custom repair or service
-                              </option>
-                            </select>
-
-                            {selectedDescription === CUSTOM_OPTION && (
-                              <textarea
-                                onChange={(event) =>
-                                  updateLineItem(
-                                    item.id,
-                                    'description',
-                                    event.target.value,
-                                  )
-                                }
-                                placeholder="Describe the custom repair or service..."
-                                rows={2}
-                                value={item.description}
-                              />
-                            )}
-                          </>
+                          <input
+                            className="estimate-green-field"
+                            list="estimate-service-description-options"
+                            onChange={(event) =>
+                              handleDescriptionSelection(
+                                item.id,
+                                event.target.value,
+                              )
+                            }
+                            placeholder="Choose or type any service"
+                            value={item.description}
+                          />
                         )}
                       </div>
 

@@ -1,5 +1,5 @@
 import {
-  BadgeCheck, Building2, Check, Circle, Copy, CreditCard, ExternalLink,
+  BadgeCheck, Building2, CalendarCheck2, Check, Circle, Copy, CreditCard, ExternalLink,
   FileText, LifeBuoy, LoaderCircle, Palette, RefreshCw, ShieldCheck, Sparkles,
   Trash2, UserX, UsersRound,
 } from 'lucide-react'
@@ -7,6 +7,7 @@ import { Capacitor } from '@capacitor/core'
 import { type FormEvent, useMemo, useState } from 'react'
 
 import { useAuth } from '../../auth/authContext'
+import { buildPublicBookingUrl } from '../../communications/publicAppUrl'
 import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import { ownerHubSubscriptionPlan, planCatalog, subscriptionIsUsable } from '../planCatalog'
 import { useSaas } from '../saasContext'
@@ -139,6 +140,15 @@ export default function BusinessWorkspace() {
     })
   }
 
+  async function copyBookingLink() {
+    if (!organization?.slug) return
+    await runAction('booking-link', async () => {
+      const bookingUrl = buildPublicBookingUrl(organization.slug)
+      await navigator.clipboard.writeText(bookingUrl)
+      setMessage('Online booking link copied. Add it to your website, Google profile, and social pages.')
+    })
+  }
+
   if (loading && !organization) return <section className="business-loading"><LoaderCircle className="auth-spinner" /><p>Loading your business workspace…</p></section>
 
   return (
@@ -175,6 +185,13 @@ export default function BusinessWorkspace() {
       </form>}
 
       <div className="business-dashboard-grid">
+        <article className="business-panel booking-link-panel">
+          <header><span><CalendarCheck2 size={22}/></span><div><p className="eyebrow">CUSTOMER ACQUISITION</p><h2>Online booking link</h2></div></header>
+          <p>Customers can send a structured project request without creating an account. Every request appears in the Owner Hub lead inbox.</p>
+          <code>{organization?.slug ? buildPublicBookingUrl(organization.slug) : 'Finish workspace setup to create the link.'}</code>
+          {canManage && <button className="business-action" disabled={!organization?.slug || busyAction === 'booking-link'} onClick={() => void copyBookingLink()} type="button"><Copy/>Copy booking link</button>}
+        </article>
+
         <article className="business-panel integration-panel" data-tour="business-square">
           <header><span><CreditCard size={22}/></span><div><p className="eyebrow">PAYMENTS</p><h2>Square connection</h2></div></header>
           <div className="integration-state"><div className={square?.status === 'connected' ? 'connection-dot connected' : 'connection-dot'}/><div><strong>{square?.status === 'connected' ? 'Square connected' : 'Connect your Square account'}</strong><p>{square?.status === 'connected' ? `Payments route to merchant ${square.merchantId ?? ''}.` : 'Every subscriber connects their own merchant account. Credentials are encrypted server-side.'}</p></div></div>

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { recordBusinessEvent } from '../../aiOperations/data/operationsStore'
 
 import {
   DATA_REFRESHED_EVENT,
@@ -14,6 +15,7 @@ import {
   loadPendingPhotoBlob,
   savePendingPhotoBlob,
 } from './photoBlobStore'
+import { recordReliabilityEvent, sanitizeReliabilityText } from '../../reliability/data/reliabilityStore'
 
 const PHOTOS_STORAGE_KEY = 'rabbits-foot-photos'
 const PHOTO_DELETE_QUEUE_KEY = 'rabbits-foot-photo-delete-queue'
@@ -95,11 +97,25 @@ export function loadPhotos(): BusinessPhoto[] {
 }
 
 export function savePhotos(photos: BusinessPhoto[]) {
+  const existingIds = new Set(loadPhotos().map((photo) => photo.id))
   localStorage.setItem(PHOTOS_STORAGE_KEY, JSON.stringify(photos))
-  queueCollectionSync(
-    'photo',
-    photos.filter((photo) => photo.uploadStatus === 'uploaded'),
-  )
+  try {
+    queueCollectionSync(
+      'photo',
+      photos.filter((photo) => photo.uploadStatus === 'uploaded'),
+    )
+    photos.filter((photo) => !existingIds.has(photo.id) && (photo.category === 'before' || photo.category === 'after')).forEach((photo) => {
+      recordBusinessEvent({
+        type: photo.category === 'before' ? 'before_photo_uploaded' : 'after_photo_uploaded',
+        timestamp: photo.createdAt,
+        entityType: 'photo', entityId: photo.id, customerId: photo.customerId ?? undefined,
+        metadata: { jobName: photo.jobName, uploadStatus: photo.uploadStatus },
+      })
+    })
+    return true
+  } catch {
+    return false
+  }
 }
 
 export async function queuePhotoFiles(
@@ -130,7 +146,12 @@ export async function queuePhotoFiles(
   for (const file of files) {
     const id = createId()
 
-    await savePendingPhotoBlob(id, file)
+    const storageBlob = file.slice(
+      0,
+      file.size,
+      file.type || 'application/octet-stream',
+    )
+    await savePendingPhotoBlob(id, storageBlob)
     newPhotos.push({
       id,
       customerId: details.customerId,
@@ -181,9 +202,24 @@ export async function synchronizePendingPhotos(
     }
 
     const pendingBlob = await loadPendingPhotoBlob(photo.id)
+    const attemptedAt = new Date().toISOString()
+    const uploadAttempts = (photo.uploadAttempts ?? 0) + 1
 
     if (!pendingBlob) {
-      nextPhotos.push({ ...photo, uploadStatus: 'error' })
+      const uploadError = 'The original image is no longer stored on this device. Reattach it from the receipt or photo editor.'
+      nextPhotos.push({
+        ...photo,
+        uploadStatus: 'error',
+        uploadAttempts,
+        uploadError,
+        lastUploadAttemptAt: attemptedAt,
+      })
+      recordReliabilityEvent({
+        area: 'upload',
+        severity: 'error',
+        message: 'A queued photo is missing its private device copy.',
+        context: { photoId: photo.id, category: photo.category, uploadAttempts },
+      })
       hasChanges = true
       continue
     }
@@ -207,7 +243,21 @@ export async function synchronizePendingPhotos(
     )
 
     if (uploadError && !alreadyUploaded) {
-      nextPhotos.push({ ...photo, uploadStatus: 'error' })
+      const safeUploadError = sanitizeReliabilityText(uploadError.message)
+      nextPhotos.push({
+        ...photo,
+        uploadStatus: 'error',
+        uploadAttempts,
+        uploadError: safeUploadError,
+        lastUploadAttemptAt: attemptedAt,
+      })
+      recordReliabilityEvent({
+        area: 'upload',
+        severity: 'error',
+        message: 'A photo attachment could not be uploaded.',
+        detail: safeUploadError,
+        context: { photoId: photo.id, category: photo.category, uploadAttempts },
+      })
       hasChanges = true
       continue
     }
@@ -217,6 +267,9 @@ export async function synchronizePendingPhotos(
       ...photo,
       storagePath,
       uploadStatus: 'uploaded',
+      uploadAttempts,
+      uploadError: '',
+      lastUploadAttemptAt: attemptedAt,
       updatedAt: new Date().toISOString(),
     })
     hasChanges = true
@@ -247,6 +300,26 @@ export async function getPhotoUrl(
   return data.signedUrl
 }
 
+export async function getPhotoBlob(
+  client: SupabaseClient | null,
+  photo: BusinessPhoto,
+) {
+  if (photo.uploadStatus !== 'uploaded') {
+    return (await loadPendingPhotoBlob(photo.id)) ?? null
+  }
+
+  if (!client || !photo.storagePath) return null
+
+  const { data, error } = await client.storage
+    .from(PHOTO_BUCKET)
+    .createSignedUrl(photo.storagePath, 60 * 10)
+
+  if (error) throw error
+  const response = await fetch(data.signedUrl)
+  if (!response.ok) throw new Error('The cloud image could not be downloaded.')
+  return response.blob()
+}
+
 export async function deletePhoto(photo: BusinessPhoto) {
   await deletePendingPhotoBlob(photo.id)
 
@@ -268,10 +341,38 @@ export function retryPhotoUpload(photoId: string) {
   savePhotos(
     loadPhotos().map((photo) =>
       photo.id === photoId
-        ? { ...photo, uploadStatus: 'queued', updatedAt: now }
+        ? { ...photo, uploadStatus: 'queued', uploadError: '', updatedAt: now }
         : photo,
     ),
   )
   window.dispatchEvent(new Event(DATA_REFRESHED_EVENT))
   window.dispatchEvent(new Event(SYNC_REQUESTED_EVENT))
+}
+
+export function retryAllPhotoUploads() {
+  const photos = loadPhotos()
+  const failedPhotoIds = new Set(
+    photos.filter((photo) => photo.uploadStatus === 'error').map((photo) => photo.id),
+  )
+  if (failedPhotoIds.size === 0) return 0
+
+  const now = new Date().toISOString()
+  savePhotos(photos.map((photo) => (
+    failedPhotoIds.has(photo.id)
+      ? { ...photo, uploadStatus: 'queued', uploadError: '', updatedAt: now }
+      : photo
+  )))
+  window.dispatchEvent(new Event(DATA_REFRESHED_EVENT))
+  window.dispatchEvent(new Event(SYNC_REQUESTED_EVENT))
+  return failedPhotoIds.size
+}
+
+export function getPhotoUploadSummary() {
+  return loadPhotos().reduce(
+    (summary, photo) => {
+      summary[photo.uploadStatus] += 1
+      return summary
+    },
+    { queued: 0, uploaded: 0, error: 0 },
+  )
 }

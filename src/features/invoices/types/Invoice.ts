@@ -74,6 +74,10 @@ export type Invoice = {
   taxReservePercent?: number
   /** Optional fee shown only when the customer chooses card checkout. */
   cardProcessingFeePercent?: number
+  /** Marks invoices that use the per-invoice, opt-in Square fee policy. */
+  cardProcessingFeeMode?: 'optional'
+  /** Version 2 changed the default terms to due upon completion. */
+  paymentPolicyVersion?: 2
   completionDate?: string
   photoIds?: string[]
   aiEstimate?: AiEstimateGeneration

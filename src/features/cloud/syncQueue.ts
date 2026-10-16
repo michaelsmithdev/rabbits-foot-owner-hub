@@ -9,6 +9,12 @@ export type CloudRecordType =
   | 'job'
   | 'appointment'
   | 'communication'
+  | 'expense'
+  | 'business_event'
+  | 'ai_action'
+  | 'ai_audit'
+  | 'automation_settings'
+  | 'support_report'
 
 export type CloudRecord = Record<string, unknown> & {
   id: string
@@ -48,6 +54,12 @@ const storageKeys: Record<CloudRecordType, string> = {
   job: 'rabbits-foot-jobs',
   appointment: 'rabbits-foot-appointments',
   communication: 'rabbits-foot-communications',
+  expense: 'rabbits-foot-expenses',
+  business_event: 'rabbits-foot-business-events',
+  ai_action: 'rabbits-foot-ai-actions',
+  ai_audit: 'rabbits-foot-ai-audit',
+  automation_settings: 'rabbits-foot-automation-settings',
+  support_report: 'rabbits-foot-support-reports',
 }
 
 function getRecordKey(recordType: CloudRecordType, recordId: string) {
@@ -74,16 +86,16 @@ export function loadSyncQueue(): QueuedRecordChange[] {
 export function clearSyncQueue(changes: QueuedRecordChange[]) {
   if (changes.length === 0) return
 
-  const completedKeys = new Set(
+  const completedVersions = new Set(
     changes.map((change) =>
-      getRecordKey(change.recordType, change.recordId),
+      `${getRecordKey(change.recordType, change.recordId)}:${change.clientUpdatedAt}:${change.isDeleted}`,
     ),
   )
 
   const remainingChanges = loadSyncQueue().filter(
     (change) =>
-      !completedKeys.has(
-        getRecordKey(change.recordType, change.recordId),
+      !completedVersions.has(
+        `${getRecordKey(change.recordType, change.recordId)}:${change.clientUpdatedAt}:${change.isDeleted}`,
       ),
   )
 
@@ -234,6 +246,12 @@ export function applyRemoteRecords(
     'job',
     'appointment',
     'communication',
+    'expense',
+    'business_event',
+    'ai_action',
+    'ai_audit',
+    'automation_settings',
+    'support_report',
   ] as CloudRecordType[]).forEach(
     (recordType) => {
       const localRecords = readJson<CloudRecord[]>(storageKeys[recordType], [])

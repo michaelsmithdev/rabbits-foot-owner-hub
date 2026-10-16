@@ -41,7 +41,7 @@ export default defineConfig(({ mode }) => {
         name: "Rabbit's Foot Owner Hub",
         short_name: 'Owner Hub',
         description:
-          "The private business workspace for Rabbit's Foot Handyman Services.",
+          "The private business workspace for Rabbit's Foot Handyman Services LLC.",
         theme_color: '#10130f',
         background_color: '#10130f',
         display: 'standalone',

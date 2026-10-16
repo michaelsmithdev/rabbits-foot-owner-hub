@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import { applyCors, requestedOrganizationId } from './_http-security.js'
+import { isValidEmailAddress, normalizeEmail } from '../src/shared/email/emailValidation.js'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -71,8 +72,8 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   try {
     const payload = await readBody(request) as { email?: unknown; reason?: unknown; source?: unknown; action?: unknown }
     const user = await userFromRequest(request)
-    const requestedEmail = (user?.email ?? (typeof payload.email === 'string' ? payload.email : '')).trim().toLowerCase().slice(0, 180)
-    if (!requestedEmail || !/^\S+@\S+\.\S+$/.test(requestedEmail)) return send(response, 400, { error: 'Enter the email used for the Owner Hub account.' })
+    const requestedEmail = normalizeEmail(user?.email ?? payload.email).slice(0, 180)
+    if (!isValidEmailAddress(requestedEmail)) return send(response, 400, { error: 'Enter the email used for the Owner Hub account.' })
     const requestedWorkspace = user ? requestedOrganizationId(request) : null
     const organizationId = user ? await ownedOrganization(user.id, requestedWorkspace) : null
     if (requestedWorkspace && !organizationId) return send(response, 403, { error: 'Only the workspace owner can request deletion of business records.' })
@@ -99,5 +100,3 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     return send(response, 500, { error: 'The request could not be submitted. Contact support if this continues.' })
   }
 }
-
-export const config = { maxDuration: 20 }

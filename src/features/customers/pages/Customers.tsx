@@ -12,10 +12,18 @@ import type { Customer } from '../types/Customer'
 import { loadEstimates } from '../../estimates/data/estimateStore'
 import { loadInvoices } from '../../invoices/data/invoiceStore'
 import { loadPhotos } from '../../photos/data/photoStore'
+import { loadExpenses } from '../../expenses/data/expenseStore'
+import { expenseCategoryLabels } from '../../expenses/utils/expenseUtils'
 import { useAuth } from '../../auth/authContext'
 import { buildCustomerDocumentStats } from '../data/customerDocumentStats'
 import { createCustomerPortalLink } from '../../communications/customerDocumentShare'
 import { normalizePhoneNumber, openSmsComposer } from '../../communications/customerContact'
+import EmailDeliveryStatus from '../../communications/components/EmailDeliveryStatus'
+import {
+  INVALID_EMAIL_MESSAGE,
+  normalizeEmail,
+  validateOptionalEmail,
+} from '../../../shared/email/emailValidation'
 
 type CustomersProps = {
   initialCustomerId?: string | null
@@ -83,18 +91,20 @@ function Customers({
   }, [customers, selectedCustomerId])
 
   const customerActivity = useMemo(() => {
-    if (!selectedCustomerId) return { estimates: [], invoices: [], photos: [], timeline: [], billed: 0 }
+    if (!selectedCustomerId) return { estimates: [], invoices: [], photos: [], receipts: [], timeline: [], billed: 0 }
     const estimates = loadEstimates().filter((item) => item.customerId === selectedCustomerId)
     const invoices = loadInvoices().filter((item) => item.customerId === selectedCustomerId)
     const photos = loadPhotos().filter((item) => item.customerId === selectedCustomerId)
+    const receipts = loadExpenses().filter((item) => item.customerId === selectedCustomerId)
     const billed = invoices.reduce((sum, invoice) => { const subtotal = invoice.lineItems.reduce((lineSum, line) => lineSum + line.quantity * line.unitPrice, 0); return sum + Math.max(0, subtotal * (1 + invoice.taxRate / 100) - invoice.discount) }, 0)
     const timeline = [
       ...estimates.map((item) => ({ id: `estimate-${item.id}`, date: item.updatedAt, type: 'Estimate', title: `${item.estimateNumber} · ${item.jobName}`, detail: item.status })),
       ...invoices.map((item) => ({ id: `invoice-${item.id}`, date: item.updatedAt, type: 'Invoice', title: `${item.invoiceNumber} · ${item.jobName}`, detail: item.status })),
       ...invoices.flatMap((invoice) => invoice.payments.map((payment) => ({ id: `payment-${payment.id}`, date: payment.createdAt, type: 'Payment', title: `$${payment.amount.toFixed(2)} received`, detail: `${payment.method} · ${invoice.invoiceNumber}` }))),
       ...photos.map((item) => ({ id: `photo-${item.id}`, date: item.capturedAt, type: 'Photo', title: `${item.category} · ${item.jobName || 'Project photo'}`, detail: item.caption || item.fileName })),
+      ...receipts.map((item) => ({ id: `receipt-${item.id}`, date: item.updatedAt, type: 'Receipt', title: `$${item.total.toFixed(2)} · ${item.merchant || item.description || 'Business expense'}`, detail: expenseCategoryLabels[item.category] })),
     ].sort((a, b) => b.date.localeCompare(a.date))
-    return { estimates, invoices, photos, timeline, billed }
+    return { estimates, invoices, photos, receipts, timeline, billed }
   }, [selectedCustomerId])
 
   const customerDocumentStats = buildCustomerDocumentStats(
@@ -168,6 +178,12 @@ function Customers({
       return
     }
 
+    const emailValidation = validateOptionalEmail(formData.email)
+    if (!emailValidation.valid) {
+      setFormError(INVALID_EMAIL_MESSAGE)
+      return
+    }
+
     const newCustomer: Customer = {
       id: `${Date.now()}-${Math.random()
         .toString(36)
@@ -175,7 +191,7 @@ function Customers({
       firstName,
       lastName,
       phone: formData.phone.trim(),
-      email: formData.email.trim(),
+      email: emailValidation.email,
       streetAddress:
         formData.streetAddress.trim(),
       city: formData.city.trim(),
@@ -271,8 +287,9 @@ function Customers({
       return
     }
 
-    if (formData.email.trim() && !formData.email.includes('@')) {
-      setFormError('Enter a valid email address or leave it blank.')
+    const emailValidation = validateOptionalEmail(formData.email)
+    if (!emailValidation.valid) {
+      setFormError(INVALID_EMAIL_MESSAGE)
       return
     }
 
@@ -284,7 +301,7 @@ function Customers({
               firstName,
               lastName,
               phone: formData.phone.trim(),
-              email: formData.email.trim(),
+              email: normalizeEmail(emailValidation.email),
               streetAddress: formData.streetAddress.trim(),
               city: formData.city.trim(),
               state: formData.state.trim().toUpperCase(),
@@ -522,13 +539,15 @@ function Customers({
             )}
           </article>
 
+          <EmailDeliveryStatus customer={selectedCustomer} />
+
           <article className="customer-card">
             <div className="customer-card-header">
               <div className="customer-card-name">
                 <h2>Customer activity</h2>
                 <p>
-                  Estimates, invoices, and
-                  payments
+                  Estimates, invoices, receipts,
+                  and payments
                 </p>
               </div>
             </div>
@@ -573,7 +592,7 @@ function Customers({
               <div className="customer-card-name">
                 <h2>Customer timeline</h2>
                 <p>
-                  Estimates, invoices, payments, and photos
+                  Estimates, invoices, receipts, payments, and photos
                 </p>
               </div>
             </div>

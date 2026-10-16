@@ -1,3 +1,5 @@
+import { recordReliabilityEvent } from '../features/reliability/data/reliabilityStore'
+
 type StartupEvent = {
   at: string
   stage: string
@@ -71,10 +73,24 @@ export function installGlobalStartupLogging() {
       failedResource ? 'resource-load-failed' : 'window-error',
       failedResource || event.error || event.message,
     )
+    recordReliabilityEvent({
+      area: failedResource ? 'startup' : 'render',
+      severity: failedResource ? 'warning' : 'error',
+      message: failedResource
+        ? 'An application resource did not load.'
+        : 'An unexpected screen error occurred.',
+      detail: failedResource || event.error || event.message,
+    })
   }, true)
 
   window.addEventListener('unhandledrejection', (event) => {
     recordStartupEvent('unhandled-promise-rejection', event.reason)
+    recordReliabilityEvent({
+      area: 'render',
+      severity: 'error',
+      message: 'An unexpected background task failed.',
+      detail: event.reason,
+    })
   })
 }
 

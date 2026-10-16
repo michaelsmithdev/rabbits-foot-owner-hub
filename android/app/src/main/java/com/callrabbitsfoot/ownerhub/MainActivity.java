@@ -3,6 +3,8 @@ package com.callrabbitsfoot.ownerhub;
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.IntentSenderRequest;
@@ -59,11 +61,33 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         Log.i(STARTUP_LOG_TAG, "MainActivity onCreate started");
         registerPlugin(DocumentManagerPlugin.class);
+        registerPlugin(ImageManagerPlugin.class);
         registerPlugin(MicrophonePermissionPlugin.class);
         super.onCreate(savedInstanceState);
+        lockOwnerHubToDeviceWidth();
         appUpdateManager = AppUpdateManagerFactory.create(this);
         appUpdateManager.registerListener(updateStateListener);
         Log.i(STARTUP_LOG_TAG, "Capacitor bridge initialized");
+    }
+
+    /**
+     * Owner Hub is a responsive application, not a zoomable document. Keeping
+     * WebView zoom enabled allowed an accidental pinch gesture to persist at
+     * roughly 150%, which made every route wider than the phone and left a
+     * blank strip beside the workspace. Lock the native shell to the device
+     * viewport while the web layer continues to provide accessible text sizes.
+     */
+    private void lockOwnerHubToDeviceWidth() {
+        WebView ownerHubWebView = getBridge().getWebView();
+        WebSettings webSettings = ownerHubWebView.getSettings();
+
+        webSettings.setSupportZoom(false);
+        webSettings.setBuiltInZoomControls(false);
+        webSettings.setDisplayZoomControls(false);
+        webSettings.setTextZoom(100);
+        ownerHubWebView.setInitialScale(0);
+
+        Log.i(STARTUP_LOG_TAG, "WebView locked to the device viewport");
     }
 
     @Override

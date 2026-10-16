@@ -11,6 +11,8 @@ export type CloudSyncContextValue = {
   organizationId: string | null
   status: CloudSyncStatus
   lastSyncedAt: string | null
+  lastAttemptAt: string | null
+  pendingRecordCount: number
   errorMessage: string
   syncNow: () => Promise<void>
 }

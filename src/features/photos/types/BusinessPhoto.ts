@@ -18,6 +18,9 @@ export interface BusinessPhoto {
   fileSize: number
   storagePath: string
   uploadStatus: PhotoUploadStatus
+  uploadAttempts?: number
+  uploadError?: string
+  lastUploadAttemptAt?: string
   capturedAt: string
   createdAt: string
   updatedAt: string

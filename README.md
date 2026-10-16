@@ -1,6 +1,6 @@
 # Rabbit's Foot Owner Hub
 
-The private business workspace for Rabbit's Foot Handyman Services. The app is
+The private business workspace for Rabbit's Foot Handyman Services LLC. The app is
 built with React, Vite, and TypeScript and is designed as an installable,
 mobile-first Progressive Web App.
 
@@ -101,6 +101,42 @@ Optional variables:
 The local `.env.local` and `.env.android.local` files are ignored by Git.
 OpenAI API billing must have available credit; a ChatGPT subscription does not
 provide API credit.
+
+## Content Autopilot
+
+Content Autopilot adds private resumable video uploads, provider-specific
+Facebook/Google Business Profile/YouTube drafts, secure OAuth connections,
+independent background publishing jobs, AI-assisted copy, Content Library,
+calendar, and Brand Brain foundations. Apply
+`supabase/migrations/202608210009_content_autopilot_foundation.sql`, keep all
+live provider flags disabled initially, and follow the exact credential and
+approval sequence in [docs/CONTENT_AUTOPILOT_SETUP.md](docs/CONTENT_AUTOPILOT_SETUP.md).
+
+Automated tests never call live social APIs. Local development defaults to
+clearly labeled mock publishing, while Vercel production always requires both a
+real connected account and that provider's explicit live-publishing flag.
+
+## AI Operations and receipt intelligence
+
+AI Operations uses the same offline queue and organization-scoped Supabase
+`business_records` data model on web and Android. Apply
+`supabase/migrations/202608230010_ai_operations_foundation.sql` after the earlier
+migrations. The migration is additive and preserves existing records.
+
+Customer-facing labor pricing and the private internal labor cost are separate
+settings. Estimate pricing uses the customer rate; job profitability uses only
+the internal cost.
+
+The default **Approval** mode requires the owner to approve every action.
+**Manual** mode analyzes only. **Autopilot** is restricted to the owner's
+explicit low-risk allowlist and cannot send customer messages, create invoices,
+take payments, delete data, change balances, edit accounting history, or change
+business configuration.
+
+Receipt extraction and the optional owner-triggered daily AI brief use secure
+authenticated server routes. Add `OPENAI_OPERATIONS_MODEL` only to override the
+default operations model. The OpenAI key and Supabase service-role key remain
+server-only and must never use a `VITE_` prefix.
 
 ## Interactive tutorial maintenance
 

@@ -1,6 +1,7 @@
 import {
   Building2,
   Cloud,
+  Clapperboard,
   Download,
   DollarSign,
   FileText,
@@ -17,6 +18,7 @@ import { useCloudSync } from '../../features/cloud/cloudSyncContext'
 import { DATA_REFRESHED_EVENT } from '../../features/cloud/syncQueue'
 import { loadCustomers } from '../../features/customers/data/customerStore'
 import { loadEstimates } from '../../features/estimates/data/estimateStore'
+import { loadExpenses } from '../../features/expenses/data/expenseStore'
 import { loadInvoices } from '../../features/invoices/data/invoiceStore'
 import { loadLeads } from '../../features/leads/data/leadStore'
 import { loadPhotos } from '../../features/photos/data/photoStore'
@@ -25,6 +27,7 @@ import { loadPricebook } from '../../features/pricing/data/pricebookStore'
 import { loadWalkthroughs } from '../../features/walkthroughs/data/walkthroughStore'
 import { loadAppointments } from '../../features/schedule/data/appointmentStore'
 import { loadCommunications } from '../../features/communications/data/communicationStore'
+import { normalizeEmail, requireValidEmail } from '../../shared/email/emailValidation'
 import {
   loadBusinessSettings,
   saveBusinessSettings,
@@ -76,7 +79,10 @@ function Settings() {
       return
     }
 
-    if (!settings.email.trim() || !settings.email.includes('@')) {
+    let businessEmail: string
+    try {
+      businessEmail = requireValidEmail(settings.email)
+    } catch {
       setFormError('Enter a valid business email address.')
       return
     }
@@ -87,8 +93,9 @@ function Settings() {
       settings.defaultTaxReservePercent < 25 ||
       settings.defaultTaxReservePercent > 35 ||
       settings.estimateValidDays < 1 ||
-      settings.invoiceDueDays < 1
+      settings.invoiceDueDays < 0
       || settings.defaultLaborRate < 0
+      || settings.internalLaborCostPerHour < 0
       || settings.minimumJobCharge < 0
       || settings.serviceCallCharge < 0
       || settings.diagnosticFee < 0
@@ -113,7 +120,7 @@ function Settings() {
       ...settings,
       businessName: settings.businessName.trim(),
       phone: settings.phone.trim(),
-      email: settings.email.trim(),
+      email: normalizeEmail(businessEmail),
       website: settings.website.trim(),
       streetAddress: settings.streetAddress.trim(),
       city: settings.city.trim(),
@@ -134,7 +141,7 @@ function Settings() {
 
   function downloadBackup() {
     const backup = {
-      version: 3,
+      version: 4,
       exportedAt: new Date().toISOString(),
       settings: loadBusinessSettings(),
       customers: loadCustomers(),
@@ -147,6 +154,7 @@ function Settings() {
       jobs: loadJobs(),
       appointments: loadAppointments(),
       communications: loadCommunications(),
+      expenses: loadExpenses(),
     }
     const backupUrl = URL.createObjectURL(
       new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }),
@@ -303,10 +311,10 @@ function Settings() {
               </div>
             </label>
             <label className="settings-field">
-              <span>Invoice due in</span>
+              <span>Invoice due (0 = upon completion)</span>
               <div className="settings-number-field">
                 <input
-                  min="1"
+                  min="0"
                   onChange={(event) => updateSetting('invoiceDueDays', Number(event.target.value))}
                   type="number"
                   value={settings.invoiceDueDays}
@@ -362,7 +370,8 @@ function Settings() {
           </header>
           <div className="settings-fields-grid">
             {([
-              ['defaultLaborRate', 'Internal labor cost / hour', '$'],
+              ['defaultLaborRate', 'Customer labor rate / hour', '$'],
+              ['internalLaborCostPerHour', 'Internal labor cost / hour', '$'],
               ['minimumJobCharge', 'Minimum job charge', '$'],
               ['serviceCallCharge', 'Service call charge', '$'],
               ['diagnosticFee', 'Diagnostic fee', '$'],
@@ -372,7 +381,6 @@ function Settings() {
               ['emergencyRatePercent', 'Emergency premium', '%'],
               ['defaultMaterialMarkupPercent', 'Material markup', '%'],
               ['defaultOverheadPercent', 'Overhead allowance', '%'],
-              ['paymentProcessingOverheadPercent', 'Payment processing overhead', '%'],
               ['targetGrossMarginPercent', 'Target gross margin', '%'],
               ['defaultDeliveryCost', 'Default delivery cost', '$'],
               ['defaultDisposalCost', 'Default disposal cost', '$'],
@@ -380,7 +388,7 @@ function Settings() {
               <label className="settings-field" key={field}>
                 <span>{label}</span>
                 <div className="settings-number-field">
-                  <input min="0" max={field === 'targetGrossMarginPercent' ? 80 : field === 'paymentProcessingOverheadPercent' ? 15 : undefined} onChange={(event) => updateSetting(field, Number(event.target.value))} step="0.01" type="number" value={settings[field]} />
+                  <input min="0" max={field === 'targetGrossMarginPercent' ? 80 : undefined} onChange={(event) => updateSetting(field, Number(event.target.value))} step="0.01" type="number" value={settings[field]} />
                   <b>{suffix}</b>
                 </div>
               </label>
@@ -427,6 +435,25 @@ function Settings() {
 
       <div className="settings-grid" data-tour="settings-data-safety">
         <TutorialSettingsCard />
+
+        <article className="settings-card">
+          <span className="settings-card-icon"><Clapperboard size={24} /></span>
+          <div>
+            <p className="eyebrow">INTEGRATIONS → SOCIAL ACCOUNTS</p>
+            <h2>Content Autopilot connections</h2>
+            <p>Connect Facebook, Google Business Profile, and YouTube, then manage the Rabbit&apos;s Foot Brand Profile.</p>
+          </div>
+          <button
+            className="settings-secondary-button"
+            onClick={() => {
+              sessionStorage.setItem('content-autopilot-view', 'connections')
+              window.location.hash = '#content-autopilot'
+            }}
+            type="button"
+          >
+            <Clapperboard size={17} /> Social accounts
+          </button>
+        </article>
 
         <article className="settings-card settings-security-card">
           <span className="settings-card-icon"><ShieldCheck size={24} /></span>

@@ -143,8 +143,10 @@ export const tutorialSectionForPage: Partial<Record<PageName, TutorialSectionId>
   pricing: 'pricing',
   inbox: 'inbox',
   photos: 'photos-documents',
+  receipts: 'photos-documents',
   settings: 'settings',
   business: 'business',
+  reliability: 'settings',
 }
 
 export function stepsForSection(sectionId: TutorialSectionId) {

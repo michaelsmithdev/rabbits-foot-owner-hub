@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Banknote,
   CalendarDays,
   CircleDollarSign,
   FilePenLine,
+  Mail,
   MessageSquareText,
   Plus,
   ReceiptText,
@@ -20,7 +21,7 @@ import DocumentPdfActions from '../../documents/components/DocumentPdfActions'
 import { useAuth } from '../../auth/authContext'
 import PricingInsightPanel from '../../pricing/components/PricingInsightPanel'
 import { useSaas } from '../../saas/saasContext'
-import { textCustomerDocument } from '../../communications/customerDocumentShare'
+import { emailCustomerDocument, textCustomerDocument } from '../../communications/customerDocumentShare'
 import {
   createInvoiceNumber,
   loadInvoices,
@@ -59,6 +60,7 @@ type InvoiceDraft = {
   jobCategory: string
   materialCost: number
   taxReservePercent: number
+  cardProcessingFeePercent: number
   status: InvoiceStatus
 }
 
@@ -100,7 +102,7 @@ function getTodayDate() {
   return getDateInputValue(new Date())
 }
 
-function getDefaultDueDate(dueDays = 14) {
+function getDefaultDueDate(dueDays = 0) {
   const dueDate = new Date()
   dueDate.setDate(dueDate.getDate() + dueDays)
 
@@ -136,6 +138,7 @@ function createEmptyDraft(settings: BusinessSettings): InvoiceDraft {
     jobCategory: 'General handyman',
     materialCost: 0,
     taxReservePercent: settings.defaultTaxReservePercent,
+    cardProcessingFeePercent: 0,
     status: 'draft',
   }
 }
@@ -160,6 +163,7 @@ function createDraftFromInvoice(
     materialCost: invoice.materialCost ?? 0,
     taxReservePercent:
       invoice.taxReservePercent ?? settings.defaultTaxReservePercent,
+    cardProcessingFeePercent: invoice.cardProcessingFeePercent ?? 0,
     status: invoice.status,
   }
 }
@@ -277,6 +281,8 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
   const [squareLinkInvoiceId, setSquareLinkInvoiceId] = useState<string | null>(null)
   const [squareMessage, setSquareMessage] = useState('')
   const [sharingInvoiceId, setSharingInvoiceId] = useState<string | null>(null)
+  const [emailingInvoiceId, setEmailingInvoiceId] = useState<string | null>(null)
+  const emailSendLocks = useRef(new Set<string>())
 
   useEffect(() => {
     saveInvoices(invoices)
@@ -390,6 +396,52 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
     }
   }
 
+  async function emailInvoice(invoice: Invoice) {
+    if (emailSendLocks.current.has(invoice.id)) return
+    const customer = customers.find((item) => item.id === invoice.customerId)
+    if (!customer) {
+      setSquareMessage('The customer attached to this invoice could not be found.')
+      return
+    }
+    if (!customer.email.trim()) {
+      setSquareMessage('No email address is saved for this customer. Edit the customer before sending.')
+      return
+    }
+    if (!session?.access_token) {
+      setSquareMessage('Sign in and connect cloud sync before sending this invoice.')
+      return
+    }
+
+    const sentInvoice: Invoice = {
+      ...invoice,
+      status: invoice.status === 'draft' ? 'sent' : invoice.status,
+      updatedAt: new Date().toISOString(),
+    }
+    emailSendLocks.current.add(invoice.id)
+    setEmailingInvoiceId(invoice.id)
+    setSquareMessage('Sending invoice email…')
+    try {
+      await emailCustomerDocument({
+        accessToken: session.access_token,
+        idempotencyKey: `invoice/${invoice.id}/${crypto.randomUUID()}`,
+        kind: 'invoice',
+        document: sentInvoice,
+        customer,
+      })
+      const nextInvoices = invoices.map((item) =>
+        item.id === invoice.id ? sentInvoice : item,
+      )
+      setInvoices(nextInvoices)
+      saveInvoices(nextInvoices)
+      setSquareMessage('Email sent')
+    } catch (error) {
+      setSquareMessage(error instanceof Error ? error.message : 'Email could not be sent right now. Please try again.')
+    } finally {
+      emailSendLocks.current.delete(invoice.id)
+      setEmailingInvoiceId(null)
+    }
+  }
+
   function openNewInvoice() {
     resetBuilder()
     setIsBuilderOpen(true)
@@ -412,6 +464,17 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
     value: InvoiceDraft[Key],
   ) {
     setDraft((currentDraft) => ({ ...currentDraft, [key]: value }))
+  }
+
+  function updateIssueDate(issueDate: string) {
+    setDraft((currentDraft) => ({
+      ...currentDraft,
+      issueDate,
+      dueDate:
+        currentDraft.dueDate === currentDraft.issueDate
+          ? issueDate
+          : currentDraft.dueDate,
+    }))
   }
 
   function selectCustomer(customerId: string) {
@@ -507,8 +570,13 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
     ) {
       return 'Every line item needs a description, quantity, and valid price.'
     }
-    if (draft.taxRate < 0 || draft.discount < 0) {
-      return 'Tax and discount values cannot be negative.'
+    if (
+      draft.taxRate < 0 ||
+      draft.discount < 0 ||
+      draft.cardProcessingFeePercent < 0 ||
+      draft.cardProcessingFeePercent > 15
+    ) {
+      return 'Tax and discount cannot be negative, and the optional Square fee must be between 0% and 15%.'
     }
 
     return ''
@@ -549,10 +617,9 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
       jobCategory: draft.jobCategory.trim(),
       materialCost: draft.materialCost,
       taxReservePercent: draft.taxReservePercent,
-      cardProcessingFeePercent:
-        existingInvoice
-          ? existingInvoice.cardProcessingFeePercent ?? 0
-          : businessSettings.paymentProcessingOverheadPercent,
+      cardProcessingFeePercent: draft.cardProcessingFeePercent,
+      cardProcessingFeeMode: 'optional',
+      paymentPolicyVersion: 2,
       completionDate: existingInvoice?.completionDate,
       photoIds: existingInvoice?.photoIds ? [...existingInvoice.photoIds] : [],
       aiEstimate: existingInvoice?.aiEstimate,
@@ -579,13 +646,16 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
           : baseInvoice.completionDate,
     }
 
-    setInvoices((currentInvoices) =>
-      existingInvoice
-        ? currentInvoices.map((invoice) =>
-            invoice.id === savedInvoice.id ? savedInvoice : invoice,
-          )
-        : [savedInvoice, ...currentInvoices],
-    )
+    const nextInvoices = existingInvoice
+      ? invoices.map((invoice) =>
+          invoice.id === savedInvoice.id ? savedInvoice : invoice,
+        )
+      : [savedInvoice, ...invoices]
+
+    // Persist before closing so fast navigation or an Android activity pause
+    // cannot discard an edit before React runs its effect.
+    saveInvoices(nextInvoices)
+    setInvoices(nextInvoices)
     closeBuilder()
   }
 
@@ -866,6 +936,14 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                     </button>
                     <DocumentPdfActions kind="invoice" document={invoice} customer={customer} />
                     <button
+                      disabled={emailingInvoiceId === invoice.id}
+                      onClick={() => void emailInvoice(invoice)}
+                      type="button"
+                    >
+                      <Mail aria-hidden="true" size={16} />
+                      {emailingInvoiceId === invoice.id ? 'Sending…' : 'Email invoice'}
+                    </button>
+                    <button
                       data-tour="send-invoice"
                       disabled={sharingInvoiceId === invoice.id}
                       onClick={() => void textInvoice(invoice)}
@@ -1016,9 +1094,7 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
               <label>
                 <span>Issue date</span>
                 <input
-                  onChange={(event) =>
-                    updateDraft('issueDate', event.target.value)
-                  }
+                  onChange={(event) => updateIssueDate(event.target.value)}
                   type="date"
                   value={draft.issueDate}
                 />
@@ -1192,6 +1268,25 @@ function Invoices({ initialInvoiceId = null }: InvoicesProps) {
                   type="number"
                   value={draft.discount || ''}
                 />
+              </label>
+              <label>
+                <span>Square card fee % (optional)</span>
+                <input
+                  max="15"
+                  min="0"
+                  onChange={(event) =>
+                    updateDraft(
+                      'cardProcessingFeePercent',
+                      Number(event.target.value),
+                    )
+                  }
+                  step="0.1"
+                  type="number"
+                  value={draft.cardProcessingFeePercent || ''}
+                />
+                <small>
+                  Leave blank or 0 for no fee. This is added only to Square checkout.
+                </small>
               </label>
               <label className="invoice-form-full-width">
                 <span>Notes and payment terms</span>

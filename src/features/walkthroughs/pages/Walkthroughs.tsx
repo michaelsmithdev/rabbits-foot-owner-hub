@@ -230,7 +230,7 @@ export default function Walkthroughs() {
       jobCategory: walkthrough.jobCategory,
       materialCost: result.economics.materialCost,
       taxReservePercent: settings.defaultTaxReservePercent,
-      cardProcessingFeePercent: settings.paymentProcessingOverheadPercent,
+      cardProcessingFeePercent: 0,
       paymentProcessingOverheadPercent: 0,
       photoIds: walkthrough.photoIds,
       aiEstimate: walkthrough.aiEstimate,
@@ -316,7 +316,7 @@ export default function Walkthroughs() {
               <div><dt>Estimate total</dt><dd>{currency.format(quotedTotal)}</dd></div>
               <div><dt>Labor hours / direct labor</dt><dd>{result.economics.laborHours.toFixed(1)} · {currency.format(result.economics.laborCost)}</dd></div>
               <div><dt>Direct materials</dt><dd>{currency.format(result.economics.materialCost)}</dd></div>
-            </dl><small>Only the work you described is included. No automatic markup, overhead, contingency, or profit padding. A {businessSettings.paymentProcessingOverheadPercent.toFixed(1)}% fee is shown separately only if the customer chooses card checkout.</small></article>
+            </dl><small>Only the work you described is included. No automatic markup, overhead, contingency, profit padding, or card fee. A Square fee can be added manually on the invoice when needed.</small></article>
           </div>
 
           {(result.upsellSuggestions ?? []).length > 0 && <article className="smart-questions"><h3>Optional upsell ideas</h3><p>These ideas are not included in the quoted total.</p><ul>{result.upsellSuggestions.map((item) => <li key={item}>{item}</li>)}</ul></article>}

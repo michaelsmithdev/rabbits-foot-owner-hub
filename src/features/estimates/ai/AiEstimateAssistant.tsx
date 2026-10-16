@@ -5,7 +5,6 @@ import type { Customer } from '../../customers/types/Customer'
 import { queuePhotoFiles } from '../../photos/data/photoStore'
 import VoiceCapture from '../../voice/components/VoiceCapture'
 import type { VoiceNote } from '../../voice/types/VoiceNote'
-import { loadBusinessSettings } from '../../settings/data/businessSettingsStore'
 import {
   MAX_AI_ESTIMATE_PHOTOS,
   prepareEstimatePhoto,
@@ -63,7 +62,6 @@ export default function AiEstimateAssistant({
   const { error, generate, generation, isLoading, setGeneration } =
     useAiEstimateAssistant(initialGeneration)
   const result = generation?.draft ?? null
-  const businessSettings = useMemo(() => loadBusinessSettings(), [])
   const canGenerate = Boolean(
     customerId && jobDescription.trim().length >= 10 && !isPreparingPhotos,
   )
@@ -430,7 +428,7 @@ export default function AiEstimateAssistant({
               />
             </label>
             <label>
-              <span>Labor estimate</span>
+              <span>Labor cost</span>
               <input
                 min="0"
                 onChange={(event) => updateResult({ laborCost: numericValue(event.target.value) })}
@@ -440,7 +438,7 @@ export default function AiEstimateAssistant({
               />
             </label>
             <label>
-              <span>Material estimate</span>
+              <span>Material cost</span>
               <input
                 min="0"
                 onChange={(event) => updateResult({ materialCost: numericValue(event.target.value) })}
@@ -457,7 +455,7 @@ export default function AiEstimateAssistant({
               />
             </label>
             <label className="ai-duration-field">
-              <span>Estimated completion time</span>
+              <span>How long it should take</span>
               <input
                 onChange={(event) => updateResult({ estimatedDuration: event.target.value })}
                 value={result.estimatedDuration}
@@ -507,9 +505,10 @@ export default function AiEstimateAssistant({
 
           {result.economics && (
             <div className="ai-economics-summary">
-              <div><span>Requested work</span><strong>{formatCurrency(result.recommendedBid)}</strong></div>
+              <div><span>Labor cost</span><strong>{formatCurrency(result.laborCost)}</strong></div>
+              <div><span>Material cost</span><strong>{formatCurrency(result.materialCost)}</strong></div>
               <div><span>Estimate total</span><strong>{formatCurrency(result.recommendedBid)}</strong></div>
-              <small>No automatic markup, overhead, contingency, or profit padding is included. A {businessSettings.paymentProcessingOverheadPercent.toFixed(1)}% fee appears separately only if the customer chooses card checkout.</small>
+              <small>Estimate total = labor cost + material cost. The estimator adds nothing else.</small>
             </div>
           )}
           {(result.upsellSuggestions ?? []).length > 0 && (
@@ -543,8 +542,8 @@ export default function AiEstimateAssistant({
 
           <p className="ai-history-note">
             {generation?.historyUsed
-              ? `Compared with ${generation.historyUsed} completed Rabbit's Foot job${generation.historyUsed === 1 ? '' : 's'}.`
-              : 'No close completed-job match was available. The quote remains limited to the work you described.'}
+              ? `Learned from ${generation.historyUsed} older Rabbit's Foot pricing record${generation.historyUsed === 1 ? '' : 's'}, weighted toward the closest work.`
+              : 'No close older estimate was available. The quote remains limited to the work you described.'}
           </p>
         </div>
       )}

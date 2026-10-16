@@ -1,14 +1,15 @@
-import { BriefcaseBusiness, CloudOff, LoaderCircle, ShieldCheck } from 'lucide-react'
+import { BriefcaseBusiness, CloudOff, LoaderCircle, MailCheck, ShieldCheck } from 'lucide-react'
 import { type FormEvent, type ReactNode, useState } from 'react'
 
 import { useAuth } from './authContext'
+import { getAuthRedirectError } from './authRedirect'
 import './auth.css'
 
 type LoginView = 'sign-in' | 'sign-up' | 'reset'
 
 function LoginScreen() {
   const joiningTeam = window.location.hash.startsWith('#invite/')
-  const { sendPasswordReset, signIn, signUp } = useAuth()
+  const { resendSignUpConfirmation, sendPasswordReset, signIn, signUp } = useAuth()
   const [view, setView] = useState<LoginView>('sign-in')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -16,7 +17,8 @@ function LoginScreen() {
   const [displayName, setDisplayName] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState('')
-  const [errorMessage, setErrorMessage] = useState('')
+  const [errorMessage, setErrorMessage] = useState(() => getAuthRedirectError())
+  const [awaitingConfirmation, setAwaitingConfirmation] = useState(() => Boolean(getAuthRedirectError()))
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -28,15 +30,37 @@ function LoginScreen() {
       if (view === 'sign-in') {
         await signIn(email, password)
       } else if (view === 'sign-up') {
-        setMessage(await signUp(email, password, businessName || (joiningTeam ? 'Invitation pending' : ''), displayName))
+        const result = await signUp(email, password, businessName || (joiningTeam ? 'Invitation pending' : ''), displayName)
+        setMessage(result)
+        setAwaitingConfirmation(result.startsWith('Check your email'))
       } else {
         await sendPasswordReset(email)
         setMessage('Password reset instructions were sent to your email.')
       }
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : 'The request could not be completed.',
-      )
+      const message = error instanceof Error ? error.message : 'The request could not be completed.'
+      setErrorMessage(message)
+      if (/email not confirmed/i.test(message)) setAwaitingConfirmation(true)
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function resendConfirmation() {
+    if (!email.trim()) {
+      setErrorMessage('Enter the email address that needs a new confirmation link.')
+      return
+    }
+
+    setIsSubmitting(true)
+    setMessage('')
+    setErrorMessage('')
+    try {
+      await resendSignUpConfirmation(email)
+      setAwaitingConfirmation(true)
+      setMessage('A fresh confirmation link was sent. Open the newest email to finish connecting your account.')
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'A new confirmation link could not be sent.')
     } finally {
       setIsSubmitting(false)
     }
@@ -108,6 +132,12 @@ function LoginScreen() {
 
           {errorMessage && <p className="auth-error" role="alert">{errorMessage}</p>}
           {message && <p className="auth-success" role="status">{message}</p>}
+          {awaitingConfirmation && (
+            <button className="auth-resend" disabled={isSubmitting} onClick={() => void resendConfirmation()} type="button">
+              <MailCheck aria-hidden="true" size={19} />
+              Resend confirmation email
+            </button>
+          )}
 
           <button className="auth-submit" disabled={isSubmitting} type="submit">
             {isSubmitting ? (

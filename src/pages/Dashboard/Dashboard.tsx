@@ -1,19 +1,36 @@
 import {
   ArrowRight,
+  Bot,
   CheckCircle2,
   CircleDollarSign,
   FileText,
+  Fuel,
+  Package,
   ReceiptText,
   UsersRound,
+  Wrench,
 } from 'lucide-react'
 import { useState } from 'react'
 
 import { loadCustomers } from '../../features/customers/data/customerStore'
 import { loadEstimates } from '../../features/estimates/data/estimateStore'
 import type { Estimate } from '../../features/estimates/types/Estimate'
+import { loadExpenses } from '../../features/expenses/data/expenseStore'
+import { expenseTotals } from '../../features/expenses/utils/expenseUtils'
 import { loadInvoices } from '../../features/invoices/data/invoiceStore'
 import type { Invoice } from '../../features/invoices/types/Invoice'
 import { loadBusinessSettings } from '../../features/settings/data/businessSettingsStore'
+import { loadJobs } from '../../features/jobs/data/jobStore'
+import { loadLeads } from '../../features/leads/data/leadStore'
+import { loadPhotos } from '../../features/photos/data/photoStore'
+import {
+  calculateProfitabilityMetrics,
+  dateRangeForPreset,
+} from '../../features/aiOperations/services/profitability'
+import {
+  buildAiRecommendations,
+  buildDailyBrief,
+} from '../../features/aiOperations/services/recommendationEngine'
 import { loadAppointments } from '../../features/schedule/data/appointmentStore'
 import {
   loadCommunications,
@@ -35,6 +52,7 @@ type DashboardProps = {
   ) => void
   onOpenDocuments: () => void
   onOpenSchedule: () => void
+  onOpenAiOperations: () => void
 }
 
 type FinancialDocument = Estimate | Invoice
@@ -70,12 +88,21 @@ function Dashboard({
   onOpenDocument,
   onOpenDocuments,
   onOpenSchedule,
+  onOpenAiOperations,
 }: DashboardProps) {
   const customers = loadCustomers()
   const estimates = loadEstimates()
   const invoices = loadInvoices()
+  const expenses = loadExpenses()
   const settings = loadBusinessSettings()
   const appointments = loadAppointments()
+  const jobs = loadJobs()
+  const leads = loadLeads()
+  const photos = loadPhotos()
+  const [datePreset, setDatePreset] = useState<'today' | 'week' | 'month' | 'last_month' | 'custom'>('month')
+  const initialMonthRange = dateRangeForPreset('month')
+  const [customStart, setCustomStart] = useState(initialMonthRange.start)
+  const [customEnd, setCustomEnd] = useState(initialMonthRange.end)
   const [communications, setCommunications] = useState(loadCommunications)
   const customerNames = new Map(
     customers.map((customer) => [
@@ -83,6 +110,31 @@ function Dashboard({
       `${customer.firstName} ${customer.lastName}`.trim(),
     ]),
   )
+  const profitabilityRange = datePreset === 'custom'
+    ? { start: customStart <= customEnd ? customStart : customEnd, end: customStart <= customEnd ? customEnd : customStart }
+    : dateRangeForPreset(datePreset)
+  const profitability = calculateProfitabilityMetrics({
+    estimates,
+    invoices,
+    jobs,
+    expenses,
+    internalLaborCostPerHour: settings.internalLaborCostPerHour,
+    range: profitabilityRange,
+  })
+  const operationsSnapshot = {
+    customers,
+    estimates,
+    invoices,
+    jobs,
+    expenses,
+    photos,
+    communications,
+    leads,
+    internalLaborCostPerHour: settings.internalLaborCostPerHour,
+    targetGrossMarginPercent: settings.targetGrossMarginPercent,
+  }
+  const aiRecommendations = buildAiRecommendations(operationsSnapshot)
+  const dailyBrief = buildDailyBrief(operationsSnapshot)
 
   const outstandingTotal = invoices
     .filter(
@@ -97,6 +149,7 @@ function Dashboard({
 
   const monthKey = new Date().toISOString().slice(0, 7)
   const monthlyRevenue = invoices.filter((invoice) => invoice.status === 'paid' && (invoice.paidAt ?? invoice.updatedAt).slice(0, 7) === monthKey).reduce((sum, invoice) => sum + getDocumentTotal(invoice), 0)
+  const monthlyExpenses = expenseTotals(expenses, `${monthKey}-01`)
   const approvedEstimateValue = estimates.filter((estimate) => estimate.status === 'approved').reduce((sum, estimate) => sum + getDocumentTotal(estimate), 0)
   const taxReserve = monthlyRevenue * (settings.defaultTaxReservePercent / 100)
 
@@ -263,6 +316,24 @@ function Dashboard({
       description: `${settings.defaultTaxReservePercent}% of monthly revenue`,
       icon: CircleDollarSign,
     },
+    {
+      label: 'Materials',
+      value: formatCurrency(monthlyExpenses.materials),
+      description: 'This month receipts',
+      icon: Package,
+    },
+    {
+      label: 'Gas',
+      value: formatCurrency(monthlyExpenses.fuel),
+      description: 'This month receipts',
+      icon: Fuel,
+    },
+    {
+      label: 'Vehicle parts',
+      value: formatCurrency(monthlyExpenses.vehicle),
+      description: 'This month receipts',
+      icon: Wrench,
+    },
   ]
 
   return (
@@ -279,6 +350,13 @@ function Dashboard({
         <div className="dashboard-header-actions">
           <button
             className="button-light"
+            onClick={onOpenAiOperations}
+            type="button"
+          >
+            <Bot aria-hidden="true" size={18} /> AI Operations
+          </button>
+          <button
+            className="button-light"
             onClick={onOpenDocuments}
             type="button"
           >
@@ -291,6 +369,43 @@ function Dashboard({
           >
             Customers
           </button>
+        </div>
+      </section>
+
+      <section className="dashboard-ai-brief" aria-label="AI operations summary">
+        <span className="dashboard-ai-icon"><Bot aria-hidden="true" size={22}/></span>
+        <div>
+          <p className="eyebrow">DAILY OPERATIONS BRIEF</p>
+          <strong>{dailyBrief.priority}</strong>
+          <p>{dailyBrief.scheduledJobs} scheduled · {formatCurrency(dailyBrief.outstanding)} outstanding · {dailyBrief.receiptsNeedingAssignment} receipt{dailyBrief.receiptsNeedingAssignment === 1 ? '' : 's'} need a job</p>
+        </div>
+        <button onClick={onOpenAiOperations} type="button">Review {aiRecommendations.length} recommendation{aiRecommendations.length === 1 ? '' : 's'} <ArrowRight size={17}/></button>
+      </section>
+
+      <section className="profitability-panel" aria-label="Profitability dashboard">
+        <header>
+          <div><p className="eyebrow">PROFITABILITY</p><h2>Revenue is not profit</h2><p>Actual job costs use receipt expenses and your private internal labor cost of {formatCurrency(settings.internalLaborCostPerHour)} per hour.</p></div>
+          <div className="profitability-range">
+            <select aria-label="Profitability date range" onChange={(event) => setDatePreset(event.target.value as typeof datePreset)} value={datePreset}>
+              <option value="today">Today</option><option value="week">This week</option><option value="month">This month</option><option value="last_month">Last month</option><option value="custom">Custom</option>
+            </select>
+            {datePreset === 'custom' ? <><input aria-label="Profitability start date" onChange={(event) => setCustomStart(event.target.value)} type="date" value={customStart}/><input aria-label="Profitability end date" onChange={(event) => setCustomEnd(event.target.value)} type="date" value={customEnd}/></> : null}
+          </div>
+        </header>
+        <div className="profitability-metrics">
+          <article><span>Total revenue</span><strong>{formatCurrency(profitability.totalRevenue)}</strong><small>Paid invoices in range</small></article>
+          <article><span>Total expenses</span><strong>{formatCurrency(profitability.totalExpenses)}</strong><small>All recorded expenses</small></article>
+          <article className={profitability.grossProfit < 0 ? 'negative' : ''}><span>Gross profit</span><strong>{formatCurrency(profitability.grossProfit)}</strong><small>{profitability.completedJobs} completed jobs</small></article>
+          <article className={profitability.grossMargin < settings.targetGrossMarginPercent ? 'warning' : ''}><span>Gross margin</span><strong>{profitability.grossMargin.toFixed(1)}%</strong><small>Target {settings.targetGrossMarginPercent}%</small></article>
+          <article><span>Outstanding</span><strong>{formatCurrency(profitability.outstandingInvoices)}</strong><small>Unpaid revenue</small></article>
+          <article><span>Average job</span><strong>{formatCurrency(profitability.averageJobValue)}</strong><small>Completed job value</small></article>
+          <article><span>Material share</span><strong>{profitability.averageMaterialPercentage.toFixed(1)}%</strong><small>Of completed-job revenue</small></article>
+          <article><span>Estimate win rate</span><strong>{profitability.estimateWinRate.toFixed(1)}%</strong><small>Approved vs decided</small></article>
+        </div>
+        <div className="profitability-insights">
+          <span><b>Most profitable:</b> {profitability.mostProfitableServiceType}</span>
+          <span><b>Least profitable:</b> {profitability.leastProfitableServiceType}</span>
+          <span><b>Average actual cost variance:</b> {profitability.averageActualVsEstimatedCost >= 0 ? '+' : ''}{formatCurrency(profitability.averageActualVsEstimatedCost)}</span>
         </div>
       </section>
 

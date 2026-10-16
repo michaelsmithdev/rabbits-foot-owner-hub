@@ -2,7 +2,21 @@ import type { EstimateLineItem } from '../../estimates/types/Estimate'
 import type { VoiceNote } from '../../voice/types/VoiceNote'
 
 export type JobStatus = 'scheduled' | 'in_progress' | 'paused' | 'completed' | 'invoiced'
-export type JobExpenseCategory = 'materials' | 'delivery' | 'disposal' | 'equipment' | 'subcontractor' | 'other'
+export type JobExpenseCategory =
+  | 'materials'
+  | 'tools'
+  | 'fuel'
+  | 'vehicle'
+  | 'delivery'
+  | 'disposal'
+  | 'equipment'
+  | 'subcontractor'
+  | 'office'
+  | 'advertising'
+  | 'software'
+  | 'insurance'
+  | 'permits'
+  | 'miscellaneous'
 
 export type JobMaterialItem = {
   id: string
@@ -35,6 +49,16 @@ export type JobTimeEntry = {
   endedAt: string | null
 }
 
+export type JobFieldChecklist = {
+  safetyReview: boolean
+  beforePhotos: boolean
+  scopeConfirmed: boolean
+  materialsLoaded: boolean
+  cleanupComplete: boolean
+  afterPhotos: boolean
+  customerWalkthrough: boolean
+}
+
 export type JobExpense = {
   id: string
   category: JobExpenseCategory
@@ -48,6 +72,10 @@ export type JobExpense = {
 }
 
 export type JobProfitability = {
+  quotedRevenue: number
+  actualRevenue: number
+  estimatedMaterials: number
+  actualMaterials: number
   estimatedLaborHours: number
   actualLaborHours: number
   estimatedLaborCost: number
@@ -60,6 +88,11 @@ export type JobProfitability = {
   actualProfit: number
   estimatedMargin: number
   actualMargin: number
+  laborCost: number
+  otherExpenses: number
+  totalJobCost: number
+  grossProfit: number
+  grossMargin: number
   approvedChangeOrderTotal: number
   capturedAt: string
 }
@@ -89,6 +122,9 @@ export type Job = {
   photoIds: string[]
   voiceNotes: VoiceNote[]
   internalNotes: string
+  assignedMemberIds: string[]
+  crewInstructions: string
+  fieldChecklist: JobFieldChecklist
   timeEntries: JobTimeEntry[]
   expenses: JobExpense[]
   profitability?: JobProfitability

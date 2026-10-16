@@ -6,6 +6,7 @@ import { AuthProvider } from './features/auth/AuthProvider.tsx'
 import { CloudSyncProvider } from './features/cloud/CloudSyncProvider.tsx'
 import LegalCenter, { type LegalView } from './features/legal/LegalCenter.tsx'
 import PublicCustomerPortal from './features/portal/PublicCustomerPortal.tsx'
+import PublicBooking from './features/booking/PublicBooking.tsx'
 import PwaLifecycle from './features/pwa/components/PwaLifecycle.tsx'
 import InviteAcceptance from './features/saas/InviteAcceptance.tsx'
 import { SaasProvider } from './features/saas/SaasProvider.tsx'
@@ -28,10 +29,14 @@ export default function RootRouter() {
   const inviteToken = hash.startsWith('#invite/')
     ? decodeURIComponent(hash.slice('#invite/'.length))
     : ''
+  const bookingSlug = hash.startsWith('#book/')
+    ? decodeURIComponent(hash.slice('#book/'.length)).trim()
+    : ''
   const requestedPublicView = hash.replace('#', '') as LegalView
   const legalView = legalViews.has(requestedPublicView) ? requestedPublicView : null
 
   if (portalToken) return <PublicCustomerPortal token={portalToken} />
+  if (bookingSlug) return <PublicBooking slug={bookingSlug} />
   if (legalView) return <LegalCenter view={legalView} />
 
   return (

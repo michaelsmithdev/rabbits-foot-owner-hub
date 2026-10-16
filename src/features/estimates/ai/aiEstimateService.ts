@@ -69,7 +69,10 @@ export async function generateAiEstimate(input: {
     customerCity: input.customerCity.trim(),
     propertyType: input.propertyType,
     jobCategory: input.jobCategory.trim(),
-    history: buildEstimateHistory(input.jobDescription, input.customerId),
+    history: buildEstimateHistory(
+      `${input.jobCategory} ${input.jobDescription}`,
+      input.customerId,
+    ),
     photos: input.photos,
     pricingDefaults: {
       laborRate: settings.defaultLaborRate,

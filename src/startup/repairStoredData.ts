@@ -21,6 +21,13 @@ const JSON_STORAGE_KEYS = [
   'rabbits-foot-jobs',
   'rabbits-foot-appointments',
   'rabbits-foot-communications',
+  'rabbits-foot-expenses',
+  'rabbits-foot-business-events',
+  'rabbits-foot-ai-actions',
+  'rabbits-foot-ai-audit',
+  'rabbits-foot-automation-settings',
+  'rabbits-foot-support-reports',
+  'rabbits-foot-reliability-events',
 ]
 
 function preserveAndRemoveInvalidValue(key: string, value: string) {

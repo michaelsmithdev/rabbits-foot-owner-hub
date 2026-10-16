@@ -54,8 +54,9 @@
 .photo-card h3 { overflow: hidden; margin: 15px 0 0; font-size: 1.03rem; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
 .photo-card p { margin: 7px 0 0; color: #5f665e; }
 .photo-card small { display: block; overflow: hidden; margin-top: 6px; color: #8a9088; text-overflow: ellipsis; white-space: nowrap; }
-.photo-card-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 15px; }
+.photo-card-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 15px; }
 .photo-card-actions button { min-height: 36px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #dde1d9; border-radius: 10px; background: #f7f8f5; color: #454b44; padding: 0 10px; font: inherit; font-size: .72rem; font-weight: 850; cursor: pointer; }
+.photo-card-actions button:disabled, .photo-lightbox-actions button:disabled { opacity: .45; cursor: wait; }
 .photo-card-actions .photo-delete-button { color: #9a372d; }
 .photo-lightbox { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: rgba(8,11,8,.82); padding: 22px; backdrop-filter: blur(12px); }
 .photo-lightbox > section { position: relative; width: min(900px, 100%); max-height: calc(100vh - 44px); overflow: auto; border-radius: 24px; background: #fff; box-shadow: 0 30px 90px rgba(0,0,0,.35); }
@@ -67,6 +68,8 @@
 .photo-lightbox-copy h2 { margin: 8px 0 0; }
 .photo-lightbox-copy p { margin: 8px 0 0; color: #5f665e; }
 .photo-lightbox-copy small { display: block; margin-top: 7px; color: #888e86; }
+.photo-lightbox-actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 18px; }
+.photo-lightbox-actions button { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #d9ded5; border-radius: 12px; background: #f6f8f3; color: #303730; padding: 0 14px; font: inherit; font-size: .8rem; font-weight: 850; cursor: pointer; }
 @media (max-width: 1050px) { .photo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .photo-library-toolbar { grid-template-columns: 1fr 1fr; } .photo-search { grid-column: 1 / -1; } }
 @media (max-width: 700px) { .photos-page-header { align-items: stretch; flex-direction: column; } .photos-header-stat { display: flex; align-items: center; justify-content: center; gap: 8px; } .photos-header-stat span { margin: 0; } .photo-upload-card { padding: 20px; } .photo-upload-grid { grid-template-columns: 1fr; } .photo-caption-field { grid-column: auto; } .photo-file-actions { display: grid; grid-template-columns: 1fr 1fr; } .photo-file-actions .photo-save-button { grid-column: 1 / -1; margin-left: 0; } .photo-library-toolbar { grid-template-columns: 1fr; } .photo-search { grid-column: auto; } .photo-grid { grid-template-columns: 1fr; } .photo-preview-button { height: 260px; } }
-@media (max-width: 430px) { .photo-file-actions { grid-template-columns: 1fr; } .photo-file-actions .photo-save-button { grid-column: auto; } }
+@media (max-width: 430px) { .photo-file-actions { grid-template-columns: 1fr; } .photo-file-actions .photo-save-button { grid-column: auto; } .photo-lightbox-actions { display: grid; grid-template-columns: 1fr; } }

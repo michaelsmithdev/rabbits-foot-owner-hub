@@ -21,6 +21,7 @@ const Customers = lazy(() => import('./features/customers/pages/Customers'))
 const Estimates = lazy(() => import('./features/estimates/pages/Estimates'))
 const Inbox = lazy(() => import('./pages/Inbox/Inbox'))
 const Photos = lazy(() => import('./pages/Photos/Photos'))
+const Receipts = lazy(() => import('./features/expenses/pages/Receipts'))
 const Settings = lazy(() => import('./pages/Settings/Settings'))
 const DocumentsArchive = lazy(() => import('./features/documents/pages/DocumentsArchive'))
 const PriceHistory = lazy(() => import('./features/pricing/pages/PriceHistory'))
@@ -28,6 +29,9 @@ const Walkthroughs = lazy(() => import('./features/walkthroughs/pages/Walkthroug
 const Jobs = lazy(() => import('./features/jobs/pages/Jobs'))
 const Schedule = lazy(() => import('./features/schedule/pages/Schedule'))
 const BusinessWorkspace = lazy(() => import('./features/saas/pages/BusinessWorkspace'))
+const ContentAutopilot = lazy(() => import('./features/contentAutopilot/pages/ContentAutopilot'))
+const AiOperations = lazy(() => import('./features/aiOperations/pages/AiOperations'))
+const ReliabilityCenter = lazy(() => import('./features/reliability/pages/ReliabilityCenter'))
 
 type DocumentLaunch = {
   requestId: number
@@ -206,11 +210,23 @@ function App() {
       case 'photos':
         return <Photos />
 
+      case 'receipts':
+        return <Receipts />
+
       case 'settings':
         return <Settings />
 
       case 'business':
         return <BusinessWorkspace />
+
+      case 'content-autopilot':
+        return <ContentAutopilot />
+
+      case 'ai-operations':
+        return <AiOperations />
+
+      case 'reliability':
+        return <ReliabilityCenter />
 
       case 'home':
       default:
@@ -221,6 +237,7 @@ function App() {
             onOpenDocument={openDocument}
             onOpenDocuments={() => handlePageChange('documents')}
             onOpenSchedule={() => handlePageChange('schedule')}
+            onOpenAiOperations={() => handlePageChange('ai-operations')}
           />
         )
     }
@@ -285,7 +302,8 @@ function App() {
           key={
             activePage === 'documents' ||
             activePage === 'inbox' ||
-            activePage === 'photos'
+            activePage === 'photos' ||
+            activePage === 'receipts'
               ? activePage
               : `${activePage}-${dataRevision}`
           }

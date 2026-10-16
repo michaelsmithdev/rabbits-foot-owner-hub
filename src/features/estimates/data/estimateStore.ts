@@ -1,5 +1,6 @@
 import type { Estimate } from '../types/Estimate'
 import { queueCollectionSync } from '../../cloud/syncQueue'
+import { recordBusinessEvent } from '../../aiOperations/data/operationsStore'
 import { nextEstimateNumber } from './estimateNumber'
 
 const STORAGE_KEY = 'rabbits-foot-estimates'
@@ -95,11 +96,31 @@ export function saveEstimates(
   estimates: Estimate[],
 ): void {
   try {
+    const previous = new Map(loadEstimates().map((estimate) => [estimate.id, estimate]))
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify(estimates),
     )
     queueCollectionSync('estimate', estimates)
+    estimates.forEach((estimate) => {
+      const prior = previous.get(estimate.id)
+      const eventType = !prior
+        ? 'estimate_created'
+        : prior.status !== estimate.status
+          ? estimate.status === 'sent'
+            ? 'estimate_sent'
+            : estimate.status === 'approved'
+              ? 'estimate_accepted'
+              : estimate.status === 'declined'
+                ? 'estimate_declined'
+                : null
+          : null
+      if (!eventType) return
+      recordBusinessEvent({
+        type: eventType, timestamp: estimate.updatedAt,
+        entityType: 'estimate', entityId: estimate.id, customerId: estimate.customerId,
+      })
+    })
   } catch (error) {
     console.error(
       'Estimate data could not be saved.',

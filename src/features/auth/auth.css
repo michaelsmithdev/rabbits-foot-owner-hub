@@ -95,6 +95,26 @@
   opacity: 0.7;
 }
 
+.auth-resend {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border: 1px solid #b8cf8a;
+  border-radius: 16px;
+  background: #f6fbe9;
+  color: #355900;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.auth-resend:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .auth-links {
   display: flex;
   flex-wrap: wrap;

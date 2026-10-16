@@ -61,6 +61,7 @@ test('card fee is separate from the invoice amount and rounded to cents', () => 
   })
 })
 
+
 test('invoice math applies tax and discount and never returns a negative balance', () => {
   const invoice = {
     lineItems: [

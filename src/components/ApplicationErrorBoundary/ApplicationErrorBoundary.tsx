@@ -8,6 +8,7 @@ import {
   markStartupReady,
   recordStartupEvent,
 } from '../../startup/startupDiagnostics'
+import { recordReliabilityEvent } from '../../features/reliability/data/reliabilityStore'
 
 type ApplicationErrorBoundaryProps = {
   children: ReactNode
@@ -32,6 +33,13 @@ class ApplicationErrorBoundary extends Component<
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Owner Hub could not render.', error, errorInfo)
     recordStartupEvent('react-render-failed', error)
+    recordReliabilityEvent({
+      area: 'render',
+      severity: 'error',
+      message: 'A screen could not be displayed.',
+      detail: error,
+      context: { componentStack: errorInfo.componentStack ?? '' },
+    })
     markStartupReady('recovery-screen-ready')
   }
 

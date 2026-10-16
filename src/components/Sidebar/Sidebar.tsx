@@ -37,7 +37,7 @@ function Sidebar({
     'home',
     'customers',
     'documents',
-    'inbox',
+    'ai-operations',
   ])
   const primaryItems = navigationItems.filter((item) => primaryIds.has(item.id))
   const secondaryItems = navigationItems.filter((item) => !primaryIds.has(item.id))

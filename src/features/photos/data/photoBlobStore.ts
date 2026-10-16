@@ -1,22 +1,10 @@
-const DATABASE_NAME = 'rabbits-foot-owner-hub'
-const DATABASE_VERSION = 1
-const PHOTO_STORE_NAME = 'pending-photo-files'
+import {
+  openOwnerHubDatabase,
+  PENDING_PHOTO_STORE_NAME,
+} from '../../../shared/data/ownerHubDatabase'
 
 function openPhotoDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, DATABASE_VERSION)
-
-    request.onupgradeneeded = () => {
-      const database = request.result
-
-      if (!database.objectStoreNames.contains(PHOTO_STORE_NAME)) {
-        database.createObjectStore(PHOTO_STORE_NAME)
-      }
-    }
-
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
+  return openOwnerHubDatabase()
 }
 
 async function runPhotoStoreOperation<T>(
@@ -26,8 +14,8 @@ async function runPhotoStoreOperation<T>(
   const database = await openPhotoDatabase()
 
   return new Promise((resolve, reject) => {
-    const transaction = database.transaction(PHOTO_STORE_NAME, mode)
-    const request = operation(transaction.objectStore(PHOTO_STORE_NAME))
+    const transaction = database.transaction(PENDING_PHOTO_STORE_NAME, mode)
+    const request = operation(transaction.objectStore(PENDING_PHOTO_STORE_NAME))
 
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
@@ -36,9 +24,9 @@ async function runPhotoStoreOperation<T>(
   })
 }
 
-export function savePendingPhotoBlob(photoId: string, file: File) {
+export function savePendingPhotoBlob(photoId: string, blob: Blob) {
   return runPhotoStoreOperation('readwrite', (store) =>
-    store.put(file, photoId),
+    store.put(blob, photoId),
   )
 }
 

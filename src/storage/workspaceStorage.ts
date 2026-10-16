@@ -1,4 +1,5 @@
 import { recordStartupEvent } from '../startup/startupDiagnostics'
+import { recordReliabilityEvent } from '../features/reliability/data/reliabilityStore'
 
 const ACTIVE_SCOPE_KEY = 'owner-hub-cache-scope'
 const BUSINESS_STORAGE_KEYS = [
@@ -11,6 +12,13 @@ const BUSINESS_STORAGE_KEYS = [
   'rabbits-foot-document-archive', 'rabbits-foot-walkthroughs',
   'rabbits-foot-pricebook', 'rabbits-foot-jobs', 'rabbits-foot-appointments',
   'rabbits-foot-communications',
+  'rabbits-foot-expenses',
+  'rabbits-foot-business-events',
+  'rabbits-foot-ai-actions',
+  'rabbits-foot-ai-audit',
+  'rabbits-foot-automation-settings',
+  'rabbits-foot-support-reports',
+  'rabbits-foot-reliability-events',
 ] as const
 
 function scopedKey(organizationId: string, key: string) {
@@ -49,6 +57,12 @@ export function activateOrganizationStorage(organizationId: string) {
     recordStartupEvent('workspace-storage-activated', organizationId)
   } catch (error) {
     recordStartupEvent('workspace-storage-activation-failed', error)
+    recordReliabilityEvent({
+      area: 'storage',
+      severity: 'error',
+      message: 'The selected business workspace could not be opened safely.',
+      detail: error,
+    })
     throw new Error('This device could not safely open the selected business workspace.', { cause: error })
   }
 }

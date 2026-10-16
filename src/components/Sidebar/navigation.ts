@@ -5,11 +5,15 @@ import {
   FolderArchive,
   Images,
   Inbox,
+  ReceiptText,
   LayoutDashboard,
   Settings,
   CalendarDays,
   Building2,
+  Clapperboard,
+  Bot,
   Sparkles,
+  ShieldCheck,
   UsersRound,
   type LucideIcon,
 } from 'lucide-react'
@@ -24,9 +28,13 @@ export type PageName =
   | 'pricing'
   | 'inbox'
   | 'photos'
+  | 'receipts'
   | 'settings'
   | 'schedule'
   | 'business'
+  | 'content-autopilot'
+  | 'ai-operations'
+  | 'reliability'
 
 type NavigationItem = {
   id: PageName
@@ -97,10 +105,34 @@ export const navigationItems: NavigationItem[] = [
     icon: Images,
   },
   {
+    id: 'receipts',
+    label: 'Receipts & expenses',
+    shortLabel: 'Receipts',
+    icon: ReceiptText,
+  },
+  {
+    id: 'ai-operations',
+    label: 'AI Operations',
+    shortLabel: 'AI Ops',
+    icon: Bot,
+  },
+  {
+    id: 'content-autopilot',
+    label: 'Content Autopilot',
+    shortLabel: 'Content',
+    icon: Clapperboard,
+  },
+  {
     id: 'business',
     label: 'Business & billing',
     shortLabel: 'Business',
     icon: Building2,
+  },
+  {
+    id: 'reliability',
+    label: 'Reliability & sync',
+    shortLabel: 'Sync',
+    icon: ShieldCheck,
   },
   {
     id: 'settings',

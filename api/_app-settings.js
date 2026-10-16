@@ -1,7 +1,7 @@
 export const APP_SETTINGS = Object.freeze({
   business: Object.freeze({
     contactVersion: 2,
-    name: "Rabbit's Foot Handyman Services",
+    name: "Rabbit's Foot Handyman Services LLC",
     email: 'callrabbitsfoot@gmail.com',
     phone: Object.freeze({
       display: '(574) 334-8410',

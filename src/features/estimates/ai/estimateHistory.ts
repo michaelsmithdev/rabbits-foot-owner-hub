@@ -40,6 +40,7 @@ function relevanceScore(description: string, item: EstimateHistoryItem): number 
       .join(' ')}`,
   )
   const overlap = requestedTokens.filter((word) => itemTokens.includes(word)).length
+  if (overlap === 0) return 0
   const similarity = requestedTokens.length > 0 ? overlap / requestedTokens.length : 0
   const age = Date.now() - new Date(`${item.completionDate}T12:00:00`).getTime()
   const ageDays = Number.isFinite(age) ? Math.max(0, age / 86_400_000) : 3650
@@ -99,11 +100,11 @@ export function buildEstimateHistory(
       }
     })
 
-  const completedEstimates = loadEstimates()
+  const historicalEstimates = loadEstimates()
     .filter(
       (estimate) =>
         !invoicedEstimateIds.has(estimate.id) &&
-        (estimate.status === 'approved' || Boolean(estimate.completionDate)),
+        estimate.status !== 'declined',
     )
     .map<EstimateHistoryItem>((estimate) => {
       const finalTotal = documentTotal(
@@ -141,7 +142,7 @@ export function buildEstimateHistory(
       }
     })
 
-  return [...completedInvoices, ...completedEstimates]
+  return [...completedInvoices, ...historicalEstimates]
     .map((item) => ({
       item,
       score:
@@ -160,6 +161,7 @@ export function buildEstimateHistory(
           ? 0.2
           : 0),
     }))
+    .filter(({ score }) => score > 0)
     .sort((left, right) => right.score - left.score)
     .slice(0, 10)
     .map(({ item }) => item)

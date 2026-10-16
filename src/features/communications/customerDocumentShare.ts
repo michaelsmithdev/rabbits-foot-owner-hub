@@ -5,6 +5,10 @@ import { cloudClient } from '../cloud/cloudClient'
 import { loadCommunications, saveCommunications } from './data/communicationStore'
 import { openSmsComposer } from './customerContact'
 import { isSafeCustomerFacingUrl } from './publicAppUrl'
+import {
+  INVALID_EMAIL_MESSAGE,
+  requireValidEmail,
+} from '../../shared/email/emailValidation'
 
 type CustomerDocument = Estimate | Invoice
 type DocumentKind = 'estimate' | 'invoice'
@@ -102,7 +106,7 @@ export async function textCustomerDocument(options: {
   const label = kind === 'estimate' ? 'estimate' : 'invoice'
   const message =
     `Hi ${customer.firstName || 'there'}, your ${label} ${number} from ` +
-    `Rabbit's Foot Handyman Services is ready: ${portalUrl}`
+    `Rabbit's Foot Handyman Services LLC is ready: ${portalUrl}`
   const now = new Date().toISOString()
   const communication = {
     id: crypto.randomUUID(),
@@ -121,4 +125,79 @@ export async function textCustomerDocument(options: {
   openSmsComposer(customer, message)
 
   return { portalUrl, message }
+}
+
+export async function emailCustomerDocument(options: {
+  accessToken: string
+  idempotencyKey: string
+  kind: DocumentKind
+  document: CustomerDocument
+  customer: Customer
+}) {
+  const { accessToken, idempotencyKey, kind, document, customer } = options
+  let recipient: string
+  try {
+    recipient = requireValidEmail(customer.email)
+  } catch {
+    throw new Error(INVALID_EMAIL_MESSAGE)
+  }
+
+  await persistDocumentBeforeSharing(kind, document)
+  const portalUrl = await createCustomerPortalLink(accessToken, customer.id)
+  const response = await fetch(`${apiOrigin}/api/send-email`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      'X-Owner-Hub-Organization':
+        localStorage.getItem('owner-hub-active-organization') ?? '',
+    },
+    body: JSON.stringify({
+      customerId: customer.id,
+      documentId: document.id,
+      idempotencyKey,
+      portalUrl,
+      recipient,
+      type: kind,
+    }),
+  }).catch(() => {
+    throw new Error('Unable to connect. Check your internet connection and try again.')
+  })
+  const responseText = await response.text()
+  let payload: {
+    error?: string
+    message?: string
+    providerMessageId?: string
+    status?: string
+  } = {}
+  try {
+    payload = responseText ? JSON.parse(responseText) as typeof payload : {}
+  } catch {
+    payload = {}
+  }
+  if (!response.ok) {
+    throw new Error(payload.error || 'Email could not be sent right now. Please try again.')
+  }
+
+  const label = kind === 'estimate' ? 'estimate' : 'invoice'
+  const now = new Date().toISOString()
+  saveCommunications([{
+    id: crypto.randomUUID(),
+    customerId: customer.id,
+    documentId: document.id,
+    channel: 'email',
+    kind: kind === 'estimate' ? 'estimate_follow_up' : 'invoice_reminder',
+    status: 'sent',
+    subject: `Rabbit's Foot ${label}`,
+    body: `${label[0].toUpperCase()}${label.slice(1)} emailed to ${recipient}.`,
+    createdAt: now,
+    sentAt: now,
+  }, ...loadCommunications()])
+
+  return {
+    message: payload.message || 'Email sent',
+    portalUrl,
+    providerMessageId: payload.providerMessageId,
+    status: payload.status || 'sent',
+  }
 }

@@ -8,6 +8,7 @@ export type AuthContextValue = {
   session: Session | null
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string, businessName: string, displayName: string) => Promise<string>
+  resendSignUpConfirmation: (email: string) => Promise<void>
   sendPasswordReset: (email: string) => Promise<void>
   signOut: () => Promise<void>
 }

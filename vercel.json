@@ -1,5 +1,33 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/content-autopilot-worker",
+      "schedule": "0 12 * * *"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/ai-operations",
+      "destination": "/api/ai-estimate?route=operations"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/saas?action=health"
+    },
+    {
+      "source": "/api/send-email",
+      "destination": "/api/saas?action=send-email"
+    },
+    {
+      "source": "/api/resend-webhook",
+      "destination": "/api/saas?action=resend-webhook"
+    },
+    {
+      "source": "/api/account-deletion-request",
+      "destination": "/api/saas?action=account-deletion-request"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

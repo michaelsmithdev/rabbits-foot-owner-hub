@@ -1,0 +1,116 @@
+{
+  "title": "Rabbit's Foot Owner Hub competitive benchmark",
+  "asOf": "2026-08-23",
+  "method": {
+    "cohort": "Five established field-service and contractor apps with current U.S. Apple App Store listings and official product documentation.",
+    "ownerHubReview": "Static inspection of the Owner Hub source tree and data models after the 2.4.1 release build.",
+    "ratingCaveat": "App Store ratings are point-in-time public sentiment signals, not a complete measure of product quality, and may change after this snapshot."
+  },
+  "appStoreRatings": [
+    {
+      "app": "Jobber",
+      "rating": 4.8,
+      "ratingCount": 21000,
+      "source": "https://apps.apple.com/us/app/jobber-field-service-software/id1014146758"
+    },
+    {
+      "app": "Joist",
+      "rating": 4.7,
+      "ratingCount": 14000,
+      "source": "https://apps.apple.com/us/app/joist-estimate-invoice-maker/id592163563"
+    },
+    {
+      "app": "Housecall Pro",
+      "rating": 4.6,
+      "ratingCount": 29000,
+      "source": "https://apps.apple.com/us/app/housecall-pro-field-service/id692833651"
+    },
+    {
+      "app": "Workiz",
+      "rating": 4.6,
+      "ratingCount": 2100,
+      "source": "https://apps.apple.com/us/app/workiz-field-service-software/id1469769810"
+    },
+    {
+      "app": "ServiceTitan Mobile",
+      "rating": 3.0,
+      "ratingCount": 1600,
+      "source": "https://apps.apple.com/us/app/servicetitan-mobile/id1037989976"
+    }
+  ],
+  "capabilityAssessment": [
+    {
+      "rank": 1,
+      "domain": "Reliability and release operations",
+      "ownerHubState": "Internal-test release with error boundaries, startup diagnostics, offline storage, and a cloud retry queue; production crash, sync, and API observability is not yet evident in the client source.",
+      "marketPattern": "Mature apps continuously ship bug and performance fixes and support large public user bases.",
+      "recommendation": "Add crash reporting, API and sync telemetry, attachment-upload diagnostics, in-app beta feedback, automated backup/restore verification, and staged release gates.",
+      "priority": "P0"
+    },
+    {
+      "rank": 2,
+      "domain": "Customer acquisition and communication automation",
+      "ownerHubState": "Lead inbox, customer records, Customer Hub, and manual SMS/email actions exist; public self-booking and provider-backed automatic reminders and follow-ups are not evident.",
+      "marketPattern": "Jobber, Housecall Pro, and Workiz promote online booking, automated reminders, estimate follow-ups, and review requests.",
+      "recommendation": "Add public booking/intake, automatic confirmations and reminders, estimate follow-up sequences, review requests, delivery status, opt-out handling, and push notifications.",
+      "priority": "P1"
+    },
+    {
+      "rank": 3,
+      "domain": "Team dispatch and field accountability",
+      "ownerHubState": "Owner/admin/technician roles and job time entries exist, but appointments have no technician assignment and time entries have no member identity; GPS routing and live ETA are not evident.",
+      "marketPattern": "Leading field-service suites assign technicians, dispatch work, track time by employee, and provide route or location visibility.",
+      "recommendation": "Add technician assignment, dispatch board, crew-specific time entries, on-my-way status, route/ETA support, job checklists, and an audit log.",
+      "priority": "P1"
+    },
+    {
+      "rank": 4,
+      "domain": "Accounting and calendar integrations",
+      "ownerHubState": "Square is implemented; QuickBooks and Google Calendar are represented in integration types and database constraints but no end-user connection workflow is evident.",
+      "marketPattern": "QuickBooks sync and calendar integrations are standard expansion features across leading platforms.",
+      "recommendation": "Finish QuickBooks Online and Google Calendar integrations with explicit sync direction, reconciliation, error recovery, and duplicate protection.",
+      "priority": "P1"
+    },
+    {
+      "rank": 5,
+      "domain": "Estimate intelligence",
+      "ownerHubState": "AI estimates produce direct labor cost, material cost, duration, and historical comparisons without hidden markup or overhead.",
+      "marketPattern": "Competitors emphasize fast quoting, pricebooks, optional upgrades, and AI-assisted office work.",
+      "recommendation": "Keep the simple direct-cost philosophy, add owner feedback on accepted or corrected estimates, show historical evidence, and measure estimate-to-actual accuracy by job type.",
+      "priority": "P1"
+    },
+    {
+      "rank": 6,
+      "domain": "Receipts and job-cost evidence",
+      "ownerHubState": "Receipt capture, AI field drafting, reviewed save, categories for materials, gas, and vehicle parts, job linking, image download/print/share, CSV export, and dashboard totals are implemented.",
+      "marketPattern": "Expense tracking exists in broader platforms, but receipt-first owner workflows are not their primary public positioning.",
+      "recommendation": "Turn this into a signature advantage with duplicate detection, tax-ready monthly exports, vendor normalization, mileage logs, and receipt-to-estimate variance alerts.",
+      "priority": "P2"
+    },
+    {
+      "rank": 7,
+      "domain": "Inventory, purchasing, and vendors",
+      "ownerHubState": "Material checklists and receipt-linked job expenses exist; purchase orders, vendor records, stock quantities, and reorder alerts are not evident.",
+      "marketPattern": "Workiz advertises inventory management, while ServiceTitan supports parts ordering and broader purchasing workflows.",
+      "recommendation": "Add lightweight vendors, purchase orders, ordered/picked-up/returned states, and frequently used material lists before attempting full warehouse inventory.",
+      "priority": "P2"
+    },
+    {
+      "rank": 8,
+      "domain": "Management analytics",
+      "ownerHubState": "Dashboard totals, job profitability, pricing history, and AI operations exist; cross-funnel conversion, crew performance, cash-flow forecasting, and custom reporting are limited.",
+      "marketPattern": "The largest platforms compete on operational and financial reporting.",
+      "recommendation": "Add lead-to-estimate-to-job-to-payment funnel metrics, labor and material variance, aging receivables, repeat-customer rate, and estimate win rate.",
+      "priority": "P2"
+    }
+  ],
+  "officialFeatureSources": [
+    "https://www.getjobber.com/features/field-service-management-software/",
+    "https://www.getjobber.com/features/quickbooks-sync/",
+    "https://www.housecallpro.com/features/",
+    "https://www.servicetitan.com/features",
+    "https://www.servicetitan.com/features/dispatch-software",
+    "https://www.workiz.com/features/",
+    "https://www.joist.com/"
+  ]
+}

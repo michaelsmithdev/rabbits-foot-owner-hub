@@ -395,9 +395,9 @@ export default function PublicCustomerPortal({ token }: { token: string }) {
   return (
     <main className="portal-shell">
       <header className="portal-hero">
-        <img alt="Rabbit's Foot Handyman Services" src="/rabbits-foot-logo.png" />
+        <img alt="Rabbit's Foot Handyman Services LLC" src="/rabbits-foot-logo.png" />
         <div>
-          <p>RABBIT'S FOOT HANDYMAN SERVICES</p>
+          <p>RABBIT'S FOOT HANDYMAN SERVICES LLC</p>
           <h1>Welcome, {data.customer.firstName}.</h1>
           <span>
             Review your work, appointments, estimates and invoices securely.

@@ -1,8 +1,10 @@
 import type { BusinessDocumentRecord } from '../types/BusinessDocument'
+import {
+  DOCUMENT_PDF_STORE_NAME,
+  openOwnerHubDatabase,
+} from '../../../shared/data/ownerHubDatabase'
 
 const ARCHIVE_KEY = 'rabbits-foot-document-archive'
-const DATABASE_NAME = 'rabbits-foot-owner-hub'
-const STORE_NAME = 'document-pdfs'
 
 export function loadDocumentArchive(): BusinessDocumentRecord[] {
   try {
@@ -25,39 +27,43 @@ export function deleteDocumentRecord(id: string) {
     JSON.stringify(loadDocumentArchive().filter((item) => item.id !== id)),
   )
   return openDatabase().then((database) => {
-    const transaction = database.transaction(STORE_NAME, 'readwrite')
-    transaction.objectStore(STORE_NAME).delete(id)
+    const transaction = database.transaction(DOCUMENT_PDF_STORE_NAME, 'readwrite')
+    transaction.objectStore(DOCUMENT_PDF_STORE_NAME).delete(id)
+    transaction.oncomplete = () => database.close()
   })
 }
 
 function openDatabase(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DATABASE_NAME, 1)
-    request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME)
-      }
-    }
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
+  return openOwnerHubDatabase()
 }
 
 export async function saveDocumentPdf(id: string, bytes: Uint8Array) {
   const database = await openDatabase()
   await new Promise<void>((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, 'readwrite')
-    transaction.objectStore(STORE_NAME).put(new Blob([bytes as BlobPart], { type: 'application/pdf' }), id)
-    transaction.oncomplete = () => resolve()
-    transaction.onerror = () => reject(transaction.error)
+    const transaction = database.transaction(DOCUMENT_PDF_STORE_NAME, 'readwrite')
+    transaction.objectStore(DOCUMENT_PDF_STORE_NAME).put(new Blob([bytes as BlobPart], { type: 'application/pdf' }), id)
+    transaction.oncomplete = () => {
+      database.close()
+      resolve()
+    }
+    transaction.onerror = () => {
+      database.close()
+      reject(transaction.error)
+    }
   })
 }
 
 export async function loadDocumentPdf(id: string): Promise<Blob | null> {
   const database = await openDatabase()
   return new Promise((resolve, reject) => {
-    const request = database.transaction(STORE_NAME).objectStore(STORE_NAME).get(id)
-    request.onsuccess = () => resolve(request.result instanceof Blob ? request.result : null)
-    request.onerror = () => reject(request.error)
+    const request = database.transaction(DOCUMENT_PDF_STORE_NAME).objectStore(DOCUMENT_PDF_STORE_NAME).get(id)
+    request.onsuccess = () => {
+      database.close()
+      resolve(request.result instanceof Blob ? request.result : null)
+    }
+    request.onerror = () => {
+      database.close()
+      reject(request.error)
+    }
   })
 }

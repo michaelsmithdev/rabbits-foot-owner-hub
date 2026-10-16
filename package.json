@@ -1,7 +1,7 @@
 {
   "name": "rabbits-foot-owner-hub",
   "private": true,
-  "version": "2.3.9",
+  "version": "2.4.6",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",
+    "@capacitor/camera": "^8.2.3",
     "@capacitor/core": "^8.5.0",
     "@supabase/supabase-js": "^2.111.0",
     "@tailwindcss/vite": "^4.3.3",
@@ -22,7 +23,9 @@
     "pdf-lib": "^1.17.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "tailwindcss": "^4.3.3"
+    "resend": "^6.22.0",
+    "tailwindcss": "^4.3.3",
+    "tus-js-client": "^4.3.1"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.0",
@@ -34,6 +37,7 @@
     "eslint": "^10.6.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
+    "fake-indexeddb": "^6.2.5",
     "globals": "^17.7.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.62.0",

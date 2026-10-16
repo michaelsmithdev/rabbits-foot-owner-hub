@@ -1,10 +1,13 @@
 import {
   Camera,
   Cloud,
+  Download,
   Image as ImageIcon,
   Images,
+  Printer,
   RefreshCw,
   Search,
+  Send,
   Trash2,
   Upload,
   X,
@@ -22,13 +25,21 @@ import { cloudClient } from '../../features/cloud/cloudClient'
 import { useCloudSync } from '../../features/cloud/cloudSyncContext'
 import { DATA_REFRESHED_EVENT } from '../../features/cloud/syncQueue'
 import { loadCustomers } from '../../features/customers/data/customerStore'
+import { loadExpenses } from '../../features/expenses/data/expenseStore'
+import { receiptPhotoDescription } from '../../features/expenses/utils/expenseUtils'
 import {
   deletePhoto,
+  getPhotoBlob,
   getPhotoUrl,
   loadPhotos,
   queuePhotoFiles,
   retryPhotoUpload,
 } from '../../features/photos/data/photoStore'
+import {
+  actOnPhoto,
+  preparePhotoPrintWindow,
+  type PhotoAction,
+} from '../../features/photos/services/photoActions'
 import type {
   BusinessPhoto,
   PhotoCategory,
@@ -75,6 +86,7 @@ function Photos() {
   const [message, setMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [activePhotoAction, setActivePhotoAction] = useState<string | null>(null)
   const galleryInputRef = useRef<HTMLInputElement>(null)
   const cameraInputRef = useRef<HTMLInputElement>(null)
 
@@ -153,6 +165,21 @@ function Photos() {
   const selectedPhoto =
     photos.find((photo) => photo.id === selectedPhotoId) ?? null
 
+  const receiptDescriptions = new Map<string, string>()
+  loadExpenses().forEach((expense) => {
+    if (expense.receiptPhotoId) {
+      receiptDescriptions.set(expense.receiptPhotoId, receiptPhotoDescription(expense.category))
+    }
+  })
+
+  function getPhotoDescription(photo: BusinessPhoto) {
+    return receiptDescriptions.get(photo.id) ?? (photo.caption || photo.jobName || photo.fileName)
+  }
+
+  function getPhotoCategoryLabel(photo: BusinessPhoto) {
+    return receiptDescriptions.get(photo.id) ?? categoryLabels[photo.category]
+  }
+
   function selectFiles(event: ChangeEvent<HTMLInputElement>) {
     const selectedFiles = Array.from(event.target.files ?? [])
     setFiles(selectedFiles)
@@ -208,6 +235,42 @@ function Photos() {
     setSelectedPhotoId(null)
     setPhotos(loadPhotos())
     setMessage('Photo removed and the cloud deletion was queued.')
+  }
+
+  async function runPhotoAction(photo: BusinessPhoto, action: PhotoAction) {
+    const preparedWindow = preparePhotoPrintWindow(action)
+    setActivePhotoAction(`${photo.id}:${action}`)
+    setErrorMessage('')
+    setMessage(
+      action === 'download'
+        ? 'Preparing image download…'
+        : action === 'share'
+          ? 'Preparing image to send…'
+          : 'Preparing image to print…',
+    )
+
+    try {
+      const blob = await getPhotoBlob(cloudClient, photo)
+      if (!blob) throw new Error('The stored image is unavailable. Sync it, then try again.')
+      await actOnPhoto({ ...photo, caption: getPhotoDescription(photo) }, blob, action, preparedWindow)
+      setMessage(
+        action === 'download'
+          ? 'Image saved to Downloads/RabbitFootOwnerHub.'
+          : action === 'share'
+            ? 'Image opened in your device share menu.'
+            : 'Image opened in the print dialog.',
+      )
+    } catch (error) {
+      preparedWindow?.close()
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setMessage('Image sharing canceled.')
+      } else {
+        setMessage('')
+        setErrorMessage(error instanceof Error ? error.message : 'The image action could not be completed.')
+      }
+    } finally {
+      setActivePhotoAction(null)
+    }
   }
 
   return (
@@ -348,26 +411,31 @@ function Photos() {
           </div>
         ) : (
           <div className="photo-grid">
-            {visiblePhotos.map((photo) => (
+            {visiblePhotos.map((photo) => {
+              const actionBusy = activePhotoAction?.startsWith(`${photo.id}:`) ?? false
+              return (
               <article className="photo-card" key={photo.id}>
                 <button className="photo-preview-button" onClick={() => setSelectedPhotoId(photo.id)} type="button">
                   {photoUrls[photo.id] ? (
-                    <img alt={photo.caption || photo.fileName} src={photoUrls[photo.id]} />
+                    <img alt={getPhotoDescription(photo)} src={photoUrls[photo.id]} />
                   ) : (
                     <span className="photo-preview-placeholder"><ImageIcon size={34} /></span>
                   )}
                 </button>
                 <div className="photo-card-body">
                   <div className="photo-card-labels">
-                    <span className={`photo-category photo-category-${photo.category}`}>{categoryLabels[photo.category]}</span>
+                    <span className={`photo-category photo-category-${photo.category}`}>{getPhotoCategoryLabel(photo)}</span>
                     <span className={`photo-status photo-status-${photo.uploadStatus}`}>
                       {photo.uploadStatus === 'uploaded' ? 'Cloud saved' : photo.uploadStatus === 'queued' ? 'Queued' : 'Needs retry'}
                     </span>
                   </div>
-                  <h3>{photo.caption || photo.jobName || photo.fileName}</h3>
+                  <h3>{getPhotoDescription(photo)}</h3>
                   <p>{photo.customerId ? customerNames.get(photo.customerId) ?? 'Customer' : 'General business'}</p>
                   <small>{photo.jobName || 'No job assigned'} · {formatFileSize(photo.fileSize)}</small>
                   <div className="photo-card-actions">
+                    <button disabled={actionBusy} onClick={() => void runPhotoAction(photo, 'download')} type="button"><Download size={15} /> Download</button>
+                    <button disabled={actionBusy} onClick={() => void runPhotoAction(photo, 'print')} type="button"><Printer size={15} /> Print</button>
+                    <button disabled={actionBusy} onClick={() => void runPhotoAction(photo, 'share')} type="button"><Send size={15} /> Send</button>
                     {photo.uploadStatus === 'error' && (
                       <button onClick={() => retryPhotoUpload(photo.id)} type="button"><RefreshCw size={15} /> Retry</button>
                     )}
@@ -377,7 +445,8 @@ function Photos() {
                   </div>
                 </div>
               </article>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
@@ -387,15 +456,20 @@ function Photos() {
           <section aria-label="Photo details" onClick={(event) => event.stopPropagation()} role="dialog">
             <button aria-label="Close photo" className="photo-lightbox-close" onClick={() => setSelectedPhotoId(null)} type="button"><X size={22} /></button>
             {photoUrls[selectedPhoto.id] ? (
-              <img alt={selectedPhoto.caption || selectedPhoto.fileName} src={photoUrls[selectedPhoto.id]} />
+              <img alt={getPhotoDescription(selectedPhoto)} src={photoUrls[selectedPhoto.id]} />
             ) : (
               <div className="photo-lightbox-placeholder"><ImageIcon size={52} /></div>
             )}
             <div className="photo-lightbox-copy">
-              <span>{categoryLabels[selectedPhoto.category]}</span>
-              <h2>{selectedPhoto.caption || selectedPhoto.jobName || selectedPhoto.fileName}</h2>
+              <span>{getPhotoCategoryLabel(selectedPhoto)}</span>
+              <h2>{getPhotoDescription(selectedPhoto)}</h2>
               <p>{selectedPhoto.customerId ? customerNames.get(selectedPhoto.customerId) : 'General business photo'}</p>
               <small>{new Date(selectedPhoto.capturedAt).toLocaleDateString()} · {selectedPhoto.fileName}</small>
+              <div className="photo-lightbox-actions">
+                <button disabled={Boolean(activePhotoAction)} onClick={() => void runPhotoAction(selectedPhoto, 'download')} type="button"><Download size={17} /> Download</button>
+                <button disabled={Boolean(activePhotoAction)} onClick={() => void runPhotoAction(selectedPhoto, 'print')} type="button"><Printer size={17} /> Print</button>
+                <button disabled={Boolean(activePhotoAction)} onClick={() => void runPhotoAction(selectedPhoto, 'share')} type="button"><Send size={17} /> Send</button>
+              </div>
             </div>
           </section>
         </div>

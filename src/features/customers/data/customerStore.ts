@@ -1,5 +1,6 @@
 import type { Customer } from '../types/Customer'
 import { queueCollectionSync } from '../../cloud/syncQueue'
+import { recordBusinessEvent } from '../../aiOperations/data/operationsStore'
 
 const STORAGE_KEY = 'rabbits-foot-customers'
 
@@ -84,8 +85,15 @@ export function loadCustomers(): Customer[] {
 
 export function saveCustomers(customers: Customer[]): void {
   try {
+    const existingIds = new Set(loadCustomers().map((customer) => customer.id))
     localStorage.setItem(STORAGE_KEY, JSON.stringify(customers))
     queueCollectionSync('customer', customers)
+    customers.filter((customer) => !existingIds.has(customer.id)).forEach((customer) => {
+      recordBusinessEvent({
+        type: 'customer_created', timestamp: customer.createdAt,
+        entityType: 'customer', entityId: customer.id, customerId: customer.id,
+      })
+    })
   } catch (error) {
     console.error('Customer data could not be saved.', error)
   }

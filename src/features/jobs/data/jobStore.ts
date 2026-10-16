@@ -1,9 +1,22 @@
 import { queueCollectionSync } from '../../cloud/syncQueue'
+import { recordBusinessEvent } from '../../aiOperations/data/operationsStore'
 import type { Estimate } from '../../estimates/types/Estimate'
 import type { Job, JobStatus } from '../types/Job'
 
 const STORAGE_KEY = 'rabbits-foot-jobs'
 const statuses: JobStatus[] = ['scheduled', 'in_progress', 'paused', 'completed', 'invoiced']
+
+function emptyFieldChecklist(): Job['fieldChecklist'] {
+  return {
+    safetyReview: false,
+    beforePhotos: false,
+    scopeConfirmed: false,
+    materialsLoaded: false,
+    cleanupComplete: false,
+    afterPhotos: false,
+    customerWalkthrough: false,
+  }
+}
 
 function isJob(value: unknown): value is Job {
   if (!value || typeof value !== 'object') return false
@@ -66,6 +79,23 @@ export function loadJobs(): Job[] {
             } as Job['changeOrders'][number]]
           })
 
+          const profitability = job.profitability
+            ? {
+                ...job.profitability,
+                quotedRevenue: typeof job.profitability.quotedRevenue === 'number' ? job.profitability.quotedRevenue : job.quotedPrice,
+                actualRevenue: typeof job.profitability.actualRevenue === 'number' ? job.profitability.actualRevenue : job.quotedPrice,
+                estimatedMaterials: typeof job.profitability.estimatedMaterials === 'number' ? job.profitability.estimatedMaterials : job.profitability.estimatedMaterialCost,
+                actualMaterials: typeof job.profitability.actualMaterials === 'number' ? job.profitability.actualMaterials : job.profitability.actualMaterialCost,
+                laborCost: typeof job.profitability.laborCost === 'number' ? job.profitability.laborCost : job.profitability.actualLaborCost,
+                otherExpenses: typeof job.profitability.otherExpenses === 'number'
+                  ? job.profitability.otherExpenses
+                  : Math.max(0, job.profitability.actualCost - job.profitability.actualLaborCost - job.profitability.actualMaterialCost),
+                totalJobCost: typeof job.profitability.totalJobCost === 'number' ? job.profitability.totalJobCost : job.profitability.actualCost,
+                grossProfit: typeof job.profitability.grossProfit === 'number' ? job.profitability.grossProfit : job.profitability.actualProfit,
+                grossMargin: typeof job.profitability.grossMargin === 'number' ? job.profitability.grossMargin : job.profitability.actualMargin,
+              }
+            : undefined
+
           return {
           ...job,
           estimatedLaborCost: typeof job.estimatedLaborCost === 'number' ? job.estimatedLaborCost : 0,
@@ -81,11 +111,29 @@ export function loadJobs(): Job[] {
                 delivered: false,
               })),
           changeOrders,
-          expenses: job.expenses.map((expense) => ({
-            ...expense,
-            vendor: typeof expense.vendor === 'string' ? expense.vendor : '',
-            notes: typeof expense.notes === 'string' ? expense.notes : '',
-          })),
+          assignedMemberIds: Array.isArray(job.assignedMemberIds)
+            ? job.assignedMemberIds.filter((memberId): memberId is string => typeof memberId === 'string')
+            : [],
+          crewInstructions: typeof job.crewInstructions === 'string' ? job.crewInstructions : '',
+          fieldChecklist: {
+            ...emptyFieldChecklist(),
+            ...(job.fieldChecklist && typeof job.fieldChecklist === 'object' ? job.fieldChecklist : {}),
+          },
+          expenses: job.expenses.map((expense) => {
+            const legacyCategory = String(expense.category)
+
+            return {
+              ...expense,
+              category: legacyCategory === 'gas'
+                ? 'fuel'
+                : legacyCategory === 'other'
+                  ? 'vehicle'
+                  : expense.category,
+              vendor: typeof expense.vendor === 'string' ? expense.vendor : '',
+              notes: typeof expense.notes === 'string' ? expense.notes : '',
+            }
+          }),
+          profitability,
         }})
       : []
   } catch {
@@ -94,8 +142,37 @@ export function loadJobs(): Job[] {
 }
 
 export function saveJobs(jobs: Job[]) {
+  const previous = loadJobs()
   localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs))
   queueCollectionSync('job', jobs)
+  const previousById = new Map(previous.map((job) => [job.id, job]))
+  jobs.forEach((job) => {
+    const oldJob = previousById.get(job.id)
+    if (!oldJob) {
+      recordBusinessEvent({
+        type: 'job_created', timestamp: job.createdAt, entityType: 'job', entityId: job.id,
+        customerId: job.customerId, jobId: job.id, metadata: { jobNumber: job.jobNumber },
+      })
+      recordBusinessEvent({
+        type: 'job_scheduled', timestamp: job.createdAt, entityType: 'job', entityId: job.id,
+        customerId: job.customerId, jobId: job.id,
+      })
+      return
+    }
+    if (oldJob.status === job.status) return
+    const eventType = job.status === 'in_progress'
+      ? 'job_started'
+      : job.status === 'completed'
+        ? 'job_completed'
+        : job.status === 'scheduled'
+          ? 'job_scheduled'
+          : null
+    if (eventType) recordBusinessEvent({
+      type: eventType,
+      timestamp: job.updatedAt,
+      entityType: 'job', entityId: job.id, customerId: job.customerId, jobId: job.id,
+    })
+  })
 }
 
 export function createJobNumber(jobs: Job[]) {
@@ -148,6 +225,9 @@ export function createJobFromEstimate(estimate: Estimate, jobs = loadJobs()): Jo
     photoIds: [...(estimate.photoIds ?? [])],
     voiceNotes: [],
     internalNotes: '',
+    assignedMemberIds: [],
+    crewInstructions: '',
+    fieldChecklist: emptyFieldChecklist(),
     timeEntries: [],
     expenses: [],
     status: 'scheduled',

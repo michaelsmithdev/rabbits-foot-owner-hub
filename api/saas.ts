@@ -1,6 +1,11 @@
 import { createHash, randomBytes } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
+import accountDeletionRequestHandler from './_account-deletion-request.js'
 import { applyCors, requestedOrganizationId } from './_http-security.js'
+import healthHandler from './_health.js'
+import resendWebhookHandler from './_resend-webhook.js'
+import sendEmailHandler from './_send-email.js'
+import { isValidEmailAddress } from '../src/shared/email/emailValidation.js'
 
 type ApiRequest = IncomingMessage & { body?: unknown }
 type ApiResponse = ServerResponse<IncomingMessage>
@@ -125,6 +130,20 @@ async function manageSquareSubscription(organizationId: string, action: 'cancel'
 }
 
 export default async function handler(request: ApiRequest, response: ApiResponse) {
+  const requestUrl = new URL(request.url ?? '/', 'http://localhost')
+  if (requestUrl.searchParams.get('action') === 'health') {
+    return healthHandler(request, response)
+  }
+  if (requestUrl.searchParams.get('action') === 'send-email') {
+    return sendEmailHandler(request, response)
+  }
+  if (requestUrl.searchParams.get('action') === 'resend-webhook') {
+    return resendWebhookHandler(request, response)
+  }
+  if (requestUrl.searchParams.get('action') === 'account-deletion-request') {
+    return accountDeletionRequestHandler(request, response)
+  }
+
   if (!setCors(request, response)) return send(response, 403, { error: 'This request origin is not allowed.' })
   if (request.method === 'OPTIONS') { response.statusCode = 204; return response.end() }
   if (request.method !== 'POST') return send(response, 405, { error: 'Method not allowed.' })
@@ -179,7 +198,7 @@ export default async function handler(request: ApiRequest, response: ApiResponse
     if (action === 'create-invite') {
       const email = cleanEmail(payload.email)
       const role = payload.role === 'admin' ? 'admin' : 'member'
-      if (!email || !email.includes('@')) return send(response, 400, { error: 'Enter a valid team member email.' })
+      if (!isValidEmailAddress(email)) return send(response, 400, { error: 'Enter a valid team member email.' })
       const rawToken = randomBytes(32).toString('base64url')
       const tokenHash = createHash('sha256').update(rawToken).digest('hex')
       const insertion = await database('/rest/v1/organization_invites', {
@@ -251,4 +270,4 @@ export default async function handler(request: ApiRequest, response: ApiResponse
   }
 }
 
-export const config = { maxDuration: 30 }
+export const config = { api: { bodyParser: false }, maxDuration: 30 }
